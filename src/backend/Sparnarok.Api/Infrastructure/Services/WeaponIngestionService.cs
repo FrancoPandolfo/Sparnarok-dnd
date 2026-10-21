@@ -91,8 +91,12 @@ public class WeaponIngestionService : IWeaponIngestionService
         {
             var trimmedName = rec.Name.Trim();
             var weightVal = rec.Weight ?? 0;
-            var costVal = rec.Cost ?? string.Empty;
-            var propsVal = rec.Properties ?? string.Empty;
+            var costVal = (rec.Cost ?? string.Empty).Trim();
+            var propsVal = (rec.Properties ?? string.Empty).Trim();
+            if (propsVal == "-")
+            {
+                propsVal = string.Empty;
+            }
 
             if (existingLookup.TryGetValue(trimmedName, out var existingWeapon))
             {

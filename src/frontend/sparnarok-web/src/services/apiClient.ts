@@ -228,8 +228,10 @@ export const apiClient = {
       const response = await fetch(`${API_BASE_URL}/creatures`, { signal });
       if (response.ok) {
         const data = await response.json();
-        inMemoryCreatures = data;
-        return data;
+        if (Array.isArray(data) && data.length > 0) {
+          inMemoryCreatures = data;
+          return data;
+        }
       }
     } catch {
       // Si la API falla o está offline, servimos la memoria local

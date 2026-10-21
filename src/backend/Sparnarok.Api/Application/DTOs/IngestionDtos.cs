@@ -1,4 +1,7 @@
+using System.Globalization;
+using CsvHelper;
 using CsvHelper.Configuration;
+using CsvHelper.TypeConversion;
 
 namespace Sparnarok.Api.Application.DTOs;
 
@@ -19,11 +22,59 @@ public class WeaponCsvRecord
     /// <summary>Propiedades tácticas (ej. "Versatile (1d10)", "Finesse, Light").</summary>
     public string Properties { get; set; } = string.Empty;
 
+    /// <summary>Propiedad de maestría de armas (ej. "Vex", "Nick", "Push").</summary>
+    public string Mastery { get; set; } = string.Empty;
+
     /// <summary>Peso del arma en libras.</summary>
     public double? Weight { get; set; }
 
     /// <summary>Costo comercial del arma (ej. "15 gp", "2 gp").</summary>
     public string Cost { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Convertidor de peso para CsvHelper capaz de procesar números simples, sufijos "lb.", "lbs." y fracciones (ej. "1/4 lb.").
+/// </summary>
+public class DndWeightConverter : DefaultTypeConverter
+{
+    /// <inheritdoc />
+    public override object? ConvertFromString(string? text, IReaderRow row, MemberMapData memberMapData)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var cleaned = text.Trim();
+        if (cleaned == "-")
+            return null;
+
+        cleaned = cleaned.Replace("lbs.", "", StringComparison.OrdinalIgnoreCase)
+                         .Replace("lb.", "", StringComparison.OrdinalIgnoreCase)
+                         .Replace("lbs", "", StringComparison.OrdinalIgnoreCase)
+                         .Replace("lb", "", StringComparison.OrdinalIgnoreCase)
+                         .Trim();
+
+        if (string.IsNullOrWhiteSpace(cleaned))
+            return null;
+
+        if (cleaned.Contains('/'))
+        {
+            var parts = cleaned.Split('/');
+            if (parts.Length == 2 &&
+                double.TryParse(parts[0].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var num) &&
+                double.TryParse(parts[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var den) &&
+                den != 0)
+            {
+                return num / den;
+            }
+        }
+
+        if (double.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out var val))
+        {
+            return val;
+        }
+
+        return null;
+    }
 }
 
 /// <summary>
@@ -40,7 +91,8 @@ public sealed class WeaponCsvClassMap : ClassMap<WeaponCsvRecord>
         Map(m => m.Damage).Name("Damage");
         Map(m => m.DamageType).Name("DamageType");
         Map(m => m.Properties).Name("Properties").Optional();
-        Map(m => m.Weight).Name("Weight").Optional();
+        Map(m => m.Mastery).Name("Mastery").Optional();
+        Map(m => m.Weight).Name("Weight").TypeConverter<DndWeightConverter>().Optional();
         Map(m => m.Cost).Name("Cost").Optional();
     }
 }

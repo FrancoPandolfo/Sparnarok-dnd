@@ -157,4 +157,36 @@ public class WeaponCsvMappingTests
         // Assert
         act.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*peso*");
     }
+
+    [Fact]
+    public async Task ParseCsvAsync_WithSeedWeaponsCsvFile_ParsesCorrectly()
+    {
+        var filePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../data/seeds/weapons.csv"));
+        using var stream = File.OpenRead(filePath);
+        var records = await _parser.ParseCsvAsync<WeaponCsvRecord, WeaponCsvClassMap>(stream);
+
+        records.Should().HaveCount(38);
+
+        var club = records.First(r => r.Name == "Club");
+        club.Damage.Should().Be("1d4");
+        club.DamageType.Should().Be("Bludgeoning");
+        club.Weight.Should().Be(2.0);
+        club.Cost.Should().Be("1 SP");
+        club.Mastery.Should().Be("Slow");
+
+        var dart = records.First(r => r.Name == "Dart");
+        dart.Weight.Should().Be(0.25);
+
+        var sling = records.First(r => r.Name == "Sling");
+        sling.Weight.Should().BeNull();
+
+        var blowgun = records.First(r => r.Name == "Blowgun");
+        blowgun.Damage.Should().Be("1");
+        blowgun.DamageType.Should().Be("Piercing");
+
+        var musket = records.First(r => r.Name == "Musket");
+        musket.Damage.Should().Be("1d12");
+        musket.Cost.Should().Be("500 GP");
+    }
 }
+
