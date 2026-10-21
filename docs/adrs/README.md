@@ -17,3 +17,4 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 - [ADR-0007: Arquitectura de Generación Pseudoaleatoria (RNG) y Evaluación de Dados para el Motor de Combate](file:///docs/adrs/0007-combat-engine-rng-and-dice-evaluation.md)
 - [ADR-0008: Concurrencia en Motor de Simulación Montecarlo y Agregación Estadística (Win Rate & DPR)](file:///docs/adrs/0008-montecarlo-simulation-concurrency-and-metrics.md)
 - [ADR-0009: Sistema de Armaduras, Ingesta CSV Heterogénea y Cálculo Dinámico de Clase de Armadura (AC)](file:///docs/adrs/0009-armor-system-and-dynamic-ac-calculation.md)
+- [ADR-0010: Integración de Bestiario Open5e y Perfiles Estáticos de Combatientes Custom (PCs)](file:///docs/adrs/0010-open5e-integration-and-custom-combatant-profiles.md)

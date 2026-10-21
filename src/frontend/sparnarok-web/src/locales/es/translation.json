@@ -136,6 +136,26 @@
     "winnerB": "Mayor probabilidad: {{name}} ({{percent}}%)",
     "drawsNotice": "Simulación balanceada con {{percent}}% de empates",
     "errorSimulating": "Ocurrió un error al ejecutar la simulación de Montecarlo.",
-    "selectCreatureHint": "Selecciona las criaturas y armas para iniciar el análisis táctico."
+    "selectCreatureHint": "Selecciona las criaturas y armas para iniciar el análisis táctico.",
+    "addCustomHero": "Añadir Héroe Custom",
+    "customHeroModal": {
+      "title": "Añadir Héroe Custom (Perfil Táctico)",
+      "subtitle": "Ingresa las estadísticas finales del personaje para evaluar su desempeño en combate de inmediato.",
+      "name": "Nombre del Héroe",
+      "namePlaceholder": "Ej. Sir Galahad, Valeria...",
+      "ac": "Clase de Armadura Final (CA)",
+      "hp": "Puntos de Golpe Máximos (HP)",
+      "attributes": "Puntuaciones de Características",
+      "str": "Fuerza (STR)",
+      "dex": "Destreza (DEX)",
+      "con": "Constitución (CON)",
+      "attackName": "Nombre de Ataque / Arma",
+      "attackNamePlaceholder": "Ej. Mandoble Sagrado, Espada Corta...",
+      "damageFormula": "Fórmula de Daño",
+      "damageFormulaPlaceholder": "Ej. 1d8+3, 2d6, 1d10...",
+      "cancel": "Cancelar",
+      "submit": "Añadir al Simulador",
+      "saving": "Guardando Héroe..."
+    }
   }
 }

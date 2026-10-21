@@ -71,6 +71,9 @@ public class Creature
     /// </summary>
     public int ProficiencyBonus => CalculateProficiencyBonus(ChallengeRating);
 
+    /// <summary>Indica si esta criatura representa a un personaje de jugador (Player Character - PC) o héroe custom.</summary>
+    public bool IsPlayerCharacter { get; private set; }
+
     /// <summary>Constructor protegido para EF Core.</summary>
     protected Creature() { }
 
@@ -87,6 +90,7 @@ public class Creature
     /// <param name="hitPoints">Puntos de golpe (opcional).</param>
     /// <param name="armorClass">Configuración de CA (opcional).</param>
     /// <param name="id">Identificador único opcional.</param>
+    /// <param name="isPlayerCharacter">Flag que indica si es un personaje de jugador / héroe custom.</param>
     public Creature(
         string name,
         CreatureSize size,
@@ -97,7 +101,8 @@ public class Creature
         AbilityScores? abilityScores = null,
         HitPoints? hitPoints = null,
         ArmorClass? armorClass = null,
-        Guid? id = null)
+        Guid? id = null,
+        bool isPlayerCharacter = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("El nombre de la criatura no puede estar vacío.", nameof(name));
@@ -118,6 +123,16 @@ public class Creature
         AbilityScores = abilityScores ?? AbilityScores.StandardBaseline;
         HitPoints = hitPoints ?? new(10);
         ArmorClass = armorClass ?? ArmorClass.Unarmored;
+        IsPlayerCharacter = isPlayerCharacter;
+    }
+
+    /// <summary>
+    /// Marca o desmarca esta criatura como un Personaje de Jugador (Player Character).
+    /// </summary>
+    /// <param name="isPlayerCharacter">Si es un PJ.</param>
+    public void MarkAsPlayerCharacter(bool isPlayerCharacter = true)
+    {
+        IsPlayerCharacter = isPlayerCharacter;
     }
 
     /// <summary>
@@ -248,6 +263,14 @@ public class Creature
     public void RemoveAction(Guid actionId)
     {
         _actions.RemoveAll(a => a.Id == actionId);
+    }
+
+    /// <summary>
+    /// Remueve todas las acciones asociadas a la criatura.
+    /// </summary>
+    public void ClearActions()
+    {
+        _actions.Clear();
     }
 
     /// <summary>

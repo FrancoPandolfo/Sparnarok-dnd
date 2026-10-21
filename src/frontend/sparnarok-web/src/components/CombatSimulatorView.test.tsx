@@ -197,4 +197,22 @@ describe('CombatSimulatorView Component Suite', () => {
 
     expect(document.getElementById('montecarlo-results-panel')).not.toBeInTheDocument();
   });
+
+  it('opens Custom Hero modal when clicking the Añadir Héroe Custom button', async () => {
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+      />
+    );
+
+    const openBtn = document.getElementById('open-custom-hero-btn');
+    expect(openBtn).toBeInTheDocument();
+
+    await userEvent.click(openBtn!);
+
+    expect(document.getElementById('custom-hero-modal')).toBeInTheDocument();
+  });
 });
+

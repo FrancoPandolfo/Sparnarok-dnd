@@ -31,6 +31,14 @@ builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Servi
 builder.Services.AddScoped<IWeaponIngestionService, Sparnarok.Api.Infrastructure.Services.WeaponIngestionService>();
 builder.Services.AddScoped<IArmorIngestionService, Sparnarok.Api.Infrastructure.Services.ArmorIngestionService>();
 
+// 4.1 Cliente Open5e Bestiary e Ingesta de Monstruos (Fase 2.2)
+builder.Services.AddHttpClient<IOpen5eBestiaryClient, Sparnarok.Api.Infrastructure.Services.Open5eBestiaryClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.open5e.com/v1/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IOpen5eSyncService, Sparnarok.Api.Infrastructure.Services.Open5eSyncService>();
+
 // 5. Motor de Simulación de Combate y RNG (Fase 2)
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Rng.IRandomProvider, Sparnarok.Api.Domain.Services.Rng.DefaultRandomProvider>();
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Dice.IDiceRoller, Sparnarok.Api.Domain.Services.Dice.DiceRoller>();

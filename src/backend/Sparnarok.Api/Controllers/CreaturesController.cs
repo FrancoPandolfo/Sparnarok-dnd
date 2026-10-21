@@ -5,6 +5,7 @@ using Microsoft.Extensions.Localization;
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Application.Interfaces;
 using Sparnarok.Api.Domain.Entities;
+using Sparnarok.Api.Domain.Enums;
 using Sparnarok.Api.Domain.ValueObjects;
 using Action = Sparnarok.Api.Domain.Entities.Action;
 
@@ -132,6 +133,81 @@ public class CreaturesController : ControllerBase
             abilityScores,
             hitPoints,
             armorClass);
+
+        await _creatureRepository.AddAsync(creature, ct);
+        await _creatureRepository.SaveChangesAsync(ct);
+
+        var responseDto = CreatureResponseDto.FromEntity(creature);
+        return CreatedAtAction(nameof(GetById), new { id = creature.Id }, responseDto);
+    }
+
+    /// <summary>
+    /// Registra un nuevo perfil de combatiente customizado (Personaje de Jugador / Héroe)
+    /// utilizando estadísticas finales directas sin requerir un motor completo de creación de personajes.
+    /// </summary>
+    /// <param name="request">Estadísticas finales del héroe (Nombre, HP, CA final y atributos).</param>
+    /// <param name="customValidator">Validador de reglas para perfil de héroe custom.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <response code="201">Retorna el héroe creado con IsPlayerCharacter = true.</response>
+    /// <response code="400">Si los datos provistos violan las validaciones del perfil.</response>
+    [HttpPost("custom")]
+    [ProducesResponseType(typeof(CreatureResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<CreatureResponseDto>> CreateCustomHero(
+        [FromBody] CreateCustomHeroRequestDto request,
+        [FromServices] IValidator<CreateCustomHeroRequestDto> customValidator,
+        CancellationToken ct)
+    {
+        var validationResult = await customValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
+        }
+
+        var abilityScores = new AbilityScores(
+            request.Strength,
+            request.Dexterity,
+            request.Constitution,
+            request.Intelligence,
+            request.Wisdom,
+            request.Charisma);
+
+        var hitPoints = new HitPoints(request.MaxHitPoints, request.MaxHitPoints);
+
+        // La CA provista es la CA final calculada del héroe
+        var armorClass = new ArmorClass(
+            request.ArmorClass,
+            shieldBonus: 0,
+            allowsDexterityModifier: false);
+
+        var creature = new Creature(
+            request.Name,
+            CreatureSize.Medium,
+            CreatureType.Humanoid,
+            "Heroic",
+            challengeRating: 1,
+            speedFeet: request.SpeedFeet > 0 ? request.SpeedFeet : 30,
+            abilityScores: abilityScores,
+            hitPoints: hitPoints,
+            armorClass: armorClass,
+            isPlayerCharacter: true);
+
+        // Acción de ataque principal del héroe
+        var attackName = string.IsNullOrWhiteSpace(request.AttackName) ? "Ataque Principal" : request.AttackName.Trim();
+        var damageFormula = string.IsNullOrWhiteSpace(request.DamageFormula) ? "1d8" : request.DamageFormula.Trim();
+
+        var primaryAttack = new Action(
+            creature.Id,
+            attackName,
+            ActionType.Action,
+            $"Ataque estándar del héroe {creature.Name}.",
+            isAttack: true,
+            reachOrRangeFeet: 5,
+            damageFormula: damageFormula,
+            damageType: DamageType.Slashing,
+            attackModifierAbility: request.AttackModifierAbility);
+
+        creature.AddAction(primaryAttack);
 
         await _creatureRepository.AddAsync(creature, ct);
         await _creatureRepository.SaveChangesAsync(ct);

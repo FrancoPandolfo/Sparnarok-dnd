@@ -156,6 +156,7 @@ export function App() {
               weapons={weapons}
               onRunSimulation={apiClient.runMontecarlo}
               onSimulationCompleted={handleIncrementSimulation}
+              onHeroCreated={(hero) => setCreatures((prev) => [hero, ...prev.filter((c) => c.id !== hero.id)])}
             />
 
             {/* Grid de capacidades del motor de simulación */}

@@ -6,12 +6,15 @@ import type {
   MontecarloRequestDto,
   MontecarloResultDto,
 } from '../types/dnd';
+import { CustomHeroModal } from './CustomHeroModal';
+import { apiClient } from '../services/apiClient';
 
 export interface CombatSimulatorViewProps {
   creatures: CreatureResponseDto[];
   weapons: WeaponDto[];
   onRunSimulation: (request: MontecarloRequestDto) => Promise<MontecarloResultDto>;
   onSimulationCompleted?: (result: MontecarloResultDto) => void;
+  onHeroCreated?: (hero: CreatureResponseDto) => void;
 }
 
 /**
@@ -24,8 +27,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   weapons,
   onRunSimulation,
   onSimulationCompleted,
+  onHeroCreated,
 }) => {
   const { t } = useTranslation();
+
+  const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
 
   const [combatantAId, setCombatantAId] = useState<string>(() => creatures[0]?.id || '');
   const [weaponAId, setWeaponAId] = useState<string>(() => weapons[0]?.id || '');
@@ -97,11 +103,28 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     }
   };
 
+  const handleHeroSaved = (hero: CreatureResponseDto) => {
+    onHeroCreated?.(hero);
+    setCombatantAId(hero.id);
+  };
+
   return (
     <div className="combat-simulator-view fade-in">
       <header className="simulator-header">
-        <h2 className="section-title">{t('simulation.title')}</h2>
-        <p className="section-subtitle">{t('simulation.subtitle')}</p>
+        <div>
+          <h2 className="section-title">{t('simulation.title')}</h2>
+          <p className="section-subtitle">{t('simulation.subtitle')}</p>
+        </div>
+        <div className="simulator-header-actions">
+          <button
+            type="button"
+            id="open-custom-hero-btn"
+            className="btn btn-primary hero-btn"
+            onClick={() => setIsHeroModalOpen(true)}
+          >
+            🛡️ {t('simulation.addCustomHero')}
+          </button>
+        </div>
       </header>
 
       {/* Panel de Configuración de Combatientes */}
@@ -122,7 +145,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             >
               {creatures.map((c) => (
                 <option key={`a-${c.id}`} value={c.id}>
-                  {c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
+                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}{c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
                 </option>
               ))}
             </select>
@@ -178,7 +201,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             >
               {creatures.map((c) => (
                 <option key={`b-${c.id}`} value={c.id}>
-                  {c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
+                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}{c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
                 </option>
               ))}
             </select>
@@ -408,6 +431,14 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           </div>
         </section>
       )}
+
+      {/* Modal para Dar de Alta un Héroe Custom */}
+      <CustomHeroModal
+        isOpen={isHeroModalOpen}
+        onClose={() => setIsHeroModalOpen(false)}
+        onSaveHero={apiClient.createCustomHero}
+        onHeroSaved={handleHeroSaved}
+      />
     </div>
   );
 };
