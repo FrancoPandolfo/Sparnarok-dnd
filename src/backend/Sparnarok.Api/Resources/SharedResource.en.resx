@@ -34,4 +34,13 @@
   <data name="SimulationActive" xml:space="preserve">
     <value>D&amp;D 5e simulation engine active.</value>
   </data>
+  <data name="CreatureNotFound" xml:space="preserve">
+    <value>The requested creature does not exist in the Codex.</value>
+  </data>
+  <data name="ActionNotFound" xml:space="preserve">
+    <value>The requested combat action does not exist.</value>
+  </data>
+  <data name="MasteryNotFound" xml:space="preserve">
+    <value>The requested weapon mastery property does not exist.</value>
+  </data>
 </root>

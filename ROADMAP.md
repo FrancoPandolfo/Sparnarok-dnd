@@ -29,36 +29,36 @@ El objetivo de esta fase es asentar el modelo ontológico de reglas 5e (revisió
    └────────────────────────────────────────────────────────┘
 ```
 
-### Paso 1.1: Entidades Base de Dominio D&D 5e (2024)
+### Paso 1.1: Entidades Base de Dominio D&D 5e (2024) [Completado]
 - **Alcance:**
   - `Creature`: Características (STR, DEX, CON, INT, WIS, CHA), Puntos de Golpe (HP actual, máximo, temporal), Clase de Armadura (AC), Velocidad, Sentidos, Alineamiento, Tamaño y Tipo de Criatura.
   - `Action`: Acciones estándar, bonus actions, reacciones, ataques cuerpo a cuerpo y a distancia, tiradas de salvación provocadas y condiciones impuestas.
   - `WeaponMastery`: Propiedades de Maestría de Armas 2024 (*Cleave*, *Graze*, *Nick*, *Push*, *Sap*, *Slow*, *Topple*, *Vex*).
 - **Entregables de Calidad & Directivas:**
-  - Rama: `feat/domain-core-entities`.
-  - Documentación: [ADR-0002](file:///docs/adrs) (Modelado de Reglas D&D 5e 2024 e Inmutabilidad en el Dominio) y comentarios XML exhaustivos.
-  - Testing: Cobertura del 100% en `Sparnarok.UnitTests` validando cálculos de modificadores de habilidad, penalizadores de maestría y restricciones de tipos.
+  - Rama: `feat/core-dnd-entities` (completada y pusheada).
+  - Documentación: [ADR-0002](file:///docs/adrs/0002-dnd-5e-2024-core-domain-modeling.md) (Modelado de Reglas D&D 5e 2024 e Inmutabilidad en el Dominio) y comentarios XML exhaustivos.
+  - Testing: 57 pruebas unitarias en `Sparnarok.UnitTests`.
 
-### Paso 1.2: Infraestructura de Persistencia & EF Core
+### Paso 1.2: Infraestructura de Persistencia & EF Core [Completado]
 - **Alcance:**
   - Configuración de `SparnarokDbContext` con EF Core y PostgreSQL (`Npgsql.EntityFrameworkCore.PostgreSQL`).
   - Mapeo declarativo mediante Fluent API (evitando Data Annotations en el dominio puro).
-  - Generación de la primera migración de esquema en PostgreSQL.
+  - Generación de la primera migración de esquema en PostgreSQL (`20261021140645_InitialCreate.cs`) con seed data canónico de 8 maestrías de armas.
 - **Entregables de Calidad & Directivas:**
-  - Rama: `feat/efcore-postgres-persistence`.
-  - Testing: Tests de integración con contenedores reales en `Sparnarok.IntegrationTests` utilizando `PostgreSqlContainerFixture`.
-  - Documentación: Diagrama Entidad-Relación y XML comments en configuraciones de entidad.
+  - Rama: `feat/efcore-postgres-persistence` (completada y pusheada).
+  - Testing: Tests de integración relacionales con `PostgreSqlContainerFixture` (PostgreSQL real y fallback SQLite in-memory).
+  - Documentación: [ADR-0003](file:///docs/adrs/0003-efcore-postgresql-persistence-mapping.md) y XML comments en configuraciones.
 
-### Paso 1.3: Capa de Aplicación & Endpoints CRUD (Web API)
+### Paso 1.3: Capa de Aplicación & Endpoints CRUD (Web API) [Completado]
 - **Alcance:**
-  - Patrón CQRS / Handlers para las operaciones CRUD de Criaturas y gestión de acciones.
-  - DTOs con validaciones mediante FluentValidation.
-  - Controlador RESTful `CreaturesController` con convenciones HTTP estrictas y códigos de respuesta estandarizados.
-  - Localización nativa (i18n) de mensajes de validación y errores.
+  - Patrón Repositorio y DTOs fuertemente tipados para CRUD de Criaturas y subrecursos (Acciones y Maestrías de Armas).
+  - Validaciones robustas con FluentValidation (`CreateCreatureRequestValidator`, etc.).
+  - Controladores RESTful `CreaturesController` y `WeaponMasteriesController` con códigos de respuesta HTTP semánticos (200, 201 Created, 204 NoContent, 400 ValidationProblem, 404 ProblemDetails).
+  - Localización nativa (i18n) de mensajes de error con `IStringLocalizer<SharedResource>`.
 - **Entregables de Calidad & Directivas:**
   - Rama: `feat/creatures-crud-api`.
-  - Documentación: Swagger / OpenAPI enriquecido con ejemplos y comentarios XML de esquemas.
-  - Testing: Tests de integración de endpoints mediante `WebApplicationFactory` con aserciones de persistencia real.
+  - Documentación: [ADR-0004](file:///docs/adrs/0004-application-cqrs-and-crud-endpoints.md) y comentarios XML exhaustivos para Swagger/OpenAPI.
+  - Testing: Tests de integración en `Sparnarok.IntegrationTests` con `CustomWebApplicationFactory` ejecutando el flujo táctico completo de punta a punta.
 
 ### Paso 1.4: Interfaz de Usuario React (sparnarok-web)
 - **Alcance:**

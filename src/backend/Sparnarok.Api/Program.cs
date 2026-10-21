@@ -1,8 +1,13 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
+using FluentValidation;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Sparnarok.Api.Application.Interfaces;
+using Sparnarok.Api.Application.Validators;
 using Sparnarok.Api.Infrastructure.Persistence;
+using Sparnarok.Api.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +22,18 @@ builder.Services.AddDbContext<SparnarokDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddControllers();
+// 3. Repositorios de Dominio
+builder.Services.AddScoped<ICreatureRepository, CreatureRepository>();
+builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
+
+// 4. Validadores de Aplicación (FluentValidation)
+builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // 2. Configuración de Swagger / OpenAPI con Comentarios XML
 builder.Services.AddEndpointsApiExplorer();

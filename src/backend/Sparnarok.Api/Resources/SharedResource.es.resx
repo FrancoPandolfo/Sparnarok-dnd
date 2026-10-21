@@ -34,4 +34,13 @@
   <data name="SimulationActive" xml:space="preserve">
     <value>Motor de simulación D&amp;D 5e activo.</value>
   </data>
+  <data name="CreatureNotFound" xml:space="preserve">
+    <value>La criatura solicitada no existe en el Códice.</value>
+  </data>
+  <data name="ActionNotFound" xml:space="preserve">
+    <value>La acción de combate solicitada no existe.</value>
+  </data>
+  <data name="MasteryNotFound" xml:space="preserve">
+    <value>La propiedad de maestría de armas solicitada no existe.</value>
+  </data>
 </root>
