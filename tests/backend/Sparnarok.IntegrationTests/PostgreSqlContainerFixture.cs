@@ -23,6 +23,9 @@ public class PostgreSqlContainerFixture : IAsyncLifetime
     /// <summary>Indica si se está ejecutando sobre PostgreSQL real.</summary>
     public bool IsPostgreSql { get; private set; }
 
+    /// <summary>Conexión Sqlite activa si se opera en modo fallback local.</summary>
+    public SqliteConnection? SqliteConnection => _sqliteConnection;
+
     public async Task InitializeAsync()
     {
         // 1. Detectar si CI ya proveyó una conexión PostgreSQL vía variable de entorno

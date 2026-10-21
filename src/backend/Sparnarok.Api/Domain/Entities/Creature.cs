@@ -125,6 +125,40 @@ public class Creature
     };
 
     /// <summary>
+    /// Actualiza las estadísticas base, defensas y características de la criatura.
+    /// </summary>
+    public void UpdateStatistics(
+        string name,
+        CreatureSize size,
+        CreatureType type,
+        string alignment,
+        double challengeRating,
+        int speedFeet,
+        AbilityScores abilityScores,
+        HitPoints hitPoints,
+        ArmorClass armorClass)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("El nombre de la criatura no puede estar vacío.", nameof(name));
+
+        if (challengeRating is < 0 or > 30)
+            throw new ArgumentOutOfRangeException(nameof(challengeRating), challengeRating, "El Challenge Rating debe estar entre 0 y 30.");
+
+        if (speedFeet < 0)
+            throw new ArgumentOutOfRangeException(nameof(speedFeet), speedFeet, "La velocidad no puede ser negativa.");
+
+        Name = name;
+        Size = size;
+        Type = type;
+        Alignment = alignment ?? "Unaligned";
+        ChallengeRating = challengeRating;
+        SpeedFeet = speedFeet;
+        AbilityScores = abilityScores ?? AbilityScores.StandardBaseline;
+        HitPoints = hitPoints ?? new(10);
+        ArmorClass = armorClass ?? ArmorClass.Unarmored;
+    }
+
+    /// <summary>
     /// Obtiene el modificador numérico de una característica específica.
     /// </summary>
     /// <param name="ability">Tipo de característica.</param>
