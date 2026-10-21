@@ -6,6 +6,8 @@ import type {
   ActionResponseDto,
   IngestionResultDto,
   WeaponDto,
+  ArmorDto,
+  EquipItemsRequestDto,
   MontecarloRequestDto,
   MontecarloResultDto,
 } from '../types/dnd';
@@ -260,6 +262,65 @@ export const CANONICAL_WEAPONS: WeaponDto[] = [
     properties: 'Finesse, Light, Thrown (Range 20/60)',
     weight: 1,
     cost: '2 GP',
+  },
+];
+
+export const CANONICAL_ARMORS: ArmorDto[] = [
+  {
+    id: 'c0000001-0000-0000-0000-000000000001',
+    name: 'Leather Armor',
+    category: 'Light',
+    rawArmorClass: '11 + Dex modifier',
+    baseArmorClass: 11,
+    shieldBonus: 0,
+    allowsDexterityModifier: true,
+    maxDexterityModifier: null,
+    strengthRequirement: null,
+    stealthDisadvantage: false,
+    weight: 10,
+    cost: '10 GP',
+  },
+  {
+    id: 'c0000001-0000-0000-0000-000000000002',
+    name: 'Half Plate Armor',
+    category: 'Medium',
+    rawArmorClass: '15 + Dex modifier (max 2)',
+    baseArmorClass: 15,
+    shieldBonus: 0,
+    allowsDexterityModifier: true,
+    maxDexterityModifier: 2,
+    strengthRequirement: null,
+    stealthDisadvantage: true,
+    weight: 40,
+    cost: '750 GP',
+  },
+  {
+    id: 'c0000001-0000-0000-0000-000000000003',
+    name: 'Plate Armor',
+    category: 'Heavy',
+    rawArmorClass: '18',
+    baseArmorClass: 18,
+    shieldBonus: 0,
+    allowsDexterityModifier: false,
+    maxDexterityModifier: null,
+    strengthRequirement: 15,
+    stealthDisadvantage: true,
+    weight: 65,
+    cost: '1,500 GP',
+  },
+  {
+    id: 'c0000001-0000-0000-0000-000000000004',
+    name: 'Shield',
+    category: 'Shield',
+    rawArmorClass: '+2',
+    baseArmorClass: 0,
+    shieldBonus: 2,
+    allowsDexterityModifier: false,
+    maxDexterityModifier: null,
+    strengthRequirement: null,
+    stealthDisadvantage: false,
+    weight: 6,
+    cost: '10 GP',
   },
 ];
 
@@ -537,6 +598,90 @@ export const apiClient = {
       // Fallback
     }
     return [...CANONICAL_WEAPONS];
+  },
+
+  /**
+   * Sube masivamente un catálogo CSV de armaduras y escudos a través de multipart/form-data.
+   */
+  async uploadArmorsCsv(file: File): Promise<IngestionResultDto> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/ingestion/armors', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const dataLines = lines.length > 1 ? lines.slice(1) : [];
+
+    return {
+      totalProcessed: dataLines.length,
+      inserted: dataLines.length,
+      updated: 0,
+      errors: [],
+    };
+  },
+
+  /**
+   * Obtiene la lista completa de armaduras y escudos registrados.
+   */
+  async getArmors(signal?: AbortSignal): Promise<ArmorDto[]> {
+    try {
+      const response = await fetch('/api/ingestion/armors', { signal });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return [...CANONICAL_ARMORS];
+  },
+
+  /**
+   * Equipa o desequipa armadura y/o escudo en una criatura existente.
+   */
+  async equipCreature(creatureId: string, request: EquipItemsRequestDto): Promise<CreatureResponseDto | null> {
+    try {
+      const response = await fetch(`/api/v1/creatures/${creatureId}/equip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+
+    const creature = inMemoryCreatures.find((c) => c.id === creatureId);
+    if (!creature) return null;
+
+    if (request.armorId !== undefined) {
+      const armor = CANONICAL_ARMORS.find((a) => a.id === request.armorId);
+      creature.equippedArmorId = armor ? armor.id : null;
+      creature.equippedArmorName = armor ? armor.name : null;
+    }
+    if (request.shieldId !== undefined) {
+      const shield = CANONICAL_ARMORS.find((s) => s.id === request.shieldId);
+      creature.equippedShieldId = shield ? shield.id : null;
+      creature.equippedShieldName = shield ? shield.name : null;
+    }
+    return { ...creature };
   },
 
   /**

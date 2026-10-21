@@ -23,7 +23,11 @@ public record CreatureResponseDto(
     HitPointsDto HitPoints,
     ArmorClassDto ArmorClass,
     IReadOnlyList<ActionResponseDto> Actions,
-    IReadOnlyList<WeaponMasteryResponseDto> KnownMasteries)
+    IReadOnlyList<WeaponMasteryResponseDto> KnownMasteries,
+    Guid? EquippedArmorId = null,
+    string? EquippedArmorName = null,
+    Guid? EquippedShieldId = null,
+    string? EquippedShieldName = null)
 {
     /// <summary>
     /// Mapea una entidad <see cref="Creature"/> a su correspondiente DTO de respuesta.
@@ -69,7 +73,11 @@ public record CreatureResponseDto(
                 entity.ArmorClass.AllowsDexterityModifier,
                 entity.ArmorClass.MaxDexterityModifier),
             entity.Actions.Select(ActionResponseDto.FromEntity).ToList(),
-            entity.KnownMasteries.Select(WeaponMasteryResponseDto.FromEntity).ToList());
+            entity.KnownMasteries.Select(WeaponMasteryResponseDto.FromEntity).ToList(),
+            entity.EquippedArmorId,
+            entity.EquippedArmor?.Name,
+            entity.EquippedShieldId,
+            entity.EquippedShield?.Name);
     }
 }
 

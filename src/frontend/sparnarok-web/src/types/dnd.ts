@@ -160,6 +160,10 @@ export interface CreatureResponseDto {
   armorClass: ArmorClassDto;
   actions: ActionResponseDto[];
   knownMasteries: WeaponMasteryResponseDto[];
+  equippedArmorId?: string | null;
+  equippedArmorName?: string | null;
+  equippedShieldId?: string | null;
+  equippedShieldName?: string | null;
 }
 
 /**
@@ -211,6 +215,37 @@ export interface WeaponDto {
   properties: string;
   weight: number;
   cost: string;
+}
+
+/**
+ * Categoría canónica de armaduras según las reglas de D&D 5e (2024).
+ */
+export type ArmorCategory = 'Light' | 'Medium' | 'Heavy' | 'Shield';
+
+/**
+ * DTO que describe una pieza de armadura o escudo en el Códice.
+ */
+export interface ArmorDto {
+  id: string;
+  name: string;
+  category: ArmorCategory;
+  rawArmorClass: string;
+  baseArmorClass: number;
+  shieldBonus: number;
+  allowsDexterityModifier: boolean;
+  maxDexterityModifier: number | null;
+  strengthRequirement: number | null;
+  stealthDisadvantage: boolean;
+  weight: number;
+  cost: string;
+}
+
+/**
+ * Payload para equipar o desequipar armadura y escudo en una criatura.
+ */
+export interface EquipItemsRequestDto {
+  armorId?: string | null;
+  shieldId?: string | null;
 }
 
 /**

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Application.Interfaces;
@@ -23,6 +24,7 @@ public class CreaturesController : ControllerBase
     private readonly IValidator<UpdateCreatureRequestDto> _updateValidator;
     private readonly IValidator<CreateActionRequestDto> _actionValidator;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? _context;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="CreaturesController"/>.
@@ -33,7 +35,8 @@ public class CreaturesController : ControllerBase
         IValidator<CreateCreatureRequestDto> createValidator,
         IValidator<UpdateCreatureRequestDto> updateValidator,
         IValidator<CreateActionRequestDto> actionValidator,
-        IStringLocalizer<SharedResource> localizer)
+        IStringLocalizer<SharedResource> localizer,
+        Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? context = null)
     {
         _creatureRepository = creatureRepository;
         _masteryRepository = masteryRepository;
@@ -41,6 +44,7 @@ public class CreaturesController : ControllerBase
         _updateValidator = updateValidator;
         _actionValidator = actionValidator;
         _localizer = localizer;
+        _context = context;
     }
 
     /// <summary>
@@ -369,6 +373,92 @@ public class CreaturesController : ControllerBase
         creature.LearnWeaponMastery(mastery);
         await _creatureRepository.SaveChangesAsync(ct);
 
+        return Ok(CreatureResponseDto.FromEntity(creature));
+    }
+
+    /// <summary>
+    /// Equipa o desequipa una armadura corporal y/o un escudo en una criatura existente, recalculando su CA dinámica.
+    /// </summary>
+    /// <param name="id">Identificador único de la criatura.</param>
+    /// <param name="armorId">ID de la armadura a equipar (o Guid.Empty / null para desequipar o no modificar).</param>
+    /// <param name="shieldId">ID del escudo a equipar (o Guid.Empty / null para desequipar o no modificar).</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <response code="200">Criatura con el equipamiento actualizado y su CA dinámica calculada.</response>
+    /// <response code="404">Si la criatura, armadura o escudo no existen.</response>
+    [HttpPost("{id:guid}/equip")]
+    [ProducesResponseType(typeof(CreatureResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CreatureResponseDto>> Equip(
+        Guid id,
+        [FromQuery] Guid? armorId,
+        [FromQuery] Guid? shieldId,
+        CancellationToken ct)
+    {
+        if (_context == null)
+            return StatusCode(StatusCodes.Status501NotImplemented, "Contexto de base de datos no configurado.");
+
+        var creature = await _context.Creatures
+            .Include(c => c.Actions).ThenInclude(a => a.AssociatedMastery)
+            .Include(c => c.KnownMasteries)
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (creature is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = _localizer["CreatureNotFound"],
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la criatura con id '{id}'."
+            });
+        }
+
+        if (armorId.HasValue)
+        {
+            if (armorId.Value == Guid.Empty)
+            {
+                creature.UnequipArmor();
+            }
+            else
+            {
+                var armor = await _context.Armors.FirstOrDefaultAsync(a => a.Id == armorId.Value, ct);
+                if (armor is null)
+                {
+                    return NotFound(new ProblemDetails
+                    {
+                        Title = "Armadura no encontrada",
+                        Status = StatusCodes.Status404NotFound,
+                        Detail = $"No se encontró la armadura con id '{armorId.Value}'."
+                    });
+                }
+                creature.EquipArmor(armor);
+            }
+        }
+
+        if (shieldId.HasValue)
+        {
+            if (shieldId.Value == Guid.Empty)
+            {
+                creature.UnequipShield();
+            }
+            else
+            {
+                var shield = await _context.Armors.FirstOrDefaultAsync(a => a.Id == shieldId.Value, ct);
+                if (shield is null)
+                {
+                    return NotFound(new ProblemDetails
+                    {
+                        Title = "Escudo no encontrado",
+                        Status = StatusCodes.Status404NotFound,
+                        Detail = $"No se encontró el escudo con id '{shieldId.Value}'."
+                    });
+                }
+                creature.EquipShield(shield);
+            }
+        }
+
+        await _context.SaveChangesAsync(ct);
         return Ok(CreatureResponseDto.FromEntity(creature));
     }
 }

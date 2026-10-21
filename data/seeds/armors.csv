@@ -1,0 +1,14 @@
+Name,Category,ArmorClass,Strength,Stealth,Weight,Cost
+Padded Armor,Light,11 + Dex modifier,-,Disadvantage,8 lb.,5 GP
+Leather Armor,Light,11 + Dex modifier,-,-,10 lb.,10 GP
+Studded Leather Armor,Light,12 + Dex modifier,-,-,13 lb.,45 GP
+Hide Armor,Medium,12 + Dex modifier (max 2),-,-,12 lb.,10 GP
+Chain Shirt,Medium,13 + Dex modifier (max 2),-,-,20 lb.,50 GP
+Scale Mail,Medium,14 + Dex modifier (max 2),-,Disadvantage,45 lb.,50 GP
+Breastplate,Medium,14 + Dex modifier (max 2),-,-,20 lb.,400 GP
+Half Plate Armor,Medium,15 + Dex modifier (max 2),-,Disadvantage,40 lb.,750 GP
+Ring Mail,Heavy,14,-,Disadvantage,40 lb.,30 GP
+Chain Mail,Heavy,16,Str 13,Disadvantage,55 lb.,75 GP
+Splint Armor,Heavy,17,Str 15,Disadvantage,60 lb.,200 GP
+Plate Armor,Heavy,18,Str 15,Disadvantage,65 lb.,"1,500 GP"
+Shield,Shield,+2,-,-,6 lb.,10 GP

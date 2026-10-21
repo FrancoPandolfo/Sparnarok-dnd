@@ -88,5 +88,16 @@ public class CreatureConfiguration : IEntityTypeConfiguration<Creature>
 
         builder.Navigation(c => c.KnownMasteries)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // 6. Relaciones opcionales para Armadura y Escudo equipados (SetNull al eliminar armadura)
+        builder.HasOne(c => c.EquippedArmor)
+            .WithMany()
+            .HasForeignKey(c => c.EquippedArmorId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(c => c.EquippedShield)
+            .WithMany()
+            .HasForeignKey(c => c.EquippedShieldId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

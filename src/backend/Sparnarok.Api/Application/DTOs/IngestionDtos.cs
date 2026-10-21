@@ -98,6 +98,53 @@ public sealed class WeaponCsvClassMap : ClassMap<WeaponCsvRecord>
 }
 
 /// <summary>
+/// Modelo de datos que refleja una fila del archivo CSV de armaduras y escudos importado.
+/// </summary>
+public class ArmorCsvRecord
+{
+    /// <summary>Nombre de la armadura (ej. "Half Plate Armor", "Plate Armor", "Shield").</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Categoría textual (Light, Medium, Heavy, Shield).</summary>
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>Fórmula de CA (ej. "11 + Dex modifier", "15 + Dex modifier (max 2)", "18", "+2").</summary>
+    public string ArmorClass { get; set; } = string.Empty;
+
+    /// <summary>Requisito de Fuerza (ej. "Str 13", "Str 15", "-").</summary>
+    public string Strength { get; set; } = string.Empty;
+
+    /// <summary>Efecto en sigilo (ej. "Disadvantage", "-").</summary>
+    public string Stealth { get; set; } = string.Empty;
+
+    /// <summary>Peso de la armadura en libras.</summary>
+    public double? Weight { get; set; }
+
+    /// <summary>Costo de mercado (ej. "750 GP", "10 GP").</summary>
+    public string Cost { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Mapeo declarativo para CsvHelper para armaduras y escudos.
+/// </summary>
+public sealed class ArmorCsvClassMap : ClassMap<ArmorCsvRecord>
+{
+    /// <summary>
+    /// Configura el mapeo de columnas para el archivo armors.csv.
+    /// </summary>
+    public ArmorCsvClassMap()
+    {
+        Map(m => m.Name).Name("Name");
+        Map(m => m.Category).Name("Category");
+        Map(m => m.ArmorClass).Name("ArmorClass");
+        Map(m => m.Strength).Name("Strength").Optional();
+        Map(m => m.Stealth).Name("Stealth").Optional();
+        Map(m => m.Weight).Name("Weight").TypeConverter<DndWeightConverter>().Optional();
+        Map(m => m.Cost).Name("Cost").Optional();
+    }
+}
+
+/// <summary>
 /// Resultado del proceso de ingesta masiva (Bulk Ingestion / Upsert).
 /// </summary>
 /// <param name="TotalProcessed">Cantidad total de filas procesadas del archivo.</param>

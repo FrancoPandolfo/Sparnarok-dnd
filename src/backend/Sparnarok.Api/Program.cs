@@ -29,6 +29,7 @@ builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
 // 4. Servicios de Ingestión de Datos (CSV & Streaming)
 builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();
 builder.Services.AddScoped<IWeaponIngestionService, Sparnarok.Api.Infrastructure.Services.WeaponIngestionService>();
+builder.Services.AddScoped<IArmorIngestionService, Sparnarok.Api.Infrastructure.Services.ArmorIngestionService>();
 
 // 5. Motor de Simulación de Combate y RNG (Fase 2)
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Rng.IRandomProvider, Sparnarok.Api.Domain.Services.Rng.DefaultRandomProvider>();

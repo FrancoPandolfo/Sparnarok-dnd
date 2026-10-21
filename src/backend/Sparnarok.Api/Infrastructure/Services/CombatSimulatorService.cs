@@ -266,6 +266,8 @@ public class CombatSimulatorService : ICombatSimulatorService
             throw new InvalidOperationException("El contexto de base de datos no fue proporcionado para operaciones asíncronas de persistencia.");
 
         var creature1 = await _context.Creatures
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .FirstOrDefaultAsync(c => c.Id == creature1Id, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura con ID: {creature1Id}");
 
@@ -274,6 +276,8 @@ public class CombatSimulatorService : ICombatSimulatorService
             ?? throw new KeyNotFoundException($"No se encontró el arma con ID: {weapon1Id}");
 
         var creature2 = await _context.Creatures
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .FirstOrDefaultAsync(c => c.Id == creature2Id, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura con ID: {creature2Id}");
 

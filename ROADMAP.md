@@ -153,6 +153,38 @@ Ejecución concurrente masiva de duelos 1v1 a través de hilos paralelos de CPU 
 
 ---
 
+## Fase 2.1: Armor Ingestion & Dynamic AC [Completado]
+
+Ingesta masiva del catálogo oficial de armaduras y escudos desde `/data/seeds/armors.csv` y actualización crucial del motor de combate con cálculo dinámico de la Clase de Armadura (CA / AC) según reglas de D&D 5e (2024).
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.1.1 Entidad Armor & Parser Heterogéneo de CA         │
+   │ 2.1.2 Endpoint REST POST /api/ingestion/armors         │
+   │ 2.1.3 Equipamiento en Creature (EquipArmor/EquipShield)│
+   │ 2.1.4 Servicio de Dominio ArmorClassCalculator         │
+   │ 2.1.5 Suites de Pruebas Unitarias, Integración & E2E   │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - Entidad de dominio `Armor` con soporte de categorías (`Light`, `Medium`, `Heavy`, `Shield`) y parser estático robusto para formatos textuales variados (`"11 + Dex modifier"`, `"15 + Dex modifier (max 2)"`, `"18"`, `"+2"`).
+  - Endpoint `POST /api/ingestion/armors` vía `CsvHelper` con conversión de guiones `"-"` a nulos/vacíos y sanitización de pesos y costes.
+  - Actualización del agregador `Creature` con ranuras tácticas independientes (`EquippedArmor`, `EquippedShield`) y métodos de dominio `EquipArmor`, `EquipShield`, `UnequipArmor`, `UnequipShield`.
+  - Calculador dinámico `ArmorClassCalculator` implementando reglas canónicas:
+    - Sin armadura: 10 + Modificador de Destreza.
+    - Armadura Ligera: CA Base + Modificador de Destreza.
+    - Armadura Media: CA Base + Modificador de Destreza (con un límite máximo de +2).
+    - Armadura Pesada: CA Base pura (se ignora el modificador de Destreza).
+    - Escudos: Suma un +2 a la CA total si hay uno equipado.
+  - Integración en `CombatSimulatorService` y `MontecarloSimulationService`.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/armor-system-and-dynamic-ac`.
+  - Documentación: [ADR-0009](file:///docs/adrs/0009-armor-system-and-dynamic-ac-calculation.md).
+  - Testing: 141 tests unitarios en backend validando todas las combinaciones matemáticas (ej: Destreza 18 (+4) con Half Plate = 17), 20 tests de integración relacional con PostgreSQL/SQLite y test Playwright E2E.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 ### Fase 2: Módulo 3 - Mathematical Simulation & DPR Matrices
