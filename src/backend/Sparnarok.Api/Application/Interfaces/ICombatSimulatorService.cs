@@ -24,6 +24,16 @@ public interface ICombatSimulatorService
         Weapon weapon2);
 
     /// <summary>
+    /// Simula un duelo 1 contra 1 de forma acelerada, sin instanciar logs de texto,
+    /// para maximizar el rendimiento en simulaciones Monte Carlo concurrentes.
+    /// </summary>
+    FastDuelResult SimulateFastDuel(
+        Creature combatant1,
+        Weapon weapon1,
+        Creature combatant2,
+        Weapon weapon2);
+
+    /// <summary>
     /// Consulta criaturas y armas desde la base de datos relacional y ejecuta la simulación de duelo.
     /// </summary>
     /// <param name="creature1Id">ID de la primera criatura.</param>

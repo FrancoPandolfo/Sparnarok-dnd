@@ -111,5 +111,31 @@
     "errorsEncountered": "Advertencias / Errores de Validación",
     "noFileSelected": "Por favor selecciona un archivo .csv primero.",
     "errorUploading": "Error al subir y procesar el archivo CSV."
+  },
+  "simulation": {
+    "title": "Simulador de Combate de Montecarlo (1v1)",
+    "subtitle": "Ejecución concurrente masiva a través de múltiples hilos de CPU con agregación estadística de Win Rates, DPR y duración.",
+    "combatantA": "Combatiente A (Iniciador)",
+    "combatantB": "Combatiente B (Defensor)",
+    "creatureSelect": "Seleccionar Criatura",
+    "weaponSelect": "Arma Equipada",
+    "iterationsLabel": "Número de Iteraciones (Duelos Concurrentes)",
+    "runButton": "Simular Combate (Montecarlo)",
+    "simulating": "Simulando duelos concurrentes...",
+    "resultsTitle": "Resultados de la Simulación",
+    "executionTime": "Tiempo de cómputo: {{ms}} ms",
+    "winRateTitle": "Porcentaje de Victoria (Win Rate)",
+    "drawRate": "Empates: {{percent}}% ({{count}})",
+    "avgRounds": "Promedio de Rondas",
+    "avgRoundsDesc": "Duración media del encuentro hasta que un combatiente cae a 0 PG",
+    "dprCombatantA": "DPR Promedio (Combatiente A)",
+    "dprCombatantB": "DPR Promedio (Combatiente B)",
+    "dprDesc": "Daño infligido por turno promedio",
+    "totalIterations": "Duelos Simulados",
+    "winnerA": "Mayor probabilidad: {{name}} ({{percent}}%)",
+    "winnerB": "Mayor probabilidad: {{name}} ({{percent}}%)",
+    "drawsNotice": "Simulación balanceada con {{percent}}% de empates",
+    "errorSimulating": "Ocurrió un error al ejecutar la simulación de Montecarlo.",
+    "selectCreatureHint": "Selecciona las criaturas y armas para iniciar el análisis táctico."
   }
 }

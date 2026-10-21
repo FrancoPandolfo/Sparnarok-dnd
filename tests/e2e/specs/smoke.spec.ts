@@ -127,5 +127,58 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await page.locator('#close-ingestion-modal-btn').click();
     await expect(page.locator('#ingestion-results-panel')).not.toBeVisible();
   });
+
+  test('User switches to Tactical Simulation tab, executes Monte Carlo duel, and inspects Win Rate and DPR metrics', async ({ page }) => {
+    await page.goto('/');
+
+    // Switch to Simulation tab
+    const simTabBtn = page.locator('#tab-simulation-btn');
+    await expect(simTabBtn).toBeVisible();
+    await simTabBtn.click();
+    await expect(simTabBtn).toHaveClass(/active/);
+
+    // Verify simulation controls are displayed
+    const runBtn = page.locator('#run-montecarlo-btn');
+    await expect(runBtn).toBeVisible();
+    await expect(page.locator('#combatant-a-select')).toBeVisible();
+    await expect(page.locator('#combatant-b-select')).toBeVisible();
+    await expect(page.locator('#iterations-select')).toBeVisible();
+
+    // Select 1,000 iterations for test speed
+    await page.locator('#iterations-select').selectOption('1000');
+
+    // Run simulation
+    await runBtn.click();
+
+    // Verify results panel renders
+    const resultsPanel = page.locator('#montecarlo-results-panel');
+    await expect(resultsPanel).toBeVisible({ timeout: 15000 });
+
+    // Verify win rate progress bar and segments
+    await expect(page.locator('#winrate-bar-container')).toBeVisible();
+    await expect(page.locator('#win-rate-a')).toBeVisible();
+    await expect(page.locator('#win-rate-b')).toBeVisible();
+    await expect(page.locator('#win-rate-summary-a')).toBeVisible();
+    await expect(page.locator('#win-rate-summary-b')).toBeVisible();
+
+    // Verify metric cards
+    const avgRounds = page.locator('#metric-avg-rounds');
+    const dprA = page.locator('#metric-dpr-a');
+    const dprB = page.locator('#metric-dpr-b');
+    const totalIterations = page.locator('#metric-total-iterations');
+
+    await expect(avgRounds).toBeVisible();
+    await expect(dprA).toBeVisible();
+    await expect(dprB).toBeVisible();
+    await expect(totalIterations).toBeVisible();
+
+    // Verify values are populated
+    await expect(totalIterations).toHaveText(/1[.,]000/);
+    const avgRoundsText = await avgRounds.textContent();
+    expect(Number(avgRoundsText?.replace(',', '.'))).toBeGreaterThan(0);
+
+    // Verify execution time pill is present
+    await expect(page.locator('#sim-execution-time')).toBeVisible();
+  });
 });
 
