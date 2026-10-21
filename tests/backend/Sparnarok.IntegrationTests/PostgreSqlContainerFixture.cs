@@ -103,3 +103,55 @@ public class PostgreSqlContainerFixture : IAsyncLifetime
         return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_HOST"));
     }
 }
+
+/// <summary>
+/// Helper concurrente seguro para inicializar la base de datos de pruebas
+/// tolerando tanto conexiones aisladas SQLite in-memory como PostgreSQL compartido.
+/// </summary>
+public static class TestDatabaseInitializer
+{
+    private static readonly SemaphoreSlim Lock = new(1, 1);
+
+    public static async Task EnsureCreatedAsync(SparnarokDbContext context)
+    {
+        await Lock.WaitAsync();
+        try
+        {
+            try
+            {
+                await context.Database.EnsureCreatedAsync();
+            }
+            catch (Exception ex) when (IsAlreadyExistsException(ex))
+            {
+                // En PostgreSQL, si otra clase o hilo creó las tablas concurrentemente, se tolera con seguridad
+            }
+        }
+        finally
+        {
+            Lock.Release();
+        }
+    }
+
+    private static bool IsAlreadyExistsException(Exception ex)
+    {
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            if (current is Npgsql.PostgresException pex && (pex.SqlState == "42P07" || pex.SqlState == "23505"))
+            {
+                return true;
+            }
+
+            if (current.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void EnsureCreated(SparnarokDbContext context)
+    {
+        EnsureCreatedAsync(context).GetAwaiter().GetResult();
+    }
+}

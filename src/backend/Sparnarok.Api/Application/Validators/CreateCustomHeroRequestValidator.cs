@@ -50,15 +50,21 @@ public class CreateCustomHeroRequestValidator : AbstractValidator<CreateCustomHe
         RuleFor(x => x.SpeedFeet)
             .GreaterThanOrEqualTo(0).WithMessage("La velocidad no puede ser negativa.");
 
+        RuleFor(x => x.Level)
+            .InclusiveBetween(1, 20).WithMessage("El nivel del héroe debe encontrarse entre 1 y 20.");
+
+        RuleFor(x => x.ExpectedDpr)
+            .GreaterThanOrEqualTo(0).When(x => x.ExpectedDpr.HasValue)
+            .WithMessage("El DPR esperado debe ser mayor o igual a 0.");
+
         RuleFor(x => x.AttackName)
-            .NotEmpty().WithMessage("El nombre del ataque principal es obligatorio.")
             .MaximumLength(100).WithMessage("El nombre del ataque no puede exceder los 100 caracteres.");
 
         RuleFor(x => x.DamageFormula)
-            .NotEmpty().WithMessage("La fórmula de daño es obligatoria.")
             .MaximumLength(50).WithMessage("La fórmula de daño no puede exceder los 50 caracteres.");
 
         RuleFor(x => x.AttackModifierAbility)
             .IsInEnum().WithMessage("La característica de modificador de ataque no es válida.");
     }
 }
+

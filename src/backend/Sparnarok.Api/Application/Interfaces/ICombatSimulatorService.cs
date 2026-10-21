@@ -19,9 +19,9 @@ public interface ICombatSimulatorService
     /// <returns>Resultado exhaustivo con logs y métricas de la simulación.</returns>
     CombatSimulationResult SimulateDuel(
         Creature combatant1,
-        Weapon weapon1,
+        Weapon? weapon1,
         Creature combatant2,
-        Weapon weapon2);
+        Weapon? weapon2);
 
     /// <summary>
     /// Simula un duelo 1 contra 1 de forma acelerada, sin instanciar logs de texto,
@@ -29,23 +29,24 @@ public interface ICombatSimulatorService
     /// </summary>
     FastDuelResult SimulateFastDuel(
         Creature combatant1,
-        Weapon weapon1,
+        Weapon? weapon1,
         Creature combatant2,
-        Weapon weapon2);
+        Weapon? weapon2);
 
     /// <summary>
     /// Consulta criaturas y armas desde la base de datos relacional y ejecuta la simulación de duelo.
     /// </summary>
     /// <param name="creature1Id">ID de la primera criatura.</param>
-    /// <param name="weapon1Id">ID del arma de la primera criatura.</param>
+    /// <param name="weapon1Id">ID del arma de la primera criatura (opcional si la criatura tiene ExpectedDpr).</param>
     /// <param name="creature2Id">ID de la segunda criatura.</param>
-    /// <param name="weapon2Id">ID del arma de la segunda criatura.</param>
+    /// <param name="weapon2Id">ID del arma de la segunda criatura (opcional si la criatura tiene ExpectedDpr).</param>
     /// <param name="cancellationToken">Token de cancelación.</param>
     /// <returns>Resultado del duelo simulado.</returns>
     Task<CombatSimulationResult> SimulateDuelAsync(
         Guid creature1Id,
-        Guid weapon1Id,
+        Guid? weapon1Id,
         Guid creature2Id,
-        Guid weapon2Id,
+        Guid? weapon2Id,
         CancellationToken cancellationToken = default);
 }
+

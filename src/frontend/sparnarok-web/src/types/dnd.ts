@@ -165,6 +165,9 @@ export interface CreatureResponseDto {
   equippedShieldId?: string | null;
   equippedShieldName?: string | null;
   isPlayerCharacter?: boolean;
+  level?: number | null;
+  expectedDpr?: number | null;
+  archetype?: string | null;
 }
 
 /**
@@ -174,6 +177,9 @@ export interface CreateCustomHeroRequestDto {
   name: string;
   maxHitPoints: number;
   armorClass: number;
+  level?: number;
+  archetype?: string;
+  expectedDpr?: number;
   strength?: number;
   dexterity?: number;
   constitution?: number;
@@ -185,6 +191,17 @@ export interface CreateCustomHeroRequestDto {
   damageFormula?: string;
   attackModifierAbility?: AbilityScoreType;
 }
+
+/**
+ * Entrada en la matriz de daño esperado por ronda (Expected DPR).
+ */
+export interface DprBaselineDto {
+  archetype: string;
+  level: number;
+  expectedDpr: number;
+  description: string;
+}
+
 
 /**
  * Payload de creación de una nueva criatura en el Códice.
@@ -283,11 +300,12 @@ export interface IngestionResultDto {
  */
 export interface MontecarloRequestDto {
   combatantAId: string;
-  weaponAId: string;
+  weaponAId?: string;
   combatantBId: string;
-  weaponBId: string;
+  weaponBId?: string;
   iterations?: number;
 }
+
 
 /**
  * Resultados agregados y distribuciones probabilísticas devueltas por la simulación de Monte Carlo.

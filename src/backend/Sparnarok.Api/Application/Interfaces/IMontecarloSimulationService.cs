@@ -22,11 +22,12 @@ public interface IMontecarloSimulationService
     /// <returns>Resultados agregados y distribuciones estadísticas.</returns>
     MontecarloResultDto Simulate(
         Creature combatantA,
-        Weapon weaponA,
+        Weapon? weaponA,
         Creature combatantB,
-        Weapon weaponB,
+        Weapon? weaponB,
         int iterations = 10000,
         ICombatSimulatorService? simulatorOverride = null);
+
 
     /// <summary>
     /// Carga criaturas y armas desde la base de datos y ejecuta la simulación masiva de Monte Carlo.

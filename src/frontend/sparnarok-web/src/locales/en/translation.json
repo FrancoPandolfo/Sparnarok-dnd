@@ -149,6 +149,10 @@
       "str": "Strength (STR)",
       "dex": "Dexterity (DEX)",
       "con": "Constitution (CON)",
+      "archetype": "Class / Archetype",
+      "level": "Level (1-20)",
+      "expectedDpr": "Estimated DPR",
+      "expectedDprNote": "Guaranteed average damage per round (with ±15% stochastic variance). No equipped weapon required.",
       "attackName": "Attack / Weapon Name",
       "attackNamePlaceholder": "E.g. Holy Greatsword, Shortsword...",
       "damageFormula": "Damage Formula",
@@ -156,6 +160,7 @@
       "cancel": "Cancel",
       "submit": "Add to Simulator",
       "saving": "Saving Hero..."
-    }
+    },
+    "noWeaponRequiredDpr": "⚡ Archetype DPR ({{dpr}} DPR) [No weapon required]"
   }
 }

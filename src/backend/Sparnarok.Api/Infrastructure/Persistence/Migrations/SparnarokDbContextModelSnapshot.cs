@@ -158,6 +158,10 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Archetype")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<double>("ChallengeRating")
                         .HasColumnType("double precision");
 
@@ -167,10 +171,16 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("EquippedShieldId")
                         .HasColumnType("uuid");
 
+                    b.Property<double?>("ExpectedDpr")
+                        .HasColumnType("double precision");
+
                     b.Property<bool>("IsPlayerCharacter")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
+
+                    b.Property<int?>("Level")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()

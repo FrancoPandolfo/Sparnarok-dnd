@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CreateCustomHeroRequestDto, CreatureResponseDto } from '../types/dnd';
+import { calculateExpectedDpr } from '../services/apiClient';
 
 export interface CustomHeroModalProps {
   isOpen: boolean;
@@ -9,9 +10,18 @@ export interface CustomHeroModalProps {
   onHeroSaved: (hero: CreatureResponseDto) => void;
 }
 
+export const ARCHETYPES = [
+  'Fighter 2H',
+  'Ranger Ranged',
+  'Paladin 2H',
+  'Barbarian 2H',
+  'Rogue Sneak Attack',
+  'Warlock Eldritch Blast',
+] as const;
+
 /**
  * Modal interactivo para crear perfiles de combatientes customizados (Héroes / PCs)
- * con estadísticas finales directas para simulación inmediata.
+ * con estadísticas finales directas y abstracción de DPR por nivel y arquetipo.
  */
 export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
   isOpen,
@@ -27,10 +37,14 @@ export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
   const [strength, setStrength] = useState(16);
   const [dexterity, setDexterity] = useState(14);
   const [constitution, setConstitution] = useState(14);
-  const [attackName, setAttackName] = useState('Espada Larga');
-  const [damageFormula, setDamageFormula] = useState('1d8+3');
+  const [archetype, setArchetype] = useState<string>('Fighter 2H');
+  const [level, setLevel] = useState<number>(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const currentDpr = useMemo(() => {
+    return calculateExpectedDpr(archetype, level);
+  }, [archetype, level]);
 
   if (!isOpen) return null;
 
@@ -49,8 +63,11 @@ export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
         strength: Number(strength),
         dexterity: Number(dexterity),
         constitution: Number(constitution),
-        attackName: attackName.trim() || 'Ataque Principal',
-        damageFormula: damageFormula.trim() || '1d8',
+        level: Number(level),
+        archetype,
+        expectedDpr: currentDpr,
+        attackName: `${archetype} Baseline`,
+        damageFormula: `${currentDpr} DPR`,
         attackModifierAbility: 'Strength',
       };
 
@@ -71,8 +88,8 @@ export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
     setStrength(16);
     setDexterity(14);
     setConstitution(14);
-    setAttackName('Espada Larga');
-    setDamageFormula('1d8+3');
+    setArchetype('Fighter 2H');
+    setLevel(5);
     setErrorMessage(null);
     onClose();
   };
@@ -209,36 +226,58 @@ export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
             </div>
           </div>
 
+          {/* Abstracción de DPR por Arquetipo y Nivel */}
           <div className="form-row-2">
             <div className="form-group">
-              <label htmlFor="hero-attack-name-input" className="form-label">
-                {t('simulation.customHeroModal.attackName')}
+              <label htmlFor="hero-archetype-select" className="form-label">
+                {t('simulation.customHeroModal.archetype')}
               </label>
-              <input
-                id="hero-attack-name-input"
-                className="form-input"
-                type="text"
-                placeholder={t('simulation.customHeroModal.attackNamePlaceholder')}
-                value={attackName}
-                onChange={(e) => setAttackName(e.target.value)}
+              <select
+                id="hero-archetype-select"
+                className="form-select"
+                value={archetype}
+                onChange={(e) => setArchetype(e.target.value)}
                 disabled={isSubmitting}
-              />
+              >
+                {ARCHETYPES.map((arch) => (
+                  <option key={arch} value={arch}>
+                    {arch}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
-              <label htmlFor="hero-damage-dice-input" className="form-label">
-                {t('simulation.customHeroModal.damageFormula')}
+              <label htmlFor="hero-level-select" className="form-label">
+                {t('simulation.customHeroModal.level')}
               </label>
-              <input
-                id="hero-damage-dice-input"
-                className="form-input"
-                type="text"
-                placeholder={t('simulation.customHeroModal.damageFormulaPlaceholder')}
-                value={damageFormula}
-                onChange={(e) => setDamageFormula(e.target.value)}
+              <select
+                id="hero-level-select"
+                className="form-select"
+                value={level}
+                onChange={(e) => setLevel(Number(e.target.value))}
                 disabled={isSubmitting}
-              />
+              >
+                {Array.from({ length: 20 }, (_, i) => i + 1).map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          {/* Panel con DPR Estimado y nota matemática */}
+          <div className="dpr-indicator-panel" id="hero-expected-dpr-display">
+            <div className="dpr-indicator-header">
+              <span className="dpr-indicator-title">
+                {t('simulation.customHeroModal.expectedDpr')}:
+              </span>
+              <span className="dpr-indicator-value">{currentDpr.toFixed(1)} DPR</span>
+            </div>
+            <p className="dpr-indicator-note">
+              {t('simulation.customHeroModal.expectedDprNote')}
+            </p>
           </div>
 
           <div className="modal-actions">

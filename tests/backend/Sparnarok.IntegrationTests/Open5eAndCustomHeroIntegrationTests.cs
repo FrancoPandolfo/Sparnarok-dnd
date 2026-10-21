@@ -53,7 +53,7 @@ public class Open5eAndCustomHeroIntegrationTests : IClassFixture<CustomWebApplic
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-        context.Database.EnsureCreated();
+        TestDatabaseInitializer.EnsureCreated(context);
     }
 
     [Fact]
@@ -130,6 +130,18 @@ public class Open5eAndCustomHeroIntegrationTests : IClassFixture<CustomWebApplic
     [Fact]
     public async Task SyncOpen5eMonsters_ViaIngestionEndpoint_PersistsMonstersInDatabase()
     {
+        // Cleanup previo para aislamiento
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var setupDb = setupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var existingOgre = await setupDb.Creatures.Include(c => c.Actions).FirstOrDefaultAsync(c => c.Name == "Test Ogre Brawler");
+            if (existingOgre != null)
+            {
+                setupDb.Creatures.Remove(existingOgre);
+                await setupDb.SaveChangesAsync();
+            }
+        }
+
         // Arrange
         const string mockJson = """
         {
@@ -204,11 +216,27 @@ public class Open5eAndCustomHeroIntegrationTests : IClassFixture<CustomWebApplic
         ogre.Type.Should().Be(CreatureType.Giant);
         ogre.IsPlayerCharacter.Should().BeFalse();
         ogre.Actions.Should().Contain(a => a.Name == "Greatclub" && a.DamageFormula == "2d8+4");
+
+        // Teardown
+        db.Creatures.Remove(ogre);
+        await db.SaveChangesAsync();
     }
 
     [Fact]
     public async Task CreateCustomHero_PersistsPlayerCharacterWithCorrectACAndAttack()
     {
+        // Cleanup previo para aislamiento
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var heroSetupDb = setupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var existingHero = await heroSetupDb.Creatures.Include(c => c.Actions).FirstOrDefaultAsync(c => c.Name == "Valeria the Paladin");
+            if (existingHero != null)
+            {
+                heroSetupDb.Creatures.Remove(existingHero);
+                await heroSetupDb.SaveChangesAsync();
+            }
+        }
+
         // Arrange
         var request = new CreateCustomHeroRequestDto
         {
@@ -247,5 +275,9 @@ public class Open5eAndCustomHeroIntegrationTests : IClassFixture<CustomWebApplic
         dbHero.Should().NotBeNull();
         dbHero!.IsPlayerCharacter.Should().BeTrue();
         dbHero.EffectiveArmorClass.Should().Be(18);
+
+        // Teardown
+        db.Creatures.Remove(dbHero);
+        await db.SaveChangesAsync();
     }
 }

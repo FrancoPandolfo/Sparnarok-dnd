@@ -11,7 +11,9 @@ import type {
   CreateCustomHeroRequestDto,
   MontecarloRequestDto,
   MontecarloResultDto,
+  DprBaselineDto,
 } from '../types/dnd';
+
 
 const API_BASE_URL = '/api/v1';
 
@@ -325,8 +327,145 @@ export const CANONICAL_ARMORS: ArmorDto[] = [
   },
 ];
 
+export const CANONICAL_DPR_BASELINES: DprBaselineDto[] = [
+  // Fighter 2H
+  { archetype: 'Fighter 2H', level: 1, expectedDpr: 9.2, description: 'Greatsword con Great Weapon Fighting' },
+  { archetype: 'Fighter 2H', level: 2, expectedDpr: 10.8, description: 'Action Surge prorrateado' },
+  { archetype: 'Fighter 2H', level: 3, expectedDpr: 12.5, description: 'Subclase Champion/Battle Master' },
+  { archetype: 'Fighter 2H', level: 4, expectedDpr: 14.1, description: 'ASI Fuerza 18 o Dote' },
+  { archetype: 'Fighter 2H', level: 5, expectedDpr: 19.4, description: 'Ataque Extra (2 ataques por turno)' },
+  { archetype: 'Fighter 2H', level: 6, expectedDpr: 21.0, description: 'ASI Fuerza 20' },
+  { archetype: 'Fighter 2H', level: 7, expectedDpr: 22.8, description: 'Habilidad de subclase nivel 7' },
+  { archetype: 'Fighter 2H', level: 8, expectedDpr: 24.5, description: 'Dote de maestría avanzada' },
+  { archetype: 'Fighter 2H', level: 9, expectedDpr: 25.6, description: 'Indomable y bono de competencia +4' },
+  { archetype: 'Fighter 2H', level: 10, expectedDpr: 27.2, description: 'Mejora táctica de combate' },
+  { archetype: 'Fighter 2H', level: 11, expectedDpr: 34.8, description: 'Ataque Extra (3 ataques por turno)' },
+  { archetype: 'Fighter 2H', level: 12, expectedDpr: 36.5, description: 'Dote épica adicional' },
+  { archetype: 'Fighter 2H', level: 13, expectedDpr: 38.2, description: 'Bono de competencia +5' },
+  { archetype: 'Fighter 2H', level: 14, expectedDpr: 40.0, description: 'ASI / Dote' },
+  { archetype: 'Fighter 2H', level: 15, expectedDpr: 42.1, description: 'Subclase avanzada' },
+  { archetype: 'Fighter 2H', level: 16, expectedDpr: 44.2, description: 'ASI / Dote' },
+  { archetype: 'Fighter 2H', level: 17, expectedDpr: 48.0, description: 'Segundo Action Surge' },
+  { archetype: 'Fighter 2H', level: 18, expectedDpr: 50.5, description: 'Subclase capstone' },
+  { archetype: 'Fighter 2H', level: 19, expectedDpr: 53.2, description: 'Dote Épica nivel 19' },
+  { archetype: 'Fighter 2H', level: 20, expectedDpr: 62.0, description: 'Ataque Extra (4 ataques por turno)' },
+  // Ranger Ranged
+  { archetype: 'Ranger Ranged', level: 1, expectedDpr: 7.5, description: 'Arco largo 1d8+3' },
+  { archetype: 'Ranger Ranged', level: 2, expectedDpr: 9.8, description: "Estilo Archery + Hunter's Mark" },
+  { archetype: 'Ranger Ranged', level: 3, expectedDpr: 11.5, description: 'Subclase Gloom Stalker' },
+  { archetype: 'Ranger Ranged', level: 4, expectedDpr: 13.0, description: 'ASI Destreza 18' },
+  { archetype: 'Ranger Ranged', level: 5, expectedDpr: 18.2, description: "Ataque Extra + Hunter's Mark" },
+  { archetype: 'Ranger Ranged', level: 6, expectedDpr: 19.5, description: 'Mejoras tácticas' },
+  { archetype: 'Ranger Ranged', level: 7, expectedDpr: 21.0, description: 'Subclase nivel 7' },
+  { archetype: 'Ranger Ranged', level: 8, expectedDpr: 22.5, description: 'ASI Destreza 20' },
+  { archetype: 'Ranger Ranged', level: 9, expectedDpr: 24.0, description: 'Conjuros de nivel 3' },
+  { archetype: 'Ranger Ranged', level: 10, expectedDpr: 25.5, description: 'Naturaleza infatigable' },
+  { archetype: 'Ranger Ranged', level: 11, expectedDpr: 29.0, description: 'Mejora de daño por subclase' },
+  { archetype: 'Ranger Ranged', level: 12, expectedDpr: 30.5, description: 'Dote' },
+  { archetype: 'Ranger Ranged', level: 13, expectedDpr: 32.0, description: 'Conjuros de nivel 4' },
+  { archetype: 'Ranger Ranged', level: 14, expectedDpr: 33.5, description: 'Habilidad táctica' },
+  { archetype: 'Ranger Ranged', level: 15, expectedDpr: 35.0, description: 'Subclase nivel 15' },
+  { archetype: 'Ranger Ranged', level: 16, expectedDpr: 37.0, description: 'ASI / Dote' },
+  { archetype: 'Ranger Ranged', level: 17, expectedDpr: 40.0, description: 'Conjuros de nivel 5' },
+  { archetype: 'Ranger Ranged', level: 18, expectedDpr: 42.0, description: 'Sentidos ferales' },
+  { archetype: 'Ranger Ranged', level: 19, expectedDpr: 44.5, description: 'Dote épica' },
+  { archetype: 'Ranger Ranged', level: 20, expectedDpr: 48.0, description: 'Foe Slayer 2024' },
+  // Paladin 2H
+  { archetype: 'Paladin 2H', level: 1, expectedDpr: 8.5, description: 'Espadón 2d6+3' },
+  { archetype: 'Paladin 2H', level: 2, expectedDpr: 11.0, description: 'Divine Smite' },
+  { archetype: 'Paladin 2H', level: 3, expectedDpr: 13.0, description: 'Canalizar divinidad' },
+  { archetype: 'Paladin 2H', level: 4, expectedDpr: 14.5, description: 'ASI Fuerza 18' },
+  { archetype: 'Paladin 2H', level: 5, expectedDpr: 20.5, description: 'Ataque Extra + Smite nivel 2' },
+  { archetype: 'Paladin 2H', level: 6, expectedDpr: 21.8, description: 'Aura de protección' },
+  { archetype: 'Paladin 2H', level: 7, expectedDpr: 23.2, description: 'Aura de subclase' },
+  { archetype: 'Paladin 2H', level: 8, expectedDpr: 24.8, description: 'ASI Fuerza 20' },
+  { archetype: 'Paladin 2H', level: 9, expectedDpr: 27.0, description: 'Smite nivel 3' },
+  { archetype: 'Paladin 2H', level: 10, expectedDpr: 28.5, description: 'Aura de coraje' },
+  { archetype: 'Paladin 2H', level: 11, expectedDpr: 36.0, description: 'Radiant Strikes' },
+  { archetype: 'Paladin 2H', level: 12, expectedDpr: 37.8, description: 'Dote' },
+  { archetype: 'Paladin 2H', level: 13, expectedDpr: 40.2, description: 'Smite nivel 4' },
+  { archetype: 'Paladin 2H', level: 14, expectedDpr: 42.0, description: 'Toque purificador' },
+  { archetype: 'Paladin 2H', level: 15, expectedDpr: 44.5, description: 'Subclase nivel 15' },
+  { archetype: 'Paladin 2H', level: 16, expectedDpr: 46.8, description: 'ASI / Dote' },
+  { archetype: 'Paladin 2H', level: 17, expectedDpr: 50.5, description: 'Smite nivel 5' },
+  { archetype: 'Paladin 2H', level: 18, expectedDpr: 53.0, description: 'Rango de auras ampliado' },
+  { archetype: 'Paladin 2H', level: 19, expectedDpr: 55.8, description: 'Dote épica' },
+  { archetype: 'Paladin 2H', level: 20, expectedDpr: 60.0, description: 'Avatar sagrado' },
+  // Barbarian 2H
+  { archetype: 'Barbarian 2H', level: 1, expectedDpr: 9.8, description: 'Greataxe 1d12+3 + Furia' },
+  { archetype: 'Barbarian 2H', level: 2, expectedDpr: 12.0, description: 'Reckless Attack' },
+  { archetype: 'Barbarian 2H', level: 3, expectedDpr: 14.2, description: 'Subclase Berserker/Zealot' },
+  { archetype: 'Barbarian 2H', level: 4, expectedDpr: 16.0, description: 'ASI Fuerza 18' },
+  { archetype: 'Barbarian 2H', level: 5, expectedDpr: 22.0, description: 'Ataque Extra + Furia + Reckless' },
+  { archetype: 'Barbarian 2H', level: 6, expectedDpr: 23.5, description: 'Subclase nivel 6' },
+  { archetype: 'Barbarian 2H', level: 7, expectedDpr: 25.0, description: 'Instinto salvaje' },
+  { archetype: 'Barbarian 2H', level: 8, expectedDpr: 26.8, description: 'ASI Fuerza 20' },
+  { archetype: 'Barbarian 2H', level: 9, expectedDpr: 29.0, description: 'Furia (+3 daño) + Brutal Critical' },
+  { archetype: 'Barbarian 2H', level: 10, expectedDpr: 30.8, description: 'Subclase nivel 10' },
+  { archetype: 'Barbarian 2H', level: 11, expectedDpr: 34.5, description: 'Furia implacable' },
+  { archetype: 'Barbarian 2H', level: 12, expectedDpr: 36.2, description: 'Dote' },
+  { archetype: 'Barbarian 2H', level: 13, expectedDpr: 38.5, description: 'Brutal Strike 2024' },
+  { archetype: 'Barbarian 2H', level: 14, expectedDpr: 40.8, description: 'Subclase nivel 14' },
+  { archetype: 'Barbarian 2H', level: 15, expectedDpr: 43.0, description: 'Furia persistente' },
+  { archetype: 'Barbarian 2H', level: 16, expectedDpr: 45.5, description: 'Furia (+4 daño)' },
+  { archetype: 'Barbarian 2H', level: 17, expectedDpr: 49.0, description: 'Brutal Critical x3' },
+  { archetype: 'Barbarian 2H', level: 18, expectedDpr: 51.5, description: 'Poderío indómito' },
+  { archetype: 'Barbarian 2H', level: 19, expectedDpr: 54.2, description: 'Dote épica' },
+  { archetype: 'Barbarian 2H', level: 20, expectedDpr: 64.0, description: 'Primal Champion (+4 STR/CON)' },
+  // Rogue Sneak Attack
+  { archetype: 'Rogue Sneak Attack', level: 1, expectedDpr: 7.2, description: 'Estoque 1d8+3 + 1d6 Sneak Attack' },
+  { archetype: 'Rogue Sneak Attack', level: 2, expectedDpr: 8.5, description: 'Acción astuta' },
+  { archetype: 'Rogue Sneak Attack', level: 3, expectedDpr: 11.2, description: 'Subclase Assassin + 2d6 Sneak' },
+  { archetype: 'Rogue Sneak Attack', level: 4, expectedDpr: 12.5, description: 'ASI Destreza 18' },
+  { archetype: 'Rogue Sneak Attack', level: 5, expectedDpr: 16.8, description: '3d6 Sneak Attack + Uncanny Dodge' },
+  { archetype: 'Rogue Sneak Attack', level: 6, expectedDpr: 18.0, description: 'Pericia adicional' },
+  { archetype: 'Rogue Sneak Attack', level: 7, expectedDpr: 21.0, description: '4d6 Sneak Attack + Evasión' },
+  { archetype: 'Rogue Sneak Attack', level: 8, expectedDpr: 22.5, description: 'ASI Destreza 20' },
+  { archetype: 'Rogue Sneak Attack', level: 9, expectedDpr: 25.5, description: '5d6 Sneak Attack' },
+  { archetype: 'Rogue Sneak Attack', level: 10, expectedDpr: 27.0, description: 'Dote adicional' },
+  { archetype: 'Rogue Sneak Attack', level: 11, expectedDpr: 30.5, description: '6d6 Sneak Attack + Talento' },
+  { archetype: 'Rogue Sneak Attack', level: 12, expectedDpr: 32.0, description: 'Dote' },
+  { archetype: 'Rogue Sneak Attack', level: 13, expectedDpr: 35.5, description: '7d6 Sneak Attack' },
+  { archetype: 'Rogue Sneak Attack', level: 14, expectedDpr: 37.0, description: 'Sentido ciego' },
+  { archetype: 'Rogue Sneak Attack', level: 15, expectedDpr: 40.5, description: '8d6 Sneak Attack' },
+  { archetype: 'Rogue Sneak Attack', level: 16, expectedDpr: 42.0, description: 'ASI / Dote' },
+  { archetype: 'Rogue Sneak Attack', level: 17, expectedDpr: 46.0, description: '9d6 Sneak Attack + Golpe mortal' },
+  { archetype: 'Rogue Sneak Attack', level: 18, expectedDpr: 48.0, description: 'Elusivo' },
+  { archetype: 'Rogue Sneak Attack', level: 19, expectedDpr: 51.5, description: '10d6 Sneak Attack + Dote épica' },
+  { archetype: 'Rogue Sneak Attack', level: 20, expectedDpr: 55.0, description: 'Golpe de suerte' },
+  // Warlock Eldritch Blast
+  { archetype: 'Warlock Eldritch Blast', level: 1, expectedDpr: 5.5, description: 'Eldritch Blast 1d10' },
+  { archetype: 'Warlock Eldritch Blast', level: 2, expectedDpr: 8.5, description: 'Agonizing Blast (+Carisma)' },
+  { archetype: 'Warlock Eldritch Blast', level: 3, expectedDpr: 9.2, description: 'Pacto y conjuros nivel 2' },
+  { archetype: 'Warlock Eldritch Blast', level: 4, expectedDpr: 10.5, description: 'ASI Carisma 18' },
+  { archetype: 'Warlock Eldritch Blast', level: 5, expectedDpr: 16.5, description: '2 rayos Eldritch Blast (Treantmonk)' },
+  { archetype: 'Warlock Eldritch Blast', level: 6, expectedDpr: 17.5, description: 'Subclase patrón' },
+  { archetype: 'Warlock Eldritch Blast', level: 7, expectedDpr: 18.5, description: 'Conjuros nivel 4' },
+  { archetype: 'Warlock Eldritch Blast', level: 8, expectedDpr: 20.0, description: 'ASI Carisma 20' },
+  { archetype: 'Warlock Eldritch Blast', level: 9, expectedDpr: 21.0, description: 'Invocación mística' },
+  { archetype: 'Warlock Eldritch Blast', level: 10, expectedDpr: 22.0, description: 'Protección de patrón' },
+  { archetype: 'Warlock Eldritch Blast', level: 11, expectedDpr: 28.5, description: '3 rayos Eldritch Blast' },
+  { archetype: 'Warlock Eldritch Blast', level: 12, expectedDpr: 29.8, description: 'Dote' },
+  { archetype: 'Warlock Eldritch Blast', level: 13, expectedDpr: 31.0, description: 'Arcanum nivel 7' },
+  { archetype: 'Warlock Eldritch Blast', level: 14, expectedDpr: 32.5, description: 'Subclase capstone' },
+  { archetype: 'Warlock Eldritch Blast', level: 15, expectedDpr: 33.8, description: 'Arcanum nivel 8' },
+  { archetype: 'Warlock Eldritch Blast', level: 16, expectedDpr: 35.0, description: 'ASI / Dote' },
+  { archetype: 'Warlock Eldritch Blast', level: 17, expectedDpr: 42.0, description: '4 rayos Eldritch Blast' },
+  { archetype: 'Warlock Eldritch Blast', level: 18, expectedDpr: 43.5, description: 'Invocación nivel 18' },
+  { archetype: 'Warlock Eldritch Blast', level: 19, expectedDpr: 45.0, description: 'Dote épica' },
+  { archetype: 'Warlock Eldritch Blast', level: 20, expectedDpr: 47.0, description: 'Master Arcanist' },
+];
+
+export function calculateExpectedDpr(archetype: string, level: number): number {
+  const match = CANONICAL_DPR_BASELINES.find(
+    (b) => b.archetype.toLowerCase() === archetype.toLowerCase() && b.level === level
+  );
+  return match ? match.expectedDpr : 10.0;
+}
+
 // Almacén en memoria para cuando el backend no está disponible
 let inMemoryCreatures: CreatureResponseDto[] = [...INITIAL_CREATURES];
+
 
 /**
  * Cliente de consumo HTTP para la Web API de Sparnarok.
@@ -686,6 +825,62 @@ export const apiClient = {
   },
 
   /**
+   * Obtiene la matriz completa de líneas base de DPR por arquetipo y nivel.
+   */
+  async getDprBaselines(signal?: AbortSignal): Promise<DprBaselineDto[]> {
+    try {
+      const response = await fetch('/api/v1/dpr-baselines', { signal });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return [...CANONICAL_DPR_BASELINES];
+  },
+
+  /**
+   * Obtiene la lista de arquetipos de daño soportados para PCs.
+   */
+  async getDprArchetypes(signal?: AbortSignal): Promise<string[]> {
+    try {
+      const response = await fetch('/api/v1/dpr-baselines/archetypes', { signal });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return Array.from(new Set(CANONICAL_DPR_BASELINES.map((b) => b.archetype)));
+  },
+
+  /**
+   * Calcula el DPR esperado para un arquetipo y nivel dados.
+   */
+  async calculateDpr(archetype: string, level: number): Promise<number> {
+    try {
+      const response = await fetch(
+        `/api/v1/dpr-baselines/calculate?archetype=${encodeURIComponent(archetype)}&level=${level}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (typeof data.expectedDpr === 'number') {
+          return data.expectedDpr;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return calculateExpectedDpr(archetype, level);
+  },
+
+  /**
    * Crea un combatiente customizado (Héroe / Personaje de Jugador) con estadísticas finales.
    */
   async createCustomHero(request: CreateCustomHeroRequestDto): Promise<CreatureResponseDto> {
@@ -713,6 +908,10 @@ export const apiClient = {
     const cha = request.charisma ?? 10;
     const calcMod = (val: number) => Math.floor((val - 10) / 2);
 
+    const calculatedDpr =
+      request.expectedDpr ??
+      (request.archetype && request.level ? calculateExpectedDpr(request.archetype, request.level) : null);
+
     const newHero: CreatureResponseDto = {
       id: `hero-${Date.now()}`,
       name: request.name,
@@ -724,6 +923,9 @@ export const apiClient = {
       proficiencyBonus: 2,
       effectiveArmorClass: request.armorClass,
       isPlayerCharacter: true,
+      level: request.level ?? 1,
+      archetype: request.archetype ?? null,
+      expectedDpr: calculatedDpr,
       abilityScores: {
         strength: str,
         strengthModifier: calcMod(str),
@@ -753,13 +955,15 @@ export const apiClient = {
         {
           id: `act-${Date.now()}`,
           creatureId: `hero-${Date.now()}`,
-          name: request.attackName || 'Ataque Principal',
+          name: request.attackName || (request.archetype ? `${request.archetype} Attack` : 'Ataque Principal'),
           type: 'Action',
-          description: `Ataque estándar del héroe ${request.name}.`,
+          description: request.archetype
+            ? `Ataque basado en arquetipo ${request.archetype} (${calculatedDpr ?? 0} DPR)`
+            : `Ataque estándar del héroe ${request.name}.`,
           isAttack: true,
           attackBonus: calcMod(str) + 2,
           reachOrRangeFeet: 5,
-          damageFormula: request.damageFormula || '1d8',
+          damageFormula: request.damageFormula || (calculatedDpr ? `${calculatedDpr} DPR` : '1d8'),
           damageType: 'Slashing',
           attackModifierAbility: request.attackModifierAbility || 'Strength',
           associatedMasteryId: null,
@@ -816,8 +1020,8 @@ export const apiClient = {
     const it = request.iterations || 10000;
     const creatureA = inMemoryCreatures.find((c) => c.id === request.combatantAId);
     const creatureB = inMemoryCreatures.find((c) => c.id === request.combatantBId);
-    const weaponA = CANONICAL_WEAPONS.find((w) => w.id === request.weaponAId);
-    const weaponB = CANONICAL_WEAPONS.find((w) => w.id === request.weaponBId);
+    const weaponA = request.weaponAId ? CANONICAL_WEAPONS.find((w) => w.id === request.weaponAId) : null;
+    const weaponB = request.weaponBId ? CANONICAL_WEAPONS.find((w) => w.id === request.weaponBId) : null;
 
     const aWins = Math.round(it * 0.61);
     const bWins = it - aWins;
@@ -831,12 +1035,12 @@ export const apiClient = {
       combatantBWinRate: 39.0,
       drawRate: 0.0,
       averageRounds: 3.8,
-      combatantAAverageDpr: 8.5,
-      combatantBAverageDpr: 5.7,
+      combatantAAverageDpr: creatureA?.expectedDpr ?? 8.5,
+      combatantBAverageDpr: creatureB?.expectedDpr ?? 5.7,
       combatantAName: creatureA?.name ?? 'Combatant A',
       combatantBName: creatureB?.name ?? 'Combatant B',
-      weaponAName: weaponA?.name ?? 'Weapon A',
-      weaponBName: weaponB?.name ?? 'Weapon B',
+      weaponAName: weaponA?.name ?? (creatureA?.expectedDpr ? `DPR Baseline (${creatureA.expectedDpr} DPR)` : 'Unarmed'),
+      weaponBName: weaponB?.name ?? (creatureB?.expectedDpr ? `DPR Baseline (${creatureB.expectedDpr} DPR)` : 'Unarmed'),
       executionTimeMs: 14,
     };
   },

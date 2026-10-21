@@ -15,12 +15,15 @@ describe('CustomHeroModal Component', () => {
     name: 'Paladín Roland',
     size: 'Medium',
     type: 'Humanoid',
-    alignment: 'Lawful Good',
-    challengeRating: 5,
+    alignment: 'Heroic',
+    challengeRating: 1,
     speedFeet: 30,
-    proficiencyBonus: 3,
+    proficiencyBonus: 2,
     effectiveArmorClass: 18,
     isPlayerCharacter: true,
+    level: 5,
+    archetype: 'Fighter 2H',
+    expectedDpr: 19.4,
     abilityScores: {
       strength: 18,
       strengthModifier: 4,
@@ -37,22 +40,7 @@ describe('CustomHeroModal Component', () => {
     },
     hitPoints: { max: 52, current: 52, temporary: 0 },
     armorClass: { base: 18, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
-    actions: [
-      {
-        id: 'act-1',
-        creatureId: 'hero-1',
-        name: 'Martillo de Guerra',
-        type: 'Action',
-        description: 'Ataque de arma cuerpo a cuerpo: +7 al impacto, daño 1d8+4 contundente.',
-        isAttack: true,
-        attackBonus: 7,
-        reachOrRangeFeet: 5,
-        damageFormula: '1d8+4',
-        damageType: 'Bludgeoning',
-        attackModifierAbility: 'Strength',
-        associatedMasteryId: null,
-      },
-    ],
+    actions: [],
     knownMasteries: [],
   };
 
@@ -68,7 +56,7 @@ describe('CustomHeroModal Component', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders all form fields when isOpen is true', () => {
+  it('renders all form fields including archetype, level, and expected DPR when isOpen is true', () => {
     render(
       <CustomHeroModal
         isOpen={true}
@@ -85,10 +73,39 @@ describe('CustomHeroModal Component', () => {
     expect(document.getElementById('hero-str-input')).toBeInTheDocument();
     expect(document.getElementById('hero-dex-input')).toBeInTheDocument();
     expect(document.getElementById('hero-con-input')).toBeInTheDocument();
+    expect(document.getElementById('hero-archetype-select')).toBeInTheDocument();
+    expect(document.getElementById('hero-level-select')).toBeInTheDocument();
+    expect(document.getElementById('hero-expected-dpr-display')).toBeInTheDocument();
     expect(document.getElementById('save-custom-hero-btn')).toBeInTheDocument();
+
+    // Default Fighter 2H Level 5 gives 19.4 DPR
+    expect(screen.getByText('19.4 DPR')).toBeInTheDocument();
   });
 
-  it('submits valid hero data and triggers callbacks', async () => {
+  it('updates live Expected DPR when selecting a different archetype or level', async () => {
+    render(
+      <CustomHeroModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSaveHero={vi.fn()}
+        onHeroSaved={vi.fn()}
+      />
+    );
+
+    const levelSelect = document.getElementById('hero-level-select') as HTMLSelectElement;
+    await userEvent.selectOptions(levelSelect, '1');
+
+    // Fighter 2H Level 1 has 9.2 DPR
+    expect(screen.getByText('9.2 DPR')).toBeInTheDocument();
+
+    const archetypeSelect = document.getElementById('hero-archetype-select') as HTMLSelectElement;
+    await userEvent.selectOptions(archetypeSelect, 'Ranger Ranged');
+
+    // Ranger Ranged Level 1 has 7.5 DPR
+    expect(screen.getByText('7.5 DPR')).toBeInTheDocument();
+  });
+
+  it('submits valid hero data with expected DPR and triggers callbacks', async () => {
     const mockSave = vi.fn().mockResolvedValue(mockSavedHero);
     const mockSaved = vi.fn();
     const mockClose = vi.fn();
@@ -123,8 +140,11 @@ describe('CustomHeroModal Component', () => {
         strength: 16,
         dexterity: 14,
         constitution: 14,
-        attackName: 'Espada Larga',
-        damageFormula: '1d8+3',
+        level: 5,
+        archetype: 'Fighter 2H',
+        expectedDpr: 19.4,
+        attackName: 'Fighter 2H Baseline',
+        damageFormula: '19.4 DPR',
         attackModifierAbility: 'Strength',
       });
       expect(mockSaved).toHaveBeenCalledWith(mockSavedHero);

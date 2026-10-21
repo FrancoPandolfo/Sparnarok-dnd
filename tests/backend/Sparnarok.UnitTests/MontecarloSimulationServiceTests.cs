@@ -25,15 +25,16 @@ public class MontecarloSimulationServiceTests
             _resultFactory = resultFactory;
         }
 
-        public FastDuelResult SimulateFastDuel(Creature combatant1, Weapon weapon1, Creature combatant2, Weapon weapon2) =>
+        public FastDuelResult SimulateFastDuel(Creature combatant1, Weapon? weapon1, Creature combatant2, Weapon? weapon2) =>
             _resultFactory();
 
-        public CombatSimulationResult SimulateDuel(Creature combatant1, Weapon weapon1, Creature combatant2, Weapon weapon2) =>
+        public CombatSimulationResult SimulateDuel(Creature combatant1, Weapon? weapon1, Creature combatant2, Weapon? weapon2) =>
             throw new NotImplementedException();
 
-        public Task<CombatSimulationResult> SimulateDuelAsync(Guid creature1Id, Guid weapon1Id, Guid creature2Id, Guid weapon2Id, CancellationToken cancellationToken = default) =>
+        public Task<CombatSimulationResult> SimulateDuelAsync(Guid creature1Id, Guid? weapon1Id, Guid creature2Id, Guid? weapon2Id, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
     }
+
 
     private static Creature CreateCreature(string name, int hp, int ac)
     {

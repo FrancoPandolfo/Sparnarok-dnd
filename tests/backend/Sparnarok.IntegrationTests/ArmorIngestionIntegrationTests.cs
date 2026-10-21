@@ -52,13 +52,32 @@ public class ArmorIngestionIntegrationTests : IClassFixture<CustomWebApplication
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-        context.Database.EnsureCreated();
+        TestDatabaseInitializer.EnsureCreated(context);
     }
 
     [Fact]
     public async Task IngestArmors_WithValidCsv_PersistsEntitiesInDatabase()
     {
-        // Arrange: Mini CSV con una de cada categoría y guiones "-"
+        // Arrange: Limpieza previa de armaduras de prueba para aislamiento determinista
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var db = setupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var toRemove = await db.Armors.Where(a => a.Name == "Leather Armor" || a.Name == "Half Plate Armor" || a.Name == "Plate Armor" || a.Name == "Shield").ToListAsync();
+            if (toRemove.Count > 0)
+            {
+                var armorIds = toRemove.Select(a => a.Id).ToList();
+                var creaturesWithArmor = await db.Creatures.Where(c => (c.EquippedArmorId != null && armorIds.Contains(c.EquippedArmorId.Value)) || (c.EquippedShieldId != null && armorIds.Contains(c.EquippedShieldId.Value))).ToListAsync();
+                foreach (var c in creaturesWithArmor)
+                {
+                    if (c.EquippedArmorId != null && armorIds.Contains(c.EquippedArmorId.Value)) c.UnequipArmor();
+                    if (c.EquippedShieldId != null && armorIds.Contains(c.EquippedShieldId.Value)) c.UnequipShield();
+                }
+                db.Armors.RemoveRange(toRemove);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // Mini CSV con una de cada categoría y guiones "-"
         const string csvData = """
             Name,Category,ArmorClass,Strength,Stealth,Weight,Cost
             Leather Armor,Light,11 + Dex modifier,-,-,10 lb.,10 GP
@@ -160,6 +179,13 @@ public class ArmorIngestionIntegrationTests : IClassFixture<CustomWebApplication
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
 
+        var existingCreature = await dbContext.Creatures.FirstOrDefaultAsync(c => c.Name == "Dynamic AC Fighter");
+        if (existingCreature != null) dbContext.Creatures.Remove(existingCreature);
+
+        var existingArmors = await dbContext.Armors.Where(a => a.Name == "Test Half Plate" || a.Name == "Test Shield").ToListAsync();
+        if (existingArmors.Count > 0) dbContext.Armors.RemoveRange(existingArmors);
+        await dbContext.SaveChangesAsync();
+
         var abilities = new AbilityScores(strength: 16, dexterity: 18, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10);
         var hp = new HitPoints(max: 30, current: 30);
         var ac = new ArmorClass(baseValue: 10, shieldBonus: 0, allowsDexterityModifier: true);
@@ -217,5 +243,10 @@ public class ArmorIngestionIntegrationTests : IClassFixture<CustomWebApplication
         // 5. Desequipar escudo: 10 + 4 = 14
         creature.UnequipShield();
         creature.EffectiveArmorClass.Should().Be(14);
+
+        // Teardown
+        dbContext.Creatures.Remove(creature);
+        dbContext.Armors.RemoveRange(halfPlate, shield);
+        await dbContext.SaveChangesAsync();
     }
 }

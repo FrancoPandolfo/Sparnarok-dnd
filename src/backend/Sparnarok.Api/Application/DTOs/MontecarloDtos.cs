@@ -4,16 +4,17 @@ namespace Sparnarok.Api.Application.DTOs;
 /// Solicitud para ejecutar una simulación estocástica masiva de combate Monte Carlo.
 /// </summary>
 /// <param name="CombatantAId">Identificador de la primera criatura.</param>
-/// <param name="WeaponAId">Identificador del arma de la primera criatura.</param>
+/// <param name="WeaponAId">Identificador del arma de la primera criatura (opcional si la criatura tiene ExpectedDpr).</param>
 /// <param name="CombatantBId">Identificador de la segunda criatura.</param>
-/// <param name="WeaponBId">Identificador del arma de la segunda criatura.</param>
+/// <param name="WeaponBId">Identificador del arma de la segunda criatura (opcional si la criatura tiene ExpectedDpr).</param>
 /// <param name="Iterations">Número de iteraciones del duelo a simular concurrentemente (por defecto 10,000).</param>
 public record MontecarloRequestDto(
     Guid CombatantAId,
-    Guid WeaponAId,
+    Guid? WeaponAId,
     Guid CombatantBId,
-    Guid WeaponBId,
+    Guid? WeaponBId,
     int Iterations = 10000);
+
 
 /// <summary>
 /// Métricas agregadas y estadísticas consolidadas resultantes de la simulación de Monte Carlo.

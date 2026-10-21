@@ -39,14 +39,18 @@ public class CombatSimulatorService : ICombatSimulatorService
     /// <inheritdoc />
     public CombatSimulationResult SimulateDuel(
         Creature combatant1,
-        Weapon weapon1,
+        Weapon? weapon1,
         Creature combatant2,
-        Weapon weapon2)
+        Weapon? weapon2)
     {
         ArgumentNullException.ThrowIfNull(combatant1);
-        ArgumentNullException.ThrowIfNull(weapon1);
         ArgumentNullException.ThrowIfNull(combatant2);
-        ArgumentNullException.ThrowIfNull(weapon2);
+
+        if (weapon1 == null && (!combatant1.IsPlayerCharacter || !combatant1.ExpectedDpr.HasValue || combatant1.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weapon1), $"El combatiente {combatant1.Name} requiere un arma equipada al no poseer ExpectedDpr.");
+
+        if (weapon2 == null && (!combatant2.IsPlayerCharacter || !combatant2.ExpectedDpr.HasValue || combatant2.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weapon2), $"El combatiente {combatant2.Name} requiere un arma equipada al no poseer ExpectedDpr.");
 
         var simulationId = Guid.NewGuid();
         var logs = new List<CombatEventLog>();
@@ -123,10 +127,13 @@ public class CombatSimulatorService : ICombatSimulatorService
             winnerId = null;
         }
 
+        var weaponName1 = weapon1?.Name ?? (combatant1.ExpectedDpr.HasValue ? $"DPR Baseline ({combatant1.Archetype ?? "Hero"})" : "Unarmed");
+        var weaponName2 = weapon2?.Name ?? (combatant2.ExpectedDpr.HasValue ? $"DPR Baseline ({combatant2.Archetype ?? "Hero"})" : "Unarmed");
+
         var summary1 = new CombatantSummary(
             combatant1.Id,
             combatant1.Name,
-            weapon1.Name,
+            weaponName1,
             totalInit1,
             combatant1.HitPoints.Max,
             combatant1.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp,
@@ -135,7 +142,7 @@ public class CombatSimulatorService : ICombatSimulatorService
         var summary2 = new CombatantSummary(
             combatant2.Id,
             combatant2.Name,
-            weapon2.Name,
+            weaponName2,
             totalInit2,
             combatant2.HitPoints.Max,
             combatant2.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp,
@@ -152,13 +159,23 @@ public class CombatSimulatorService : ICombatSimulatorService
             DateTime.UtcNow);
     }
 
+
     /// <inheritdoc />
     public FastDuelResult SimulateFastDuel(
         Creature combatant1,
-        Weapon weapon1,
+        Weapon? weapon1,
         Creature combatant2,
-        Weapon weapon2)
+        Weapon? weapon2)
     {
+        ArgumentNullException.ThrowIfNull(combatant1);
+        ArgumentNullException.ThrowIfNull(combatant2);
+
+        if (weapon1 == null && (!combatant1.IsPlayerCharacter || !combatant1.ExpectedDpr.HasValue || combatant1.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weapon1), $"El combatiente {combatant1.Name} requiere un arma equipada al no poseer ExpectedDpr.");
+
+        if (weapon2 == null && (!combatant2.IsPlayerCharacter || !combatant2.ExpectedDpr.HasValue || combatant2.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weapon2), $"El combatiente {combatant2.Name} requiere un arma equipada al no poseer ExpectedDpr.");
+
         var dexMod1 = combatant1.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
         var dexMod2 = combatant2.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
 
@@ -230,6 +247,21 @@ public class CombatSimulatorService : ICombatSimulatorService
 
     private int ExecuteFastAttack(Fighter attacker, Fighter defender)
     {
+        // Flujo alternativo de ExpectedDpr para Personajes de Jugador:
+        // Se omite la tirada d20 contra CA y se aplica daño directo con ±15% de varianza
+        if (attacker.Creature.IsPlayerCharacter && attacker.Creature.ExpectedDpr.HasValue && attacker.Creature.ExpectedDpr.Value > 0)
+        {
+            var baseDpr = attacker.Creature.ExpectedDpr.Value;
+            var variancePercent = _random.Next(-15, 16);
+            var factor = 1.0 + (variancePercent / 100.0);
+            var damage = Math.Max(1, (int)Math.Round(baseDpr * factor, MidpointRounding.AwayFromZero));
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
+            return damage;
+        }
+
+        if (attacker.Weapon == null)
+            return 0;
+
         var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
         var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
 
@@ -257,9 +289,9 @@ public class CombatSimulatorService : ICombatSimulatorService
     /// <inheritdoc />
     public async Task<CombatSimulationResult> SimulateDuelAsync(
         Guid creature1Id,
-        Guid weapon1Id,
+        Guid? weapon1Id,
         Guid creature2Id,
-        Guid weapon2Id,
+        Guid? weapon2Id,
         CancellationToken cancellationToken = default)
     {
         if (_context == null)
@@ -271,9 +303,17 @@ public class CombatSimulatorService : ICombatSimulatorService
             .FirstOrDefaultAsync(c => c.Id == creature1Id, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura con ID: {creature1Id}");
 
-        var weapon1 = await _context.Weapons
-            .FirstOrDefaultAsync(w => w.Id == weapon1Id, cancellationToken)
-            ?? throw new KeyNotFoundException($"No se encontró el arma con ID: {weapon1Id}");
+        Weapon? weapon1 = null;
+        if (weapon1Id.HasValue && weapon1Id.Value != Guid.Empty)
+        {
+            weapon1 = await _context.Weapons
+                .FirstOrDefaultAsync(w => w.Id == weapon1Id.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"No se encontró el arma con ID: {weapon1Id}");
+        }
+        else if (!creature1.IsPlayerCharacter || !creature1.ExpectedDpr.HasValue || creature1.ExpectedDpr.Value <= 0)
+        {
+            throw new KeyNotFoundException($"Se requiere un arma para la criatura {creature1.Name} al no tener configurado ExpectedDpr.");
+        }
 
         var creature2 = await _context.Creatures
             .Include(c => c.EquippedArmor)
@@ -281,9 +321,17 @@ public class CombatSimulatorService : ICombatSimulatorService
             .FirstOrDefaultAsync(c => c.Id == creature2Id, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura con ID: {creature2Id}");
 
-        var weapon2 = await _context.Weapons
-            .FirstOrDefaultAsync(w => w.Id == weapon2Id, cancellationToken)
-            ?? throw new KeyNotFoundException($"No se encontró el arma con ID: {weapon2Id}");
+        Weapon? weapon2 = null;
+        if (weapon2Id.HasValue && weapon2Id.Value != Guid.Empty)
+        {
+            weapon2 = await _context.Weapons
+                .FirstOrDefaultAsync(w => w.Id == weapon2Id.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"No se encontró el arma con ID: {weapon2Id}");
+        }
+        else if (!creature2.IsPlayerCharacter || !creature2.ExpectedDpr.HasValue || creature2.ExpectedDpr.Value <= 0)
+        {
+            throw new KeyNotFoundException($"Se requiere un arma para la criatura {creature2.Name} al no tener configurado ExpectedDpr.");
+        }
 
         return SimulateDuel(creature1, weapon1, creature2, weapon2);
     }
@@ -297,6 +345,44 @@ public class CombatSimulatorService : ICombatSimulatorService
         Fighter defender,
         List<CombatEventLog> logs)
     {
+        // Si el atacante es un Player Character con ExpectedDpr configurado,
+        // se omite la tirada de ataque convencional d20 vs CA y se reduce directamente la vida del defensor con ±15% de varianza
+        if (attacker.Creature.IsPlayerCharacter && attacker.Creature.ExpectedDpr.HasValue && attacker.Creature.ExpectedDpr.Value > 0)
+        {
+            var baseDpr = attacker.Creature.ExpectedDpr.Value;
+            var variancePercent = _random.Next(-15, 16); // -15% a +15%
+            var factor = 1.0 + (variancePercent / 100.0);
+            var dprDamage = Math.Max(1, (int)Math.Round(baseDpr * factor, MidpointRounding.AwayFromZero));
+
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - dprDamage);
+
+            var weaponName = attacker.Weapon?.Name ?? $"DPR Baseline ({attacker.Creature.Archetype ?? "Hero"})";
+            var sign = variancePercent >= 0 ? "+" : "";
+            var dprDescription = $"{attacker.Creature.Name} ejecuta su turno con DPR de arquetipo ({baseDpr:F1} DPR, varianza {sign}{variancePercent}%): inflige {dprDamage} de daño directo a {defender.Creature.Name}. (HP restantes: {defender.CurrentHp})";
+
+            logs.Add(new CombatEventLog(
+                Round: round,
+                AttackerName: attacker.Creature.Name,
+                DefenderName: defender.Creature.Name,
+                WeaponName: weaponName,
+                D20Roll: 0,
+                AttackModifier: 0,
+                TotalAttackRoll: 0,
+                TargetArmorClass: defender.EffectiveAc,
+                IsNatural20: false,
+                IsNatural1: false,
+                IsHit: true,
+                DamageDealt: dprDamage,
+                DefenderRemainingHp: defender.CurrentHp,
+                Description: dprDescription));
+
+            return;
+        }
+
+
+        if (attacker.Weapon == null)
+            throw new InvalidOperationException($"El combatiente {attacker.Creature.Name} no tiene un arma equipada ni ExpectedDpr configurado.");
+
         // Determinación de la característica gobernante del ataque según propiedades del arma
         var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
         var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
@@ -381,10 +467,12 @@ public class CombatSimulatorService : ICombatSimulatorService
     /// - Ranged (Ammunition sin Thrown): Destreza.
     /// - Melee estándar: Fuerza.
     /// </summary>
-    private static int GetWeaponAbilityModifier(Creature creature, Weapon weapon)
+    private static int GetWeaponAbilityModifier(Creature creature, Weapon? weapon)
     {
         var strMod = creature.AbilityScores.GetModifier(AbilityScoreType.Strength);
         var dexMod = creature.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
+
+        if (weapon == null) return strMod;
 
         var props = weapon.Properties ?? string.Empty;
 
@@ -408,12 +496,12 @@ public class CombatSimulatorService : ICombatSimulatorService
     private class Fighter
     {
         public Creature Creature { get; }
-        public Weapon Weapon { get; }
+        public Weapon? Weapon { get; }
         public int Initiative { get; }
         public int CurrentHp { get; set; }
         public int EffectiveAc { get; }
 
-        public Fighter(Creature creature, Weapon weapon, int initiative)
+        public Fighter(Creature creature, Weapon? weapon, int initiative)
         {
             Creature = creature;
             Weapon = weapon;
@@ -423,3 +511,4 @@ public class CombatSimulatorService : ICombatSimulatorService
         }
     }
 }
+

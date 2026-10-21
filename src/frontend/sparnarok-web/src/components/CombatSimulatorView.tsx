@@ -78,7 +78,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   );
 
   const handleRun = async () => {
-    if (!combatantAId || !combatantBId || !weaponAId || !weaponBId) {
+    const hasDprA = Boolean(creatureA?.expectedDpr);
+    const hasDprB = Boolean(creatureB?.expectedDpr);
+
+    if (!combatantAId || !combatantBId) {
+      return;
+    }
+    if (!hasDprA && !weaponAId) {
+      return;
+    }
+    if (!hasDprB && !weaponBId) {
       return;
     }
 
@@ -88,9 +97,9 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     try {
       const response = await onRunSimulation({
         combatantAId,
-        weaponAId,
+        weaponAId: hasDprA ? undefined : weaponAId,
         combatantBId,
-        weaponBId,
+        weaponBId: hasDprB ? undefined : weaponBId,
         iterations,
       });
 
@@ -145,7 +154,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             >
               {creatures.map((c) => (
                 <option key={`a-${c.id}`} value={c.id}>
-                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}{c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
+                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                  {c.name}
+                  {c.expectedDpr
+                    ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                    : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
                 </option>
               ))}
             </select>
@@ -158,15 +171,21 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <select
               id="weapon-a-select"
               className="sim-select"
-              value={weaponAId}
+              value={creatureA?.expectedDpr ? '' : weaponAId}
               onChange={(e) => setWeaponAId(e.target.value)}
-              disabled={isSimulating}
+              disabled={isSimulating || Boolean(creatureA?.expectedDpr)}
             >
-              {weapons.map((w) => (
-                <option key={`w-a-${w.id}`} value={w.id}>
-                  {w.name} ({w.damage} {w.damageType})
+              {creatureA?.expectedDpr ? (
+                <option value="">
+                  {t('simulation.noWeaponRequiredDpr', { dpr: creatureA.expectedDpr })}
                 </option>
-              ))}
+              ) : (
+                weapons.map((w) => (
+                  <option key={`w-a-${w.id}`} value={w.id}>
+                    {w.name} ({w.damage} {w.damageType})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -174,7 +193,14 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <div className="creature-preview-strip">
               <span>🛡️ CA: <strong>{creatureA.effectiveArmorClass}</strong></span>
               <span>❤️ HP: <strong>{creatureA.hitPoints.max}</strong></span>
-              <span>⚡ PB: <strong>+{creatureA.proficiencyBonus}</strong></span>
+              {creatureA.expectedDpr ? (
+                <span className="dpr-preview-badge">⚡ DPR: <strong>{creatureA.expectedDpr}</strong></span>
+              ) : (
+                <span>⚡ PB: <strong>+{creatureA.proficiencyBonus}</strong></span>
+              )}
+              {creatureA.archetype && (
+                <span className="archetype-preview-badge">🏹 {creatureA.archetype} (Nv {creatureA.level ?? 1})</span>
+              )}
             </div>
           )}
         </div>
@@ -201,7 +227,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             >
               {creatures.map((c) => (
                 <option key={`b-${c.id}`} value={c.id}>
-                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}{c.name} (CR {c.challengeRating} | CA {c.effectiveArmorClass} | {c.hitPoints.max} HP)
+                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                  {c.name}
+                  {c.expectedDpr
+                    ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                    : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
                 </option>
               ))}
             </select>
@@ -214,15 +244,21 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <select
               id="weapon-b-select"
               className="sim-select"
-              value={weaponBId}
+              value={creatureB?.expectedDpr ? '' : weaponBId}
               onChange={(e) => setWeaponBId(e.target.value)}
-              disabled={isSimulating}
+              disabled={isSimulating || Boolean(creatureB?.expectedDpr)}
             >
-              {weapons.map((w) => (
-                <option key={`w-b-${w.id}`} value={w.id}>
-                  {w.name} ({w.damage} {w.damageType})
+              {creatureB?.expectedDpr ? (
+                <option value="">
+                  {t('simulation.noWeaponRequiredDpr', { dpr: creatureB.expectedDpr })}
                 </option>
-              ))}
+              ) : (
+                weapons.map((w) => (
+                  <option key={`w-b-${w.id}`} value={w.id}>
+                    {w.name} ({w.damage} {w.damageType})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -230,7 +266,14 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <div className="creature-preview-strip">
               <span>🛡️ CA: <strong>{creatureB.effectiveArmorClass}</strong></span>
               <span>❤️ HP: <strong>{creatureB.hitPoints.max}</strong></span>
-              <span>⚡ PB: <strong>+{creatureB.proficiencyBonus}</strong></span>
+              {creatureB.expectedDpr ? (
+                <span className="dpr-preview-badge">⚡ DPR: <strong>{creatureB.expectedDpr}</strong></span>
+              ) : (
+                <span>⚡ PB: <strong>+{creatureB.proficiencyBonus}</strong></span>
+              )}
+              {creatureB.archetype && (
+                <span className="archetype-preview-badge">🏹 {creatureB.archetype} (Nv {creatureB.level ?? 1})</span>
+              )}
             </div>
           )}
         </div>

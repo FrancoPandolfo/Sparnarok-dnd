@@ -1731,3 +1731,63 @@
   margin: 0;
 }
 
+/* ==========================================================================
+   DPR Baselines & Archetype Abstraction Styles
+   ========================================================================== */
+.dpr-indicator-panel {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(13, 18, 31, 0.85) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  box-shadow: inset 0 0 20px rgba(245, 158, 11, 0.05);
+}
+
+.dpr-indicator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dpr-indicator-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fde68a;
+  letter-spacing: 0.02em;
+}
+
+.dpr-indicator-value {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  color: #fbbf24;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.35);
+}
+
+.dpr-indicator-note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dpr-preview-badge {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  font-weight: 600;
+}
+
+.archetype-preview-badge {
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: #c7d2fe;
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  font-weight: 600;
+}
+

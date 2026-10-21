@@ -38,11 +38,20 @@ public class CreateCustomHeroRequestDto
     /// <summary>Velocidad en pies (por defecto 30).</summary>
     public int SpeedFeet { get; set; } = 30;
 
-    /// <summary>Nombre del ataque o habilidad táctica primaria del héroe.</summary>
-    public string AttackName { get; set; } = "Ataque Principal";
+    /// <summary>Nivel del personaje (1 a 20, por defecto 1).</summary>
+    public int Level { get; set; } = 1;
+
+    /// <summary>Nombre del arquetipo o clase (ej. 'Fighter 2H', 'Ranger Ranged').</summary>
+    public string? Archetype { get; set; }
+
+    /// <summary>Daño promedio por ronda esperado (Expected DPR). Si no se proporciona, se calcula a partir del arquetipo y nivel.</summary>
+    public double? ExpectedDpr { get; set; }
+
+    /// <summary>Nombre del ataque o habilidad táctica primaria del héroe (opcional si se usa DPR).</summary>
+    public string? AttackName { get; set; } = "Ataque Principal";
 
     /// <summary>Fórmula de dados de daño del ataque (ej. "1d8", "2d6", "1d10").</summary>
-    public string DamageFormula { get; set; } = "1d8";
+    public string? DamageFormula { get; set; } = "1d8";
 
     /// <summary>Característica gobernante para la tirada de ataque del héroe.</summary>
     public AbilityScoreType AttackModifierAbility { get; set; } = AbilityScoreType.Strength;
