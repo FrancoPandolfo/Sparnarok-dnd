@@ -13,3 +13,4 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 - [ADR-0003: Estrategia de Mapeo y Persistencia con Entity Framework Core y PostgreSQL](file:///docs/adrs/0003-efcore-postgresql-persistence-mapping.md)
 - [ADR-0004: Diseño de la Capa de Aplicación, Patrón Repositorio y Endpoints CRUD para Criaturas](file:///docs/adrs/0004-application-cqrs-and-crud-endpoints.md)
 - [ADR-0005: Arquitectura Frontend y Cliente de Consumo para Gestión Táctica de Criaturas](file:///docs/adrs/0005-frontend-creatures-tactical-ui.md)
+- [ADR-0006: Pipeline de Ingesta Masiva de Datos Mediante CSV y CsvHelper](file:///docs/adrs/0006-csv-data-ingestion-pipeline.md)

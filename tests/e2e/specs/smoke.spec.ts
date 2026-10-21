@@ -61,4 +61,71 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await page.locator('#close-stat-modal-btn').click();
     await expect(page.getByText('Características y Modificadores')).not.toBeVisible();
   });
+
+  test('Admin user uploads weapons CSV file and views ingestion metrics summary', async ({ page }) => {
+    // Intercept POST /api/ingestion/weapons to return deterministic API ingestion metrics
+    await page.route('**/api/ingestion/weapons', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            totalProcessed: 3,
+            inserted: 2,
+            updated: 1,
+            errors: [],
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/');
+
+    // Open Data Ingestion modal
+    const openIngestionBtn = page.locator('#open-ingestion-btn');
+    await expect(openIngestionBtn).toBeVisible();
+    await openIngestionBtn.click();
+
+    // Verify modal header and format spec
+    await expect(page.getByRole('heading', { level: 2, name: /Pipeline de Ingesta: Armas/i })).toBeVisible();
+    await expect(page.getByText('Name,Damage,DamageType,Properties,Weight,Cost')).toBeVisible();
+
+    // Verify upload button disabled until file is attached
+    const uploadBtn = page.locator('#upload-csv-btn');
+    await expect(uploadBtn).toBeDisabled();
+
+    // Attach sample weapons CSV file
+    const sampleCsvContent = [
+      'Name,Damage,DamageType,Properties,Weight,Cost',
+      'Longsword,1d8,Slashing,"Versatile (1d10)",3.0,15 gp',
+      'Shortbow,1d6,Piercing,"Two-Handed, Ammunition",2.0,25 gp',
+      'Dagger,1d4,Piercing,"Finesse, Light, Thrown",1.0,2 gp',
+    ].join('\n');
+
+    await page.locator('#weapon-csv-input').setInputFiles({
+      name: 'canonical_weapons.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(sampleCsvContent, 'utf-8'),
+    });
+
+    // File name is displayed and upload button enabled
+    await expect(page.getByText('canonical_weapons.csv')).toBeVisible();
+    await expect(uploadBtn).toBeEnabled();
+
+    // Execute upload
+    await uploadBtn.click();
+
+    // Verify results card displays metrics
+    await expect(page.locator('#ingestion-results-panel')).toBeVisible();
+    await expect(page.locator('#ingestion-total')).toHaveText('3');
+    await expect(page.locator('#ingestion-inserted')).toHaveText('2');
+    await expect(page.locator('#ingestion-updated')).toHaveText('1');
+
+    // Close modal
+    await page.locator('#close-ingestion-modal-btn').click();
+    await expect(page.locator('#ingestion-results-panel')).not.toBeVisible();
+  });
 });
+

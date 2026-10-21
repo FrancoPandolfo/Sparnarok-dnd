@@ -199,3 +199,26 @@ export interface CreateActionRequestDto {
   attackModifierAbility?: AbilityScoreType | null;
   associatedMasteryId?: string | null;
 }
+
+/**
+ * DTO que describe un arma canónica o importada en el Códice.
+ */
+export interface WeaponDto {
+  id: string;
+  name: string;
+  damage: string;
+  damageType: DamageType;
+  properties: string;
+  weight: number;
+  cost: string;
+}
+
+/**
+ * DTO con el resultado del proceso de ingesta masiva CSV.
+ */
+export interface IngestionResultDto {
+  totalProcessed: number;
+  inserted: number;
+  updated: number;
+  errors: string[];
+}

@@ -5,6 +5,7 @@ export interface NavbarProps {
   activeTab: 'bestiary' | 'simulation';
   onTabChange: (tab: 'bestiary' | 'simulation') => void;
   onOpenCreateModal: () => void;
+  onOpenIngestionModal: () => void;
 }
 
 /**
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onTabChange,
   onOpenCreateModal,
+  onOpenIngestionModal,
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -52,6 +54,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       </nav>
 
       <div className="navbar-actions">
+        <button
+          type="button"
+          id="open-ingestion-btn"
+          className="action-btn ingestion-btn"
+          onClick={onOpenIngestionModal}
+          title={t('app.nav.ingestCsv')}
+        >
+          📥 {t('app.nav.ingestCsv')}
+        </button>
         {activeTab === 'bestiary' && (
           <button
             type="button"

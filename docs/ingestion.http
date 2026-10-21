@@ -1,0 +1,22 @@
+### ==============================================================================
+### Sparnarok: The Architect's Codex - Data Ingestion API HTTP Requests
+### ==============================================================================
+
+@baseUrl = http://localhost:5000
+
+### 1. Ingest Weapons via CSV File (multipart/form-data)
+# @name uploadWeaponsCsv
+POST {{baseUrl}}/api/ingestion/weapons
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="weapons.csv"
+Content-Type: text/csv
+
+< ../data/seeds/weapons.csv
+--WebAppBoundary--
+
+### 2. Retrieve Ingested Weapons Catalog
+# @name getIngestedWeapons
+GET {{baseUrl}}/api/ingestion/weapons
+Accept: application/json

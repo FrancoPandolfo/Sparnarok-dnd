@@ -26,7 +26,11 @@ builder.Services.AddDbContext<SparnarokDbContext>(options =>
 builder.Services.AddScoped<ICreatureRepository, CreatureRepository>();
 builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
 
-// 4. Validadores de Aplicación (FluentValidation)
+// 4. Servicios de Ingestión de Datos (CSV & Streaming)
+builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();
+builder.Services.AddScoped<IWeaponIngestionService, Sparnarok.Api.Infrastructure.Services.WeaponIngestionService>();
+
+// 5. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
 
 builder.Services.AddControllers()

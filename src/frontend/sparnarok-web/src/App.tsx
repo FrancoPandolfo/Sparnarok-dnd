@@ -10,6 +10,7 @@ import type {
 import { apiClient } from './services/apiClient';
 import { Navbar } from './components/Navbar';
 import { BestiaryView } from './components/BestiaryView';
+import { WeaponIngestionModal } from './components/WeaponIngestionModal';
 
 /**
  * Componente principal de la interfaz de usuario de Sparnarok: The Architect's Codex.
@@ -26,6 +27,7 @@ export function App() {
   const [creatures, setCreatures] = useState<CreatureResponseDto[]>([]);
   const [allMasteries, setAllMasteries] = useState<WeaponMasteryResponseDto[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
 
   // Carga inicial de criaturas y catálogo de maestrías
   useEffect(() => {
@@ -106,6 +108,7 @@ export function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        onOpenIngestionModal={() => setIsIngestionModalOpen(true)}
       />
 
       {/* Hero Section */}
@@ -183,6 +186,13 @@ export function App() {
           </div>
         )}
       </main>
+
+      {/* Modal de Ingesta Masiva de Armas (CSV) */}
+      <WeaponIngestionModal
+        isOpen={isIngestionModalOpen}
+        onClose={() => setIsIngestionModalOpen(false)}
+        onUpload={apiClient.uploadWeaponsCsv}
+      />
     </div>
   );
 }
