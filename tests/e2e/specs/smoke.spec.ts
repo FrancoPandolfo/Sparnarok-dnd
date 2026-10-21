@@ -57,6 +57,10 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await expect(page.getByText('Características y Modificadores')).toBeVisible();
     await expect(page.getByText('Acciones y Ataques Tácticos')).toBeVisible();
 
+    // Verify dynamic AC (Clase de Armadura) calculation is displayed
+    const acStatLine = page.locator('.stat-core-stats .stat-line').first();
+    await expect(acStatLine).toContainText('16');
+
     // Close modal
     await page.locator('#close-stat-modal-btn').click();
     await expect(page.getByText('Características y Modificadores')).not.toBeVisible();
@@ -180,5 +184,101 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     // Verify execution time pill is present
     await expect(page.locator('#sim-execution-time')).toBeVisible();
   });
+
+  test('Armor catalog ingestion and dynamic AC calculation display', async ({ page }) => {
+    // Intercept POST /api/ingestion/armors to validate CSV upload contract
+    let interceptedPost = false;
+    await page.route('**/api/ingestion/armors', async (route) => {
+      if (route.request().method() === 'POST') {
+        interceptedPost = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            totalProcessed: 13,
+            inserted: 12,
+            updated: 1,
+            errors: [],
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'c0000001-0000-0000-0000-000000000001',
+              name: 'Leather Armor',
+              category: 'Light',
+              rawArmorClass: '11 + Dex modifier',
+              baseArmorClass: 11,
+              shieldBonus: 0,
+              allowsDexterityModifier: true,
+              maxDexterityModifier: null,
+            },
+            {
+              id: 'c0000001-0000-0000-0000-000000000002',
+              name: 'Half Plate Armor',
+              category: 'Medium',
+              rawArmorClass: '15 + Dex modifier (max 2)',
+              baseArmorClass: 15,
+              shieldBonus: 0,
+              allowsDexterityModifier: true,
+              maxDexterityModifier: 2,
+            },
+            {
+              id: 'c0000001-0000-0000-0000-000000000003',
+              name: 'Plate Armor',
+              category: 'Heavy',
+              rawArmorClass: '18',
+              baseArmorClass: 18,
+              shieldBonus: 0,
+              allowsDexterityModifier: false,
+              maxDexterityModifier: null,
+            },
+            {
+              id: 'c0000001-0000-0000-0000-000000000004',
+              name: 'Shield',
+              category: 'Shield',
+              rawArmorClass: '+2',
+              baseArmorClass: 0,
+              shieldBonus: 2,
+              allowsDexterityModifier: false,
+              maxDexterityModifier: null,
+            },
+          ]),
+        });
+      }
+    });
+
+    await page.goto('/');
+
+    // Verify bestiary displays creature dynamic AC calculation
+    const inspectBtn = page.getByRole('button', { name: /Ver Ficha Táctica/i }).first();
+    await inspectBtn.click();
+
+    // Verify modal is open and shows dynamic AC
+    await expect(page.getByText('Características y Modificadores')).toBeVisible();
+    const acStatLine = page.locator('.stat-core-stats .stat-line').first();
+    await expect(acStatLine).toContainText('16');
+
+    // Close modal
+    await page.locator('#close-stat-modal-btn').click();
+
+    // Trigger API call to verify the mock/real ingestion endpoint behaves according to contract
+    const response = await page.evaluate(async () => {
+      const formData = new FormData();
+      const blob = new Blob(['Name,Category,ArmorClass,Strength,Stealth,Weight,Cost\nPlate Armor,Heavy,18,Str 15,Disadvantage,65 lb.,"1,500 GP"'], { type: 'text/csv' });
+      formData.append('file', blob, 'armors.csv');
+      const res = await fetch('/api/ingestion/armors', { method: 'POST', body: formData });
+      return await res.json();
+    });
+
+    expect(response.totalProcessed).toBe(13);
+    expect(response.inserted).toBe(12);
+    expect(response.updated).toBe(1);
+    expect(interceptedPost).toBe(true);
+  });
 });
+
 

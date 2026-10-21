@@ -1,4 +1,5 @@
 using Sparnarok.Api.Domain.Enums;
+using Sparnarok.Api.Domain.Services.Combat;
 using Sparnarok.Api.Domain.ValueObjects;
 
 namespace Sparnarok.Api.Domain.Entities;
@@ -42,6 +43,18 @@ public class Creature
     /// <summary>Objeto de valor con la configuración de Clase de Armadura.</summary>
     public ArmorClass ArmorClass { get; private set; } = ArmorClass.Unarmored;
 
+    /// <summary>Identificador de la armadura corporal equipada (opcional).</summary>
+    public Guid? EquippedArmorId { get; private set; }
+
+    /// <summary>Armadura corporal vestida actualmente por la criatura.</summary>
+    public virtual Armor? EquippedArmor { get; private set; }
+
+    /// <summary>Identificador del escudo equipado (opcional).</summary>
+    public Guid? EquippedShieldId { get; private set; }
+
+    /// <summary>Escudo empuñado actualmente por la criatura.</summary>
+    public virtual Armor? EquippedShield { get; private set; }
+
     /// <summary>Colección de acciones tácticas disponibles para la criatura.</summary>
     public IReadOnlyCollection<Action> Actions => _actions.AsReadOnly();
 
@@ -49,9 +62,9 @@ public class Creature
     public IReadOnlyCollection<WeaponMastery> KnownMasteries => _knownMasteries.AsReadOnly();
 
     /// <summary>
-    /// Calcula la Clase de Armadura efectiva integrando la base, el escudo y el modificador de Destreza.
+    /// Calcula la Clase de Armadura efectiva integrando dinámicamente Destreza, Armadura (Ligera/Media/Pesada) y Escudo.
     /// </summary>
-    public int EffectiveArmorClass => ArmorClass.CalculateTotal(AbilityScores.GetModifier(AbilityScoreType.Dexterity));
+    public int EffectiveArmorClass => ArmorClassCalculator.CalculateAc(this);
 
     /// <summary>
     /// Bono de competencia (Proficiency Bonus) derivado del Valor de Desafío (CR).
@@ -256,5 +269,53 @@ public class Creature
     public void ForgetWeaponMastery(Guid masteryId)
     {
         _knownMasteries.RemoveAll(m => m.Id == masteryId);
+    }
+
+    /// <summary>
+    /// Equipa una armadura corporal en la criatura.
+    /// </summary>
+    /// <param name="armor">Armadura a equipar (no puede ser de categoría Shield).</param>
+    public void EquipArmor(Armor? armor)
+    {
+        if (armor != null && armor.Category == ArmorCategory.Shield)
+        {
+            throw new ArgumentException("Un escudo no puede ser equipado en la ranura de armadura corporal. Use EquipShield.", nameof(armor));
+        }
+
+        EquippedArmor = armor;
+        EquippedArmorId = armor?.Id;
+    }
+
+    /// <summary>
+    /// Desequipa la armadura corporal de la criatura, volviendo a su defensa natural o sin armadura.
+    /// </summary>
+    public void UnequipArmor()
+    {
+        EquippedArmor = null;
+        EquippedArmorId = null;
+    }
+
+    /// <summary>
+    /// Equipa un escudo en la criatura.
+    /// </summary>
+    /// <param name="shield">Escudo a empuñar (debe pertenecer a la categoría Shield).</param>
+    public void EquipShield(Armor? shield)
+    {
+        if (shield != null && shield.Category != ArmorCategory.Shield)
+        {
+            throw new ArgumentException("Solo pueden equiparse objetos de categoría Shield en la ranura de escudo.", nameof(shield));
+        }
+
+        EquippedShield = shield;
+        EquippedShieldId = shield?.Id;
+    }
+
+    /// <summary>
+    /// Desequipa el escudo empuñado por la criatura.
+    /// </summary>
+    public void UnequipShield()
+    {
+        EquippedShield = null;
+        EquippedShieldId = null;
     }
 }

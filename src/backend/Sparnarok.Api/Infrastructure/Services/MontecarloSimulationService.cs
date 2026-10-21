@@ -133,6 +133,8 @@ public class MontecarloSimulationService : IMontecarloSimulationService
             throw new InvalidOperationException("El contexto de base de datos no está disponible.");
 
         var combatantA = await _context.Creatures
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .FirstOrDefaultAsync(c => c.Id == request.CombatantAId, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura A con ID: {request.CombatantAId}");
 
@@ -141,6 +143,8 @@ public class MontecarloSimulationService : IMontecarloSimulationService
             ?? throw new KeyNotFoundException($"No se encontró el arma A con ID: {request.WeaponAId}");
 
         var combatantB = await _context.Creatures
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .FirstOrDefaultAsync(c => c.Id == request.CombatantBId, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura B con ID: {request.CombatantBId}");
 

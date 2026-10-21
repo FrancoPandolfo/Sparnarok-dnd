@@ -30,6 +30,11 @@ public class SparnarokDbContext : DbContext
     public DbSet<Weapon> Weapons => Set<Weapon>();
 
     /// <summary>
+    /// Conjunto de datos para las armaduras y escudos de D&amp;D 5e ingeridos en el sistema.
+    /// </summary>
+    public DbSet<Armor> Armors => Set<Armor>();
+
+    /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.
     /// </summary>
     /// <param name="options">Opciones de configuración del contexto.</param>

@@ -92,6 +92,61 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("Actions", (string)null);
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Armor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowsDexterityModifier")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("BaseArmorClass")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Cost")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("MaxDexterityModifier")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RawArmorClass")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("ShieldBonus")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("StealthDisadvantage")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("StrengthRequirement")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("Weight")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Armors", (string)null);
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
                 {
                     b.Property<Guid>("Id")
@@ -105,6 +160,12 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.Property<double>("ChallengeRating")
                         .HasColumnType("double precision");
+
+                    b.Property<Guid?>("EquippedArmorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("EquippedShieldId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -125,6 +186,10 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EquippedArmorId");
+
+                    b.HasIndex("EquippedShieldId");
 
                     b.ToTable("Creatures", (string)null);
                 });
@@ -301,6 +366,16 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
                 {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Armor", "EquippedArmor")
+                        .WithMany()
+                        .HasForeignKey("EquippedArmorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Armor", "EquippedShield")
+                        .WithMany()
+                        .HasForeignKey("EquippedShieldId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.OwnsOne("Sparnarok.Api.Domain.ValueObjects.AbilityScores", "AbilityScores", b1 =>
                         {
                             b1.Property<Guid>("CreatureId")
@@ -397,6 +472,10 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.Navigation("ArmorClass")
                         .IsRequired();
+
+                    b.Navigation("EquippedArmor");
+
+                    b.Navigation("EquippedShield");
 
                     b.Navigation("HitPoints")
                         .IsRequired();

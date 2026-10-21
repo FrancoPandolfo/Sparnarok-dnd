@@ -29,6 +29,8 @@ public class CreatureRepository : ICreatureRepository
             .Include(c => c.Actions)
                 .ThenInclude(a => a.AssociatedMastery)
             .Include(c => c.KnownMasteries)
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -40,6 +42,8 @@ public class CreatureRepository : ICreatureRepository
             .Include(c => c.Actions)
                 .ThenInclude(a => a.AssociatedMastery)
             .Include(c => c.KnownMasteries)
+            .Include(c => c.EquippedArmor)
+            .Include(c => c.EquippedShield)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
