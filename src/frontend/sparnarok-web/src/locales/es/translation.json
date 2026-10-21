@@ -8,6 +8,7 @@
     "nav": {
       "bestiary": "Bestiario del Códice",
       "simulation": "Simulador Táctico",
+      "ingestCsv": "Importar Armas (CSV)",
       "newCreature": "+ Nueva Criatura"
     },
     "features": {
@@ -94,5 +95,21 @@
       "submit": "Incorporar Acción",
       "cancel": "Cancelar"
     }
+  },
+  "ingestion": {
+    "title": "Pipeline de Ingesta: Armas",
+    "subtitle": "Carga masiva de armas de D&D 5e (2024) en la base de datos del Códice mediante streaming de CSV.",
+    "specTitle": "Esquema y Encabezados CSV Requeridos",
+    "specExample": "Línea de ejemplo",
+    "chooseFilePrompt": "Haz clic o arrastra un archivo CSV de armas aquí",
+    "uploadButton": "Iniciar Ingesta",
+    "uploading": "Procesando y Guardando...",
+    "resultsTitle": "Resumen de Ingesta",
+    "metricTotal": "Procesados",
+    "metricInserted": "Insertados",
+    "metricUpdated": "Actualizados",
+    "errorsEncountered": "Advertencias / Errores de Validación",
+    "noFileSelected": "Por favor selecciona un archivo .csv primero.",
+    "errorUploading": "Error al subir y procesar el archivo CSV."
   }
 }

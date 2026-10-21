@@ -43,4 +43,7 @@
   <data name="MasteryNotFound" xml:space="preserve">
     <value>The requested weapon mastery property does not exist.</value>
   </data>
+  <data name="InvalidCsvFile" xml:space="preserve">
+    <value>The provided file is not a valid CSV or is empty.</value>
+  </data>
 </root>

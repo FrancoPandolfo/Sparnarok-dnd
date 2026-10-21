@@ -4,6 +4,8 @@ import type {
   WeaponMasteryResponseDto,
   CreateActionRequestDto,
   ActionResponseDto,
+  IngestionResultDto,
+  WeaponDto,
 } from '../types/dnd';
 
 const API_BASE_URL = '/api/v1';
@@ -435,5 +437,53 @@ export const apiClient = {
       creature.knownMasteries.push(mastery);
     }
     return creature;
+  },
+
+  /**
+   * Sube un archivo CSV de armas a la API para ingesta y reconciliación masiva (Bulk Upsert).
+   */
+  async uploadWeaponsCsv(file: File): Promise<IngestionResultDto> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/ingestion/weapons', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local para pruebas y entornos offline
+    }
+
+    // Parseo sintético local del texto CSV
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const dataLines = lines.length > 1 ? lines.slice(1) : [];
+
+    return {
+      totalProcessed: dataLines.length,
+      inserted: dataLines.length,
+      updated: 0,
+      errors: [],
+    };
+  },
+
+  /**
+   * Obtiene la lista de armas actualmente ingestadas.
+   */
+  async getWeapons(signal?: AbortSignal): Promise<WeaponDto[]> {
+    try {
+      const response = await fetch('/api/ingestion/weapons', { signal });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
   },
 };

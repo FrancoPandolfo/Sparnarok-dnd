@@ -76,6 +76,33 @@ El objetivo de esta fase es asentar el modelo ontológico de reglas 5e (revisió
 ## Estado Global del Proyecto: ¡Fase 1 Completa al 100%!
 Con la conclusión de los Pasos 1.1, 1.2, 1.3 y 1.4, la base ontológica, de persistencia, de API REST y de interfaz gráfica de **Sparnarok** se encuentra totalmente operativa, testeada y documentada bajo arquitectura de monorepo.
 
+---
+
+## Fase 1.5: Data Ingestion Pipeline (Combustible del Motor) [Enfoque Actual]
+
+Antes de iniciar las simulaciones estocásticas de la Fase 2, se requiere una arquitectura de ingesta de datos masiva y resiliente para cargar reglas, armas, hechizos y monstruos mediante archivos CSV estructurados.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 1.5.1 Capa de Ingestión Genérica & Streaming CsvHelper │
+   │ 1.5.2 Entidad Weapon & Persistencia EF Core Bulk Upsert│
+   │ 1.5.3 Endpoint REST POST /api/ingestion/weapons        │
+   │ 1.5.4 Componente React de Ingesta & Test Suite E2E     │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - Servicio genérico de parseo y streaming de archivos delimitados mediante `CsvHelper`.
+  - Entidad de dominio `Weapon` (Name, Damage, DamageType, Properties, Weight, Cost) y mapeo relacional en EF Core.
+  - Endpoint de ingesta masiva `POST /api/ingestion/weapons` (`multipart/form-data`) con validación y estrategia de Bulk Upsert (inserción de nuevas armas y actualización idempotente de existentes).
+  - Interfaz de usuario en React con modal de subida de archivos CSV, retroalimentación de estado y métricas de procesamiento.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/csv-ingestion-pipeline`.
+  - Documentación: [ADR-0006](file:///docs/adrs/0006-csv-data-ingestion-pipeline.md) justificando el formato CSV y la biblioteca `CsvHelper`.
+  - Testing: Tests unitarios de mapeo/parsing en `Sparnarok.UnitTests`, tests de integración relacional con persistencia real en `Sparnarok.IntegrationTests` y test Playwright E2E de carga de archivo desde la UI.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 ### Fase 2: Combat Engine & Mathematical Simulation

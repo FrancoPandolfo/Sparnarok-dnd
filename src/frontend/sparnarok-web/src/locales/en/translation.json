@@ -8,6 +8,7 @@
     "nav": {
       "bestiary": "Codex Bestiary",
       "simulation": "Tactical Simulator",
+      "ingestCsv": "Import Weapons (CSV)",
       "newCreature": "+ New Creature"
     },
     "features": {
@@ -94,5 +95,21 @@
       "submit": "Incorporate Action",
       "cancel": "Cancel"
     }
+  },
+  "ingestion": {
+    "title": "Data Ingestion Pipeline: Weapons",
+    "subtitle": "Bulk upload D&D 5e (2024) weapons into the Codex database via CSV streaming.",
+    "specTitle": "Required CSV Schema & Header Format",
+    "specExample": "Example line",
+    "chooseFilePrompt": "Click or drag weapons CSV file here",
+    "uploadButton": "Start Ingestion",
+    "uploading": "Streaming & Upserting...",
+    "resultsTitle": "Ingestion Summary",
+    "metricTotal": "Processed",
+    "metricInserted": "Inserted",
+    "metricUpdated": "Updated",
+    "errorsEncountered": "Validation Warnings / Errors",
+    "noFileSelected": "Please select a valid .csv file first.",
+    "errorUploading": "Failed to upload and ingest CSV file."
   }
 }
