@@ -1,24 +1,52 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import './App.css';
+import type {
+  CreatureResponseDto,
+  WeaponMasteryResponseDto,
+  CreateCreatureRequestDto,
+  CreateActionRequestDto,
+} from './types/dnd';
+import { apiClient } from './services/apiClient';
+import { Navbar } from './components/Navbar';
+import { BestiaryView } from './components/BestiaryView';
 
 /**
  * Componente principal de la interfaz de usuario de Sparnarok: The Architect's Codex.
- * Proporciona el punto de entrada a la simulación matemática de D&D 5e y orquestación de mundo.
+ * Orquesta la navegación entre el Bestiario de D&D 5e (2024) y el Simulador Matemático de Combate.
  *
  * @returns {JSX.Element} Vista renderizada del Códice con soporte de internacionalización (i18n).
  */
 export function App() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+
+  const [activeTab, setActiveTab] = useState<'bestiary' | 'simulation'>('bestiary');
   const [simulationCount, setSimulationCount] = useState<number>(0);
 
-  /**
-   * Conmuta dinámicamente entre los idiomas soportados (Español / Inglés).
-   */
-  const handleToggleLanguage = useCallback(() => {
-    const nextLanguage = i18n.language.startsWith('es') ? 'en' : 'es';
-    i18n.changeLanguage(nextLanguage);
-  }, [i18n]);
+  const [creatures, setCreatures] = useState<CreatureResponseDto[]>([]);
+  const [allMasteries, setAllMasteries] = useState<WeaponMasteryResponseDto[]>([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+
+  // Carga inicial de criaturas y catálogo de maestrías
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadData = async () => {
+      try {
+        const [creatureList, masteryList] = await Promise.all([
+          apiClient.getCreatures(controller.signal),
+          apiClient.getWeaponMasteries(controller.signal),
+        ]);
+        setCreatures(creatureList);
+        setAllMasteries(masteryList);
+      } catch {
+        // En caso de error o aborto, el cliente ya maneja fallback local
+      }
+    };
+
+    loadData();
+    return () => controller.abort();
+  }, []);
 
   /**
    * Incrementa el contador de simulaciones de combate ejecutadas.
@@ -27,81 +55,135 @@ export function App() {
     setSimulationCount((prev) => prev + 1);
   }, []);
 
-  return (
-    <main className="app-container">
-      {/* Barra superior con indicador de estado y conmutador de idioma */}
-      <header className="top-bar">
-        <div className="badge">
-          <span>{t('app.currentLanguage')}</span>
-        </div>
-        <button
-          type="button"
-          className="lang-btn"
-          id="lang-toggle-btn"
-          onClick={handleToggleLanguage}
-          aria-label={t('app.switchLanguage')}
-        >
-          {t('app.switchLanguage')}
-        </button>
-      </header>
+  /**
+   * Crea una nueva criatura en el backend y sincroniza el estado local.
+   */
+  const handleCreateCreature = useCallback(async (data: CreateCreatureRequestDto) => {
+    const created = await apiClient.createCreature(data);
+    setCreatures((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+  }, []);
 
-      {/* Sección Hero principal */}
+  /**
+   * Elimina una criatura del backend y actualiza el estado local.
+   */
+  const handleDeleteCreature = useCallback(async (id: string) => {
+    await apiClient.deleteCreature(id);
+    setCreatures((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  /**
+   * Incorpora una acción táctica a una criatura existente.
+   */
+  const handleAddAction = useCallback(async (creatureId: string, data: CreateActionRequestDto) => {
+    const newAction = await apiClient.addAction(creatureId, data);
+    setCreatures((prev) =>
+      prev.map((c) => {
+        if (c.id === creatureId) {
+          return {
+            ...c,
+            actions: [...c.actions, newAction],
+          };
+        }
+        return c;
+      })
+    );
+  }, []);
+
+  /**
+   * Asigna el aprendizaje de una maestría de armas a una criatura.
+   */
+  const handleLearnMastery = useCallback(async (creatureId: string, masteryId: string) => {
+    const updated = await apiClient.learnMastery(creatureId, masteryId);
+    setCreatures((prev) =>
+      prev.map((c) => (c.id === creatureId ? updated : c))
+    );
+  }, []);
+
+  return (
+    <div className="app-wrapper">
+      {/* Barra de Navegación y Acciones Globales */}
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenCreateModal={() => setIsCreateModalOpen(true)}
+      />
+
+      {/* Hero Section */}
       <section className="hero-section">
         <h1 className="hero-title">{t('app.title')}</h1>
         <p className="hero-subtitle">{t('app.subtitle')}</p>
       </section>
 
-      {/* Tarjeta interactiva de simulación de combate */}
-      <section className="interactive-card">
+      {/* Widget Interactivo de Simulación Rápida */}
+      <div className="quick-sim-bar">
         <button
           type="button"
           className="counter-button"
           id="simulation-counter-btn"
           onClick={handleIncrementSimulation}
+          aria-label={t('app.counterButton', { count: simulationCount })}
         >
-          {t('app.counterButton', { count: simulationCount })}
+          🎲 {t('app.counterButton', { count: simulationCount })}
         </button>
-      </section>
+      </div>
 
-      {/* Grid de capacidades del motor */}
-      <section className="features-grid">
-        <article className="feature-box">
-          <h2 className="feature-title">Combat Math Matrix</h2>
-          <p className="feature-desc">{t('app.features.combatMath')}</p>
-        </article>
-        <article className="feature-box">
-          <h2 className="feature-title">World Orchestration</h2>
-          <p className="feature-desc">{t('app.features.worldOrchestration')}</p>
-        </article>
-        <article className="feature-box">
-          <h2 className="feature-title">Architectural Rigor</h2>
-          <p className="feature-desc">{t('app.features.architecture')}</p>
-        </article>
-      </section>
+      {/* Vista Activa: Bestiario o Simulador */}
+      <main>
+        {activeTab === 'bestiary' ? (
+          <BestiaryView
+            creatures={creatures}
+            allMasteries={allMasteries}
+            isCreateModalOpen={isCreateModalOpen}
+            onCloseCreateModal={() => setIsCreateModalOpen(false)}
+            onCreateCreature={handleCreateCreature}
+            onDeleteCreature={handleDeleteCreature}
+            onAddAction={handleAddAction}
+            onLearnMastery={handleLearnMastery}
+          />
+        ) : (
+          <div className="simulation-tab-container fade-in">
+            {/* Grid de capacidades del motor de simulación */}
+            <section className="features-grid">
+              <article className="feature-box">
+                <h2 className="feature-title">Combat Math Matrix</h2>
+                <p className="feature-desc">{t('app.features.combatMath')}</p>
+              </article>
+              <article className="feature-box">
+                <h2 className="feature-title">World Orchestration</h2>
+                <p className="feature-desc">{t('app.features.worldOrchestration')}</p>
+              </article>
+              <article className="feature-box">
+                <h2 className="feature-title">Architectural Rigor</h2>
+                <p className="feature-desc">{t('app.features.architecture')}</p>
+              </article>
+            </section>
 
-      {/* Enlaces de documentación técnica */}
-      <footer className="doc-section">
-        <span className="feature-title">{t('app.documentation.title')}</span>
-        <nav className="doc-links">
-          <a
-            href="http://localhost:5000/swagger"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="doc-link"
-          >
-            {t('app.documentation.swaggerLink')} &rarr;
-          </a>
-          <a
-            href="https://github.com/FrancoPandolfo/Sparnarok-dnd/tree/main/docs/adrs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="doc-link"
-          >
-            {t('app.documentation.adrsLink')} &rarr;
-          </a>
-        </nav>
-      </footer>
-    </main>
+            {/* Enlaces de documentación técnica */}
+            <footer className="doc-section">
+              <span className="feature-title">{t('app.documentation.title')}</span>
+              <nav className="doc-links">
+                <a
+                  href="http://localhost:5000/swagger"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="doc-link"
+                >
+                  {t('app.documentation.swaggerLink')} &rarr;
+                </a>
+                <a
+                  href="https://github.com/FrancoPandolfo/Sparnarok-dnd/tree/main/docs/adrs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="doc-link"
+                >
+                  {t('app.documentation.adrsLink')} &rarr;
+                </a>
+              </nav>
+            </footer>
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
 

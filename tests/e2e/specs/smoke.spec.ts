@@ -31,4 +31,34 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     // Verify button text switched to English
     await expect(page.getByRole('button', { name: /Switch to Spanish/i })).toBeVisible();
   });
+
+  test('Bestiary displays creatures, filters by name, and opens 2024 stat block modal', async ({ page }) => {
+    await page.goto('/');
+
+    // Verify initial creatures in the bestiary grid
+    const bugbearCard = page.getByRole('heading', { level: 3, name: 'Bugbear Stalker' });
+    await expect(bugbearCard).toBeVisible();
+
+    // Search filter
+    const searchInput = page.getByPlaceholder('Buscar criatura por nombre...');
+    await searchInput.fill('Gorgon');
+    await expect(page.getByRole('heading', { level: 3, name: 'Gorgon Vanguard' })).toBeVisible();
+    await expect(bugbearCard).not.toBeVisible();
+
+    // Clear search
+    await page.getByRole('button', { name: '✕' }).click();
+    await expect(bugbearCard).toBeVisible();
+
+    // Inspect first creature stat block
+    const inspectBtn = page.getByRole('button', { name: /Ver Ficha Táctica/i }).first();
+    await inspectBtn.click();
+
+    // Verify modal is open with D&D 5e 2024 sections
+    await expect(page.getByText('Características y Modificadores')).toBeVisible();
+    await expect(page.getByText('Acciones y Ataques Tácticos')).toBeVisible();
+
+    // Close modal
+    await page.locator('#close-stat-modal-btn').click();
+    await expect(page.getByText('Características y Modificadores')).not.toBeVisible();
+  });
 });

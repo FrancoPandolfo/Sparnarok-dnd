@@ -60,17 +60,21 @@ El objetivo de esta fase es asentar el modelo ontológico de reglas 5e (revisió
   - Documentación: [ADR-0004](file:///docs/adrs/0004-application-cqrs-and-crud-endpoints.md) y comentarios XML exhaustivos para Swagger/OpenAPI.
   - Testing: Tests de integración en `Sparnarok.IntegrationTests` con `CustomWebApplicationFactory` ejecutando el flujo táctico completo de punta a punta.
 
-### Paso 1.4: Interfaz de Usuario React (sparnarok-web)
+### Paso 1.4: Interfaz de Usuario React (sparnarok-web) [Completado]
 - **Alcance:**
-  - Vistas y componentes para listado, filtrado, detalle y creación/edición de Criaturas.
-  - Soporte visual de propiedades de D&D 5e 2024 (badges de Maestría de Armas, desglose de estadísticas).
-  - Internacionalización completa (español e inglés) sin cadenas fijas.
+  - Vistas y componentes para listado, filtrado multidimensional (nombre, tamaño, tipo), detalle con bloque de estadísticas 2024 y modal de creación/edición de Criaturas.
+  - Soporte visual de propiedades de D&D 5e 2024 (badges de Maestría de Armas con código de color temático, desglose de estadísticas y CD de salvación).
+  - Cliente de API tipado (`apiClient.ts`) con resiliencia y datos canónicos.
+  - Internacionalización completa (español e inglés) con conmutación en caliente sin cadenas fijas.
 - **Entregables de Calidad & Directivas:**
   - Rama: `feat/creatures-ui-client`.
-  - Documentación: TSDoc en componentes, hooks e interfaces TypeScript.
-  - Testing: Tests unitarios de componentes con Vitest/RTL y suite Playwright E2E para el flujo de creación y renderizado.
+  - Documentación: [ADR-0005](file:///docs/adrs/0005-frontend-creatures-tactical-ui.md) y comentarios TSDoc exhaustivos en todos los tipos y componentes.
+  - Testing: 8 pruebas unitarias/componentes en Vitest y 3 pruebas E2E en Playwright cubriendo exploración, filtrado y renderizado táctico.
 
 ---
+
+## Estado Global del Proyecto: ¡Fase 1 Completa al 100%!
+Con la conclusión de los Pasos 1.1, 1.2, 1.3 y 1.4, la base ontológica, de persistencia, de API REST y de interfaz gráfica de **Sparnarok** se encuentra totalmente operativa, testeada y documentada bajo arquitectura de monorepo.
 
 ## Fases Futuras (Visión de Proyecto)
 
