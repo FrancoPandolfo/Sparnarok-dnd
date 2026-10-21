@@ -1,0 +1,6 @@
+@Sparnarok.Api_HostAddress = http://localhost:5062
+
+GET {{Sparnarok.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

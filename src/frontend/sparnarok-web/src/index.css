@@ -1,0 +1,49 @@
+:root {
+  --bg-primary: #0a0b10;
+  --bg-secondary: #121420;
+  --bg-card: rgba(22, 25, 40, 0.7);
+  --border-card: rgba(147, 112, 219, 0.25);
+  --border-glow: rgba(212, 175, 55, 0.3);
+  
+  --text-primary: #f0f3f8;
+  --text-muted: #9aa5b8;
+  --accent-gold: #f5c542;
+  --accent-purple: #9d4edd;
+  --accent-blue: #3a86ff;
+  
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  font-family: var(--font-sans);
+  color-scheme: dark;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(157, 78, 221, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(58, 134, 255, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(245, 197, 66, 0.05) 0%, transparent 50%),
+    #0a0b10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1rem;
+}
+
+#root {
+  width: 100%;
+  max-width: 1080px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}

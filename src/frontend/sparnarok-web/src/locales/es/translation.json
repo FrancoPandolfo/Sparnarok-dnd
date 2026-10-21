@@ -1,0 +1,19 @@
+{
+  "app": {
+    "title": "Sparnarok: El Códice del Arquitecto",
+    "subtitle": "Motor de Simulación Matemática y Orquestación de Mundo para D&D 5e",
+    "counterButton": "Simulaciones ejecutadas: {{count}}",
+    "switchLanguage": "Cambiar a Inglés",
+    "currentLanguage": "Idioma actual: Español",
+    "features": {
+      "combatMath": "Cálculo probabilístico y matrices de daño en tiempo real",
+      "worldOrchestration": "Orquestación determinista y simulación de estados de campaña",
+      "architecture": "Arquitectura limpia y tipado estricto de extremo a extremo"
+    },
+    "documentation": {
+      "title": "Documentación Arquitectónica",
+      "swaggerLink": "Explorar Swagger / OpenAPI",
+      "adrsLink": "Registros de Decisiones de Arquitectura (ADRs)"
+    }
+  }
+}
