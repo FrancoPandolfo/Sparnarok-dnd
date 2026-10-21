@@ -1,10 +1,15 @@
 {
   "app": {
     "title": "Sparnarok: El Códice del Arquitecto",
-    "subtitle": "Motor de Simulación Matemática y Orquestación de Mundo para D&D 5e",
+    "subtitle": "Motor de Simulación Matemática y Orquestación de Mundo para D&D 5e (Reglas 2024)",
     "counterButton": "Simulaciones ejecutadas: {{count}}",
     "switchLanguage": "Cambiar a Inglés",
     "currentLanguage": "Idioma actual: Español",
+    "nav": {
+      "bestiary": "Bestiario del Códice",
+      "simulation": "Simulador Táctico",
+      "newCreature": "+ Nueva Criatura"
+    },
     "features": {
       "combatMath": "Cálculo probabilístico y matrices de daño en tiempo real",
       "worldOrchestration": "Orquestación determinista y simulación de estados de campaña",
@@ -14,6 +19,80 @@
       "title": "Documentación Arquitectónica",
       "swaggerLink": "Explorar Swagger / OpenAPI",
       "adrsLink": "Registros de Decisiones de Arquitectura (ADRs)"
+    }
+  },
+  "bestiary": {
+    "title": "Grimorio Táctico de Criaturas",
+    "subtitle": "Catálogo ontológico con soporte oficial de reglas D&D 5e (2024)",
+    "searchPlaceholder": "Buscar criatura por nombre...",
+    "filterType": "Todos los Tipos",
+    "filterSize": "Todos los Tamaños",
+    "clearFilters": "Restablecer filtros",
+    "totalCount": "Mostrando {{count}} criaturas",
+    "emptyState": "No se encontraron criaturas que coincidan con los criterios de búsqueda.",
+    "viewDetails": "Ver Ficha Táctica",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Estás seguro de eliminar a '{{name}}' del Códice?",
+    "stats": {
+      "ac": "CA",
+      "hp": "PG",
+      "speed": "Velocidad",
+      "speedValue": "{{value}} pies",
+      "cr": "CR",
+      "pb": "PB",
+      "str": "FUE",
+      "dex": "DES",
+      "con": "CON",
+      "int": "INT",
+      "wis": "SAB",
+      "cha": "CAR"
+    },
+    "details": {
+      "statBlockTitle": "Ficha de Estadísticas 2024",
+      "abilityScores": "Características y Modificadores",
+      "savingThrowDc": "CD de Salvación canónica (8 + PB + Mod): {{dc}}",
+      "actionsTitle": "Acciones y Ataques Tácticos",
+      "noActions": "Esta criatura no tiene acciones ofensivas registradas.",
+      "masteriesTitle": "Propiedades de Maestría de Armas (2024)",
+      "noMasteries": "No domina ninguna propiedad de maestría de armas aún.",
+      "prerequisite": "Requisito: {{weapon}}",
+      "attackBonus": "Tirada de Ataque: +{{bonus}} para impactar",
+      "reach": "Alcance: {{value}} pies",
+      "damage": "Daño: {{formula}} de tipo {{type}}",
+      "addAction": "Añadir Acción Táctica",
+      "learnMastery": "Enseñar Maestría"
+    },
+    "form": {
+      "createTitle": "Registrar Nueva Criatura en el Códice",
+      "editTitle": "Editar Criatura",
+      "name": "Nombre de la Criatura",
+      "size": "Tamaño",
+      "type": "Tipo",
+      "alignment": "Alineamiento",
+      "cr": "Valor de Desafío (CR)",
+      "speed": "Velocidad terrestre (pies)",
+      "maxHp": "Puntos de Golpe Máximos",
+      "acBase": "Clase de Armadura Base",
+      "shieldBonus": "Bono por Escudo",
+      "allowsDex": "Suma Modificador de Destreza a la CA",
+      "abilitiesTitle": "Puntuaciones de Características (1 a 30)",
+      "submit": "Crear Criatura",
+      "cancel": "Cancelar",
+      "saving": "Guardando..."
+    },
+    "actionForm": {
+      "title": "Añadir Acción Táctica a {{name}}",
+      "name": "Nombre de la Acción / Arma",
+      "type": "Tipo de Acción",
+      "isAttack": "¿Es una tirada de ataque contra CA?",
+      "reach": "Alcance o Rango (pies)",
+      "formula": "Fórmula de Daño (ej. 1d8, 2d6)",
+      "damageType": "Tipo de Daño",
+      "ability": "Característica para Ataque",
+      "mastery": "Maestría de Armas Asociada (opcional)",
+      "description": "Descripción operativa del efecto",
+      "submit": "Incorporar Acción",
+      "cancel": "Cancelar"
     }
   }
 }

@@ -1,10 +1,15 @@
 {
   "app": {
     "title": "Sparnarok: The Architect's Codex",
-    "subtitle": "Mathematical Simulation & World Orchestration Engine for D&D 5e",
+    "subtitle": "Mathematical Simulation & World Orchestration Engine for D&D 5e (2024 Rules)",
     "counterButton": "Simulations executed: {{count}}",
     "switchLanguage": "Switch to Spanish",
     "currentLanguage": "Current language: English",
+    "nav": {
+      "bestiary": "Codex Bestiary",
+      "simulation": "Tactical Simulator",
+      "newCreature": "+ New Creature"
+    },
     "features": {
       "combatMath": "Real-time probabilistic math and combat damage matrices",
       "worldOrchestration": "Deterministic campaign state orchestration and world state simulation",
@@ -14,6 +19,80 @@
       "title": "Architectural Documentation",
       "swaggerLink": "Explore Swagger / OpenAPI",
       "adrsLink": "Architecture Decision Records (ADRs)"
+    }
+  },
+  "bestiary": {
+    "title": "Tactical Creature Grimoire",
+    "subtitle": "Ontological catalog with official D&D 5e (2024) rules support",
+    "searchPlaceholder": "Search creature by name...",
+    "filterType": "All Types",
+    "filterSize": "All Sizes",
+    "clearFilters": "Reset filters",
+    "totalCount": "Displaying {{count}} creatures",
+    "emptyState": "No creatures found matching search criteria.",
+    "viewDetails": "View Stat Block",
+    "delete": "Delete",
+    "confirmDelete": "Are you sure you want to delete '{{name}}' from the Codex?",
+    "stats": {
+      "ac": "AC",
+      "hp": "HP",
+      "speed": "Speed",
+      "speedValue": "{{value}} ft.",
+      "cr": "CR",
+      "pb": "PB",
+      "str": "STR",
+      "dex": "DEX",
+      "con": "CON",
+      "int": "INT",
+      "wis": "WIS",
+      "cha": "CHA"
+    },
+    "details": {
+      "statBlockTitle": "2024 Statistics Block",
+      "abilityScores": "Ability Scores & Modifiers",
+      "savingThrowDc": "Canonical Saving Throw DC (8 + PB + Mod): {{dc}}",
+      "actionsTitle": "Tactical Actions & Attacks",
+      "noActions": "This creature has no offensive actions registered.",
+      "masteriesTitle": "Weapon Mastery Properties (2024)",
+      "noMasteries": "No weapon mastery properties mastered yet.",
+      "prerequisite": "Prerequisite: {{weapon}}",
+      "attackBonus": "Attack Roll: +{{bonus}} to hit",
+      "reach": "Reach: {{value}} ft.",
+      "damage": "Damage: {{formula}} {{type}}",
+      "addAction": "Add Tactical Action",
+      "learnMastery": "Learn Mastery"
+    },
+    "form": {
+      "createTitle": "Register New Creature in the Codex",
+      "editTitle": "Edit Creature",
+      "name": "Creature Name",
+      "size": "Size",
+      "type": "Type",
+      "alignment": "Alignment",
+      "cr": "Challenge Rating (CR)",
+      "speed": "Speed (feet)",
+      "maxHp": "Max Hit Points",
+      "acBase": "Base Armor Class",
+      "shieldBonus": "Shield Bonus",
+      "allowsDex": "Add Dexterity Modifier to AC",
+      "abilitiesTitle": "Ability Scores (1 to 30)",
+      "submit": "Create Creature",
+      "cancel": "Cancel",
+      "saving": "Saving..."
+    },
+    "actionForm": {
+      "title": "Add Tactical Action to {{name}}",
+      "name": "Action / Weapon Name",
+      "type": "Action Type",
+      "isAttack": "Is this an attack roll against AC?",
+      "reach": "Reach / Range (ft)",
+      "formula": "Damage Formula (e.g. 1d8, 2d6)",
+      "damageType": "Damage Type",
+      "ability": "Governing Attack Ability",
+      "mastery": "Linked Weapon Mastery (optional)",
+      "description": "Operational effect description",
+      "submit": "Incorporate Action",
+      "cancel": "Cancel"
     }
   }
 }
