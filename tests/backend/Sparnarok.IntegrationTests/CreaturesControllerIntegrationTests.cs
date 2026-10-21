@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Domain.Enums;
@@ -14,11 +15,13 @@ namespace Sparnarok.IntegrationTests;
 
 public class CreaturesControllerIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public CreaturesControllerIntegrationTests(CustomWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
         _jsonOptions = new JsonSerializerOptions
         {
@@ -29,7 +32,7 @@ public class CreaturesControllerIntegrationTests : IClassFixture<CustomWebApplic
         // Ensure database is initialized with seed data
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-        context.Database.EnsureCreated();
+        TestDatabaseInitializer.EnsureCreated(context);
     }
 
     [Fact]
@@ -87,6 +90,16 @@ public class CreaturesControllerIntegrationTests : IClassFixture<CustomWebApplic
         // Verify retrieval via Location URL
         var getResponse = await _client.GetAsync(response.Headers.Location);
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Teardown
+        using var cleanupScope = _factory.Services.CreateScope();
+        var db = cleanupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+        var persisted = await db.Creatures.FirstOrDefaultAsync(c => c.Id == created.Id);
+        if (persisted != null)
+        {
+            db.Creatures.Remove(persisted);
+            await db.SaveChangesAsync();
+        }
     }
 
     [Fact]

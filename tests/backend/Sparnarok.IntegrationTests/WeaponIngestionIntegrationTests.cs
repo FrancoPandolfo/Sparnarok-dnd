@@ -35,13 +35,24 @@ public class WeaponIngestionIntegrationTests : IClassFixture<CustomWebApplicatio
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-        context.Database.EnsureCreated();
+        TestDatabaseInitializer.EnsureCreated(context);
     }
 
     [Fact]
     public async Task IngestWeapons_WithValidCsv_PersistsEntitiesInDatabase()
     {
-        // Arrange
+        // Arrange: Asegurar aislamiento de armas previas
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var db = setupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var toRemove = await db.Weapons.Where(w => w.Name == "Rapier" || w.Name == "Shortsword" || w.Name == "Heavy Crossbow").ToListAsync();
+            if (toRemove.Count > 0)
+            {
+                db.Weapons.RemoveRange(toRemove);
+                await db.SaveChangesAsync();
+            }
+        }
+
         const string csvData = """
             Name,Damage,DamageType,Properties,Weight,Cost
             Rapier,1d8,Piercing,Finesse,2.0,25 gp
@@ -86,6 +97,18 @@ public class WeaponIngestionIntegrationTests : IClassFixture<CustomWebApplicatio
     [Fact]
     public async Task IngestWeapons_WithExistingWeapons_PerformsIdempotentUpsert()
     {
+        // 0. Limpieza previa de Longsword y Glaive para aislamiento determinista
+        using (var setupScope = _factory.Services.CreateScope())
+        {
+            var db = setupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var toRemove = await db.Weapons.Where(w => w.Name == "Longsword" || w.Name == "Glaive").ToListAsync();
+            if (toRemove.Count > 0)
+            {
+                db.Weapons.RemoveRange(toRemove);
+                await db.SaveChangesAsync();
+            }
+        }
+
         // 1. Arrange: Subir Longsword inicial
         const string initialCsv = """
             Name,Damage,DamageType,Properties,Weight,Cost

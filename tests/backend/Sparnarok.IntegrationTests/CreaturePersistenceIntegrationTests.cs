@@ -22,7 +22,7 @@ public class CreaturePersistenceIntegrationTests : IClassFixture<PostgreSqlConta
     {
         // Arrange
         await using var initContext = _fixture.CreateDbContext();
-        await initContext.Database.EnsureCreatedAsync();
+        await TestDatabaseInitializer.EnsureCreatedAsync(initContext);
 
         // Verify seeded Weapon Masteries exist
         var seededMasteries = await initContext.WeaponMasteries.ToListAsync();

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Domain.Entities;
@@ -32,7 +33,7 @@ public class SimulationControllerIntegrationTests : IClassFixture<CustomWebAppli
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-        context.Database.EnsureCreated();
+        TestDatabaseInitializer.EnsureCreated(context);
     }
 
     [Fact]
@@ -67,6 +68,27 @@ public class SimulationControllerIntegrationTests : IClassFixture<CustomWebAppli
         using (var scope = _factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var existingWeapons = await context.Weapons
+                .Where(w => w.Name == "Test Greatsword" || w.Name == "Test Rapier")
+                .ToListAsync();
+            if (existingWeapons.Count > 0)
+            {
+                context.Weapons.RemoveRange(existingWeapons);
+            }
+
+            var existingCreatures = await context.Creatures
+                .Where(c => c.Name == "Test Gladiator A" || c.Name == "Test Gladiator B")
+                .ToListAsync();
+            if (existingCreatures.Count > 0)
+            {
+                context.Creatures.RemoveRange(existingCreatures);
+            }
+
+            if (existingWeapons.Count > 0 || existingCreatures.Count > 0)
+            {
+                await context.SaveChangesAsync();
+            }
+
             context.Creatures.AddRange(creatureA, creatureB);
             context.Weapons.AddRange(weaponA, weaponB);
             await context.SaveChangesAsync();
@@ -99,6 +121,17 @@ public class SimulationControllerIntegrationTests : IClassFixture<CustomWebAppli
         result.AverageRounds.Should().BeGreaterThan(0);
         result.CombatantAAverageDpr.Should().BeGreaterThan(0);
         result.CombatantBAverageDpr.Should().BeGreaterThan(0);
+
+        // Teardown
+        using (var cleanupScope = _factory.Services.CreateScope())
+        {
+            var context = cleanupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var creatures = await context.Creatures.Where(c => c.Id == creatureA.Id || c.Id == creatureB.Id).ToListAsync();
+            var weapons = await context.Weapons.Where(w => w.Id == weaponA.Id || w.Id == weaponB.Id).ToListAsync();
+            context.Creatures.RemoveRange(creatures);
+            context.Weapons.RemoveRange(weapons);
+            await context.SaveChangesAsync();
+        }
     }
 
     [Theory]
