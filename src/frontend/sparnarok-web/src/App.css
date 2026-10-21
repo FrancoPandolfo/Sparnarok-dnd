@@ -1286,7 +1286,56 @@
 }
 
 .simulator-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.hero-create-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border: 1px solid rgba(147, 197, 253, 0.4);
+  color: #ffffff;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hero-create-btn:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+.custom-hero-modal {
+  max-width: 580px;
+  width: 90%;
+}
+
+.hero-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  margin-top: 1rem;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
 }
 
 .sim-setup-grid {

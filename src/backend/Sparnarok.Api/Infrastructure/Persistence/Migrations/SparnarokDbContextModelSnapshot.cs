@@ -167,6 +167,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("EquippedShieldId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsPlayerCharacter")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)

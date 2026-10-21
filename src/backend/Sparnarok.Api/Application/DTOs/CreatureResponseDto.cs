@@ -27,7 +27,8 @@ public record CreatureResponseDto(
     Guid? EquippedArmorId = null,
     string? EquippedArmorName = null,
     Guid? EquippedShieldId = null,
-    string? EquippedShieldName = null)
+    string? EquippedShieldName = null,
+    bool IsPlayerCharacter = false)
 {
     /// <summary>
     /// Mapea una entidad <see cref="Creature"/> a su correspondiente DTO de respuesta.
@@ -77,7 +78,8 @@ public record CreatureResponseDto(
             entity.EquippedArmorId,
             entity.EquippedArmor?.Name,
             entity.EquippedShieldId,
-            entity.EquippedShield?.Name);
+            entity.EquippedShield?.Name,
+            entity.IsPlayerCharacter);
     }
 }
 

@@ -19,6 +19,7 @@ public class IngestionController : ControllerBase
 {
     private readonly IWeaponIngestionService _weaponIngestionService;
     private readonly IArmorIngestionService _armorIngestionService;
+    private readonly IOpen5eSyncService _open5eSyncService;
     private readonly SparnarokDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
 
@@ -28,11 +29,13 @@ public class IngestionController : ControllerBase
     public IngestionController(
         IWeaponIngestionService weaponIngestionService,
         IArmorIngestionService armorIngestionService,
+        IOpen5eSyncService open5eSyncService,
         SparnarokDbContext context,
         IStringLocalizer<SharedResource> localizer)
     {
         _weaponIngestionService = weaponIngestionService;
         _armorIngestionService = armorIngestionService;
+        _open5eSyncService = open5eSyncService;
         _context = context;
         _localizer = localizer;
     }
@@ -176,5 +179,21 @@ public class IngestionController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(armors);
+    }
+
+    /// <summary>
+    /// Sincroniza e ingesta un lote de criaturas desde el Bestiario de la API externa de Open5e v1 hacia la base de datos de Sparnarok.
+    /// </summary>
+    /// <param name="limit">Cantidad máxima de criaturas a sincronizar de la primera página (por defecto 50).</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <response code="200">Resumen con las métricas del procesamiento (registros procesados, insertados, actualizados y errores).</response>
+    [HttpPost("open5e/monsters/sync")]
+    [ProducesResponseType(typeof(IngestionResultDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IngestionResultDto>> SyncOpen5eMonsters(
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default)
+    {
+        var result = await _open5eSyncService.SyncMonstersAsync(limit, ct);
+        return Ok(result);
     }
 }

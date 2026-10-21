@@ -185,7 +185,35 @@ Ingesta masiva del catálogo oficial de armaduras y escudos desde `/data/seeds/a
 
 ---
 
+## Fase 2.2: Bestiary API Integration & Custom Combatant Profiles [Completado]
+
+Integración con la API externa pública de Open5e para sincronización masiva del Bestiario oficial de SRD y creación de perfiles estáticos de combatientes custom (Personajes de Jugadores - PCs) con estadísticas finales directas para simulación inmediata.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.2.1 Open5e Bestiary Client (IHttpClientFactory)      │
+   │ 2.2.2 Ingestión Sincronizada POST /api/ingestion/open5e│
+   │ 2.2.3 Perfiles de Héroes POST /api/v1/creatures/custom │
+   │ 2.2.4 Modal de Héroe Custom en CombatSimulatorView     │
+   │ 2.2.5 Test Suites: Unitarios, Integración & E2E       │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - Cliente HTTP tipado `Open5eBestiaryClient` (`IOpen5eBestiaryClient`) configurado mediante `IHttpClientFactory` para consumir `/monsters/` desde `https://api.open5e.com/v1/`.
+  - Servicio de sincronización `Open5eSyncService` con mapeo exhaustivo (HP, CA efectiva con `AllowsDexterityModifier = false`, atributos, bonos de ataque y dados de daño) y upsert idempotente por nombre en PostgreSQL.
+  - Endpoint de sincronización `POST /api/ingestion/open5e/monsters/sync`.
+  - Endpoint `POST /api/v1/creatures/custom` para dar de alta combatientes de jugadores (PCs) con estadísticas finales y flag de dominio `IsPlayerCharacter = true`.
+  - Interfaz web con modal "Añadir Héroe Custom" (`CustomHeroModal`) en `CombatSimulatorView`, con selección inmediata e insignias temáticas (`🛡️ [Héroe]`).
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/open5e-integration-and-profiles`.
+  - Documentación: [ADR-0010](file:///docs/adrs/0010-open5e-integration-and-custom-combatant-profiles.md).
+  - Testing: 150 tests unitarios en `Sparnarok.UnitTests`, 23 tests de integración en `Sparnarok.IntegrationTests` con `HttpMessageHandler` mockeado y base de datos relacional, 21 tests de componentes en Vitest y 7 tests E2E en Playwright.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
+
 
 ### Fase 2: Módulo 3 - Mathematical Simulation & DPR Matrices
 - Modelado probabilístico de tiradas d20 con ventaja / desventaja.

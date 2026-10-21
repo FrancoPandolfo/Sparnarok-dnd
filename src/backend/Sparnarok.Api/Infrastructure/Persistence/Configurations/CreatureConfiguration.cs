@@ -40,6 +40,10 @@ public class CreatureConfiguration : IEntityTypeConfiguration<Creature>
         builder.Property(c => c.SpeedFeet)
             .IsRequired();
 
+        builder.Property(c => c.IsPlayerCharacter)
+            .HasDefaultValue(false)
+            .IsRequired();
+
         // 1. Mapeo de Objeto de Valor: AbilityScores (OwnsOne)
         builder.OwnsOne(c => c.AbilityScores, ab =>
         {

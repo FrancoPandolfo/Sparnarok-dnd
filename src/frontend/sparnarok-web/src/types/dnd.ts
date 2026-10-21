@@ -164,6 +164,26 @@ export interface CreatureResponseDto {
   equippedArmorName?: string | null;
   equippedShieldId?: string | null;
   equippedShieldName?: string | null;
+  isPlayerCharacter?: boolean;
+}
+
+/**
+ * Payload para dar de alta un perfil de combatiente customizado (Héroe / PC).
+ */
+export interface CreateCustomHeroRequestDto {
+  name: string;
+  maxHitPoints: number;
+  armorClass: number;
+  strength?: number;
+  dexterity?: number;
+  constitution?: number;
+  intelligence?: number;
+  wisdom?: number;
+  charisma?: number;
+  speedFeet?: number;
+  attackName?: string;
+  damageFormula?: string;
+  attackModifierAbility?: AbilityScoreType;
 }
 
 /**

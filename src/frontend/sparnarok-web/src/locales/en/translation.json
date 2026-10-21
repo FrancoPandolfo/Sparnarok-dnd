@@ -136,6 +136,26 @@
     "winnerB": "Favorable odds: {{name}} ({{percent}}%)",
     "drawsNotice": "Balanced simulation with {{percent}}% draws",
     "errorSimulating": "An error occurred while executing the Monte Carlo simulation.",
-    "selectCreatureHint": "Select creatures and weapons to start the tactical analysis."
+    "selectCreatureHint": "Select creatures and weapons to start the tactical analysis.",
+    "addCustomHero": "Add Custom Hero",
+    "customHeroModal": {
+      "title": "Add Custom Hero (Tactical Profile)",
+      "subtitle": "Enter the character's final stats to evaluate their combat performance immediately.",
+      "name": "Hero Name",
+      "namePlaceholder": "E.g. Sir Galahad, Valeria...",
+      "ac": "Final Armor Class (AC)",
+      "hp": "Maximum Hit Points (HP)",
+      "attributes": "Ability Scores",
+      "str": "Strength (STR)",
+      "dex": "Dexterity (DEX)",
+      "con": "Constitution (CON)",
+      "attackName": "Attack / Weapon Name",
+      "attackNamePlaceholder": "E.g. Holy Greatsword, Shortsword...",
+      "damageFormula": "Damage Formula",
+      "damageFormulaPlaceholder": "E.g. 1d8+3, 2d6, 1d10...",
+      "cancel": "Cancel",
+      "submit": "Add to Simulator",
+      "saving": "Saving Hero..."
+    }
   }
 }

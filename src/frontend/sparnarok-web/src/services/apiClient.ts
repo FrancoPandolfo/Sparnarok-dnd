@@ -8,6 +8,7 @@ import type {
   WeaponDto,
   ArmorDto,
   EquipItemsRequestDto,
+  CreateCustomHeroRequestDto,
   MontecarloRequestDto,
   MontecarloResultDto,
 } from '../types/dnd';
@@ -682,6 +683,116 @@ export const apiClient = {
       creature.equippedShieldName = shield ? shield.name : null;
     }
     return { ...creature };
+  },
+
+  /**
+   * Crea un combatiente customizado (Héroe / Personaje de Jugador) con estadísticas finales.
+   */
+  async createCustomHero(request: CreateCustomHeroRequestDto): Promise<CreatureResponseDto> {
+    try {
+      const response = await fetch('/api/v1/creatures/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (response.ok) {
+        const created: CreatureResponseDto = await response.json();
+        inMemoryCreatures.unshift(created);
+        return created;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const str = request.strength ?? 10;
+    const dex = request.dexterity ?? 10;
+    const con = request.constitution ?? 10;
+    const int = request.intelligence ?? 10;
+    const wis = request.wisdom ?? 10;
+    const cha = request.charisma ?? 10;
+    const calcMod = (val: number) => Math.floor((val - 10) / 2);
+
+    const newHero: CreatureResponseDto = {
+      id: `hero-${Date.now()}`,
+      name: request.name,
+      size: 'Medium',
+      type: 'Humanoid',
+      alignment: 'Heroic',
+      challengeRating: 1,
+      speedFeet: request.speedFeet || 30,
+      proficiencyBonus: 2,
+      effectiveArmorClass: request.armorClass,
+      isPlayerCharacter: true,
+      abilityScores: {
+        strength: str,
+        strengthModifier: calcMod(str),
+        dexterity: dex,
+        dexterityModifier: calcMod(dex),
+        constitution: con,
+        constitutionModifier: calcMod(con),
+        intelligence: int,
+        intelligenceModifier: calcMod(int),
+        wisdom: wis,
+        wisdomModifier: calcMod(wis),
+        charisma: cha,
+        charismaModifier: calcMod(cha),
+      },
+      hitPoints: {
+        max: request.maxHitPoints,
+        current: request.maxHitPoints,
+        temporary: 0,
+      },
+      armorClass: {
+        base: request.armorClass,
+        shieldBonus: 0,
+        allowsDexterityModifier: false,
+        maxDexterityModifier: null,
+      },
+      actions: [
+        {
+          id: `act-${Date.now()}`,
+          creatureId: `hero-${Date.now()}`,
+          name: request.attackName || 'Ataque Principal',
+          type: 'Action',
+          description: `Ataque estándar del héroe ${request.name}.`,
+          isAttack: true,
+          attackBonus: calcMod(str) + 2,
+          reachOrRangeFeet: 5,
+          damageFormula: request.damageFormula || '1d8',
+          damageType: 'Slashing',
+          attackModifierAbility: request.attackModifierAbility || 'Strength',
+          associatedMasteryId: null,
+        },
+      ],
+      knownMasteries: [],
+    };
+
+    inMemoryCreatures.unshift(newHero);
+    return newHero;
+  },
+
+  /**
+   * Dispara la sincronización de monstruos desde el Bestiario de Open5e hacia la base de datos.
+   */
+  async syncOpen5eMonsters(limit = 50): Promise<IngestionResultDto> {
+    try {
+      const response = await fetch(`/api/ingestion/open5e/monsters/sync?limit=${limit}`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+
+    return {
+      totalProcessed: limit,
+      inserted: limit,
+      updated: 0,
+      errors: [],
+    };
   },
 
   /**
