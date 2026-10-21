@@ -212,6 +212,35 @@ Integración con la API externa pública de Open5e para sincronización masiva d
 
 ---
 
+## Fase 2.3: DPR Baselines & Archetype Abstraction [Completado]
+
+Abstracción estadística del daño de Personajes de Jugadores (PCs) mediante matrices de Daño por Ronda Esperado (Expected DPR Baselines) por nivel (1-20) y arquetipo táctico, omitiendo tiradas convencionales de d20 contra CA e inyectando un factor de variabilidad estocástica de ±15%.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.3.1 Modelado en Creature (Level, ExpectedDpr, Arch)  │
+   │ 2.3.2 Matriz y Servicio IDprBaselineService (CSV Seed) │
+   │ 2.3.3 Endpoints REST /api/v1/dpr-baselines             │
+   │ 2.3.4 Bucle de Combate Directo con ±15% de Varianza    │
+   │ 2.3.5 UI Selectores de Arquetipo/Nivel y Live DPR Badge│
+   │ 2.3.6 Suites de Pruebas Unitarias, Integración & E2E   │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - Extensión de la entidad de dominio `Creature` con `Level` (1-20), `ExpectedDpr` (double?), `Archetype` (string?) y método `ConfigurePlayerCharacterProfile(...)`.
+  - Migración EF Core `20261021202132_AddDprBaselinesToCreature` aplicada sobre PostgreSQL.
+  - Catálogo y semilla CSV `/data/seeds/dpr_baselines.csv` con 6 arquetipos canónicos (*Fighter 2H*, *Ranger Ranged*, *Paladin 2H*, *Barbarian 2H*, *Rogue Sneak Attack*, *Warlock Eldritch Blast*) para los 20 niveles.
+  - Servicio `IDprBaselineService` / `DprBaselineService` con catálogo embebido resiliente y endpoints en `DprBaselinesController`.
+  - Actualización del motor de combate `CombatSimulatorService` y `MontecarloSimulationService`: omisión de tiradas d20 contra CA para atacantes PC con `ExpectedDpr`, reducción directa de HP con factor de variabilidad de $\pm 15\%$ por ronda ($E[\text{Damage}] = \text{ExpectedDpr}$), sin requerir arma equipada.
+  - Actualización de frontend: `CustomHeroModal` con selectores reactivos de Arquetipo y Nivel, indicador de DPR en vivo y soporte en `CombatSimulatorView` con inhabilitación de selector de armas y badge de DPR.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/dpr-baselines-integration`.
+  - Documentación: [ADR-0011](file:///docs/adrs/0011-dpr-baselines-and-archetype-abstraction.md).
+  - Testing: 156 tests unitarios en backend (incluyendo suite matemática de DPR y variabilidad $\pm 15\%$), 23 tests de integración en backend, 23 tests de componentes en Vitest y 8 tests E2E en Playwright.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 

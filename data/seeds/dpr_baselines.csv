@@ -1,0 +1,121 @@
+Archetype,Level,ExpectedDpr,Description
+Fighter 2H,1,9.2,Greatsword 2d6+3 con Great Weapon Fighting
+Fighter 2H,2,10.8,Action Surge prorrateado
+Fighter 2H,3,12.5,Subclase Champion/Battle Master
+Fighter 2H,4,14.1,ASI Fuerza 18 o Dote de daño
+Fighter 2H,5,19.4,Ataque Extra (2 ataques por turno)
+Fighter 2H,6,21.0,ASI Fuerza 20
+Fighter 2H,7,22.8,Habilidad de subclase nivel 7
+Fighter 2H,8,24.5,Dote de maestría avanzada
+Fighter 2H,9,25.6,Indomable y bono de competencia +4
+Fighter 2H,10,27.2,Mejora táctica de combate
+Fighter 2H,11,34.8,Ataque Extra (3 ataques por turno)
+Fighter 2H,12,36.5,Dote épica adicional
+Fighter 2H,13,38.2,Bono de competencia +5
+Fighter 2H,14,40.0,ASI / Dote
+Fighter 2H,15,42.1,Subclase avanzada
+Fighter 2H,16,44.2,ASI / Dote
+Fighter 2H,17,48.0,Segundo Action Surge
+Fighter 2H,18,50.5,Subclase capstone
+Fighter 2H,19,53.2,Dote Épica nivel 19
+Fighter 2H,20,62.0,Ataque Extra (4 ataques por turno)
+Ranger Ranged,1,7.5,Arco largo 1d8+3
+Ranger Ranged,2,9.8,Estilo Archery + Hunter's Mark
+Ranger Ranged,3,11.5,Subclase Hunter / Gloom Stalker
+Ranger Ranged,4,13.0,ASI Destreza 18 o Sharpshooter
+Ranger Ranged,5,18.2,Ataque Extra + Hunter's Mark
+Ranger Ranged,6,19.5,Favored Foe / mejoras tácticas
+Ranger Ranged,7,21.0,Subclase nivel 7
+Ranger Ranged,8,22.5,ASI Destreza 20
+Ranger Ranged,9,24.0,Conjuros de nivel 3
+Ranger Ranged,10,25.5,Naturaleza infatigable
+Ranger Ranged,11,29.0,Mejora de daño por subclase
+Ranger Ranged,12,30.5,Dote
+Ranger Ranged,13,32.0,Conjuros de nivel 4
+Ranger Ranged,14,33.5,Habilidad defensiva/ofensiva
+Ranger Ranged,15,35.0,Subclase nivel 15
+Ranger Ranged,16,37.0,ASI / Dote
+Ranger Ranged,17,40.0,Conjuros de nivel 5 (Swift Quiver)
+Ranger Ranged,18,42.0,Sentidos ferales
+Ranger Ranged,19,44.5,Dote épica
+Ranger Ranged,20,48.0,Foe Slayer 2024
+Paladin 2H,1,8.5,Espadón 2d6+3
+Paladin 2H,2,11.0,Estilo Great Weapon + Divine Smite
+Paladin 2H,3,13.0,Voto sagrado y canalizar divinidad
+Paladin 2H,4,14.5,ASI Fuerza 18
+Paladin 2H,5,20.5,Ataque Extra + Smite nivel 2
+Paladin 2H,6,21.8,Aura de protección
+Paladin 2H,7,23.2,Aura de subclase
+Paladin 2H,8,24.8,ASI Fuerza 20
+Paladin 2H,9,27.0,Smite nivel 3
+Paladin 2H,10,28.5,Aura de coraje
+Paladin 2H,11,36.0,Radiant Strikes (+1d8 radiante por impacto)
+Paladin 2H,12,37.8,Dote
+Paladin 2H,13,40.2,Smite nivel 4
+Paladin 2H,14,42.0,Toque purificador
+Paladin 2H,15,44.5,Subclase nivel 15
+Paladin 2H,16,46.8,ASI / Dote
+Paladin 2H,17,50.5,Smite nivel 5
+Paladin 2H,18,53.0,Rango de auras ampliado
+Paladin 2H,19,55.8,Dote épica
+Paladin 2H,20,60.0,Avatar sagrado (capstone)
+Barbarian 2H,1,9.8,Greataxe 1d12+3 + Furia (+2)
+Barbarian 2H,2,12.0,Reckless Attack (ventaja constante)
+Barbarian 2H,3,14.2,Subclase Berserker / Zealot
+Barbarian 2H,4,16.0,ASI Fuerza 18 o Great Weapon Master
+Barbarian 2H,5,22.0,Ataque Extra + Furia + Reckless
+Barbarian 2H,6,23.5,Subclase nivel 6
+Barbarian 2H,7,25.0,Instinto salvaje
+Barbarian 2H,8,26.8,ASI Fuerza 20
+Barbarian 2H,9,29.0,Furia (+3 daño) y Brutal Critical
+Barbarian 2H,10,30.8,Subclase nivel 10
+Barbarian 2H,11,34.5,Furia implacable
+Barbarian 2H,12,36.2,Dote
+Barbarian 2H,13,38.5,Brutal Strike 2024
+Barbarian 2H,14,40.8,Subclase nivel 14
+Barbarian 2H,15,43.0,Furia persistente
+Barbarian 2H,16,45.5,Furia (+4 daño)
+Barbarian 2H,17,49.0,Brutal Critical x3
+Barbarian 2H,18,51.5,Poderío indómito
+Barbarian 2H,19,54.2,Dote épica
+Barbarian 2H,20,64.0,Primal Champion (+4 STR/CON)
+Rogue Sneak Attack,1,7.2,Estoques 1d8+3 + 1d6 Sneak Attack
+Rogue Sneak Attack,2,8.5,Acción astuta
+Rogue Sneak Attack,3,11.2,Subclase Assassin/Thief + 2d6 Sneak Attack
+Rogue Sneak Attack,4,12.5,ASI Destreza 18
+Rogue Sneak Attack,5,16.8,3d6 Sneak Attack + Uncanny Dodge
+Rogue Sneak Attack,6,18.0,Pericia adicional
+Rogue Sneak Attack,7,21.0,4d6 Sneak Attack + Evasión
+Rogue Sneak Attack,8,22.5,ASI Destreza 20
+Rogue Sneak Attack,9,25.5,5d6 Sneak Attack
+Rogue Sneak Attack,10,27.0,Dote adicional
+Rogue Sneak Attack,11,30.5,6d6 Sneak Attack + Talento confiable
+Rogue Sneak Attack,12,32.0,Dote
+Rogue Sneak Attack,13,35.5,7d6 Sneak Attack
+Rogue Sneak Attack,14,37.0,Sentido ciego
+Rogue Sneak Attack,15,40.5,8d6 Sneak Attack + Mente resbaladiza
+Rogue Sneak Attack,16,42.0,ASI / Dote
+Rogue Sneak Attack,17,46.0,9d6 Sneak Attack + Golpe mortal
+Rogue Sneak Attack,18,48.0,Elusivo
+Rogue Sneak Attack,19,51.5,10d6 Sneak Attack + Dote épica
+Rogue Sneak Attack,20,55.0,Golpe de suerte
+Warlock Eldritch Blast,1,5.5,Eldritch Blast 1d10
+Warlock Eldritch Blast,2,8.5,Agonizing Blast (+Carisma)
+Warlock Eldritch Blast,3,9.2,Pacto y conjuros de nivel 2
+Warlock Eldritch Blast,4,10.5,ASI Carisma 18
+Warlock Eldritch Blast,5,16.5,2 rayos de Eldritch Blast (Treantmonk Baseline)
+Warlock Eldritch Blast,6,17.5,Subclase patrón
+Warlock Eldritch Blast,7,18.5,Conjuros nivel 4
+Warlock Eldritch Blast,8,20.0,ASI Carisma 20
+Warlock Eldritch Blast,9,21.0,Invocación mística adicional
+Warlock Eldritch Blast,10,22.0,Protección de patrón
+Warlock Eldritch Blast,11,28.5,3 rayos de Eldritch Blast + Mystic Arcanum
+Warlock Eldritch Blast,12,29.8,Dote
+Warlock Eldritch Blast,13,31.0,Arcanum nivel 7
+Warlock Eldritch Blast,14,32.5,Subclase capstone
+Warlock Eldritch Blast,15,33.8,Arcanum nivel 8
+Warlock Eldritch Blast,16,35.0,ASI / Dote
+Warlock Eldritch Blast,17,42.0,4 rayos de Eldritch Blast + Arcanum nivel 9
+Warlock Eldritch Blast,18,43.5,Invocación nivel 18
+Warlock Eldritch Blast,19,45.0,Dote épica
+Warlock Eldritch Blast,20,47.0,Master Arcanist

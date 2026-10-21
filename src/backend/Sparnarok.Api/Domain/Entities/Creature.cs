@@ -74,6 +74,15 @@ public class Creature
     /// <summary>Indica si esta criatura representa a un personaje de jugador (Player Character - PC) o héroe custom.</summary>
     public bool IsPlayerCharacter { get; private set; }
 
+    /// <summary>Nivel del personaje (1 a 20), aplicable a PJs o héroes custom.</summary>
+    public int? Level { get; private set; }
+
+    /// <summary>Daño Promedio por Ronda esperado (Expected DPR), utilizado como abstracción de combate para PCs.</summary>
+    public double? ExpectedDpr { get; private set; }
+
+    /// <summary>Arquetipo táctico o clase del personaje (ej. 'Fighter 2H', 'Ranger Ranged').</summary>
+    public string? Archetype { get; private set; }
+
     /// <summary>Constructor protegido para EF Core.</summary>
     protected Creature() { }
 
@@ -91,6 +100,9 @@ public class Creature
     /// <param name="armorClass">Configuración de CA (opcional).</param>
     /// <param name="id">Identificador único opcional.</param>
     /// <param name="isPlayerCharacter">Flag que indica si es un personaje de jugador / héroe custom.</param>
+    /// <param name="level">Nivel del personaje (1 a 20, opcional).</param>
+    /// <param name="expectedDpr">Daño promedio por ronda esperado (opcional).</param>
+    /// <param name="archetype">Arquetipo o clase (opcional).</param>
     public Creature(
         string name,
         CreatureSize size,
@@ -102,7 +114,10 @@ public class Creature
         HitPoints? hitPoints = null,
         ArmorClass? armorClass = null,
         Guid? id = null,
-        bool isPlayerCharacter = false)
+        bool isPlayerCharacter = false,
+        int? level = null,
+        double? expectedDpr = null,
+        string? archetype = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("El nombre de la criatura no puede estar vacío.", nameof(name));
@@ -112,6 +127,12 @@ public class Creature
 
         if (speedFeet < 0)
             throw new ArgumentOutOfRangeException(nameof(speedFeet), speedFeet, "La velocidad no puede ser negativa.");
+
+        if (level.HasValue && level.Value is < 1 or > 20)
+            throw new ArgumentOutOfRangeException(nameof(level), level.Value, "El nivel del personaje debe estar comprendido entre 1 y 20.");
+
+        if (expectedDpr.HasValue && expectedDpr.Value < 0)
+            throw new ArgumentOutOfRangeException(nameof(expectedDpr), expectedDpr.Value, "El DPR esperado no puede ser negativo.");
 
         Id = id ?? Guid.NewGuid();
         Name = name;
@@ -124,6 +145,9 @@ public class Creature
         HitPoints = hitPoints ?? new(10);
         ArmorClass = armorClass ?? ArmorClass.Unarmored;
         IsPlayerCharacter = isPlayerCharacter;
+        Level = level;
+        ExpectedDpr = expectedDpr;
+        Archetype = string.IsNullOrWhiteSpace(archetype) ? null : archetype.Trim();
     }
 
     /// <summary>
@@ -134,6 +158,27 @@ public class Creature
     {
         IsPlayerCharacter = isPlayerCharacter;
     }
+
+    /// <summary>
+    /// Configura el perfil de combate de un Personaje de Jugador (PC) con nivel, arquetipo y daño promedio esperado por ronda.
+    /// </summary>
+    /// <param name="level">Nivel del personaje (1 a 20).</param>
+    /// <param name="expectedDpr">Daño promedio por ronda (DPR).</param>
+    /// <param name="archetype">Nombre del arquetipo o clase (opcional).</param>
+    public void ConfigurePlayerCharacterProfile(int level, double expectedDpr, string? archetype = null)
+    {
+        if (level is < 1 or > 20)
+            throw new ArgumentOutOfRangeException(nameof(level), level, "El nivel del personaje debe estar comprendido entre 1 y 20.");
+
+        if (expectedDpr < 0)
+            throw new ArgumentOutOfRangeException(nameof(expectedDpr), expectedDpr, "El DPR esperado no puede ser negativo.");
+
+        IsPlayerCharacter = true;
+        Level = level;
+        ExpectedDpr = expectedDpr;
+        Archetype = string.IsNullOrWhiteSpace(archetype) ? null : archetype.Trim();
+    }
+
 
     /// <summary>
     /// Calcula el Bono de Competencia canónico según el Challenge Rating de la criatura.

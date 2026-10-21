@@ -26,6 +26,7 @@ public class CreaturesController : ControllerBase
     private readonly IValidator<CreateActionRequestDto> _actionValidator;
     private readonly IStringLocalizer<SharedResource> _localizer;
     private readonly Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? _context;
+    private readonly IDprBaselineService _dprBaselineService;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="CreaturesController"/>.
@@ -37,7 +38,8 @@ public class CreaturesController : ControllerBase
         IValidator<UpdateCreatureRequestDto> updateValidator,
         IValidator<CreateActionRequestDto> actionValidator,
         IStringLocalizer<SharedResource> localizer,
-        Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? context = null)
+        Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? context = null,
+        IDprBaselineService? dprBaselineService = null)
     {
         _creatureRepository = creatureRepository;
         _masteryRepository = masteryRepository;
@@ -46,7 +48,9 @@ public class CreaturesController : ControllerBase
         _actionValidator = actionValidator;
         _localizer = localizer;
         _context = context;
+        _dprBaselineService = dprBaselineService ?? new Sparnarok.Api.Infrastructure.Services.DprBaselineService();
     }
+
 
     /// <summary>
     /// Lista todas las criaturas registradas en el Códice junto a sus acciones y maestrías.
@@ -180,6 +184,13 @@ public class CreaturesController : ControllerBase
             shieldBonus: 0,
             allowsDexterityModifier: false);
 
+        int level = request.Level is >= 1 and <= 20 ? request.Level : 1;
+        double? expectedDpr = request.ExpectedDpr;
+        if (!expectedDpr.HasValue && !string.IsNullOrWhiteSpace(request.Archetype))
+        {
+            expectedDpr = _dprBaselineService.GetExpectedDpr(request.Archetype, level);
+        }
+
         var creature = new Creature(
             request.Name,
             CreatureSize.Medium,
@@ -190,10 +201,15 @@ public class CreaturesController : ControllerBase
             abilityScores: abilityScores,
             hitPoints: hitPoints,
             armorClass: armorClass,
-            isPlayerCharacter: true);
+            isPlayerCharacter: true,
+            level: level,
+            expectedDpr: expectedDpr,
+            archetype: request.Archetype);
 
         // Acción de ataque principal del héroe
-        var attackName = string.IsNullOrWhiteSpace(request.AttackName) ? "Ataque Principal" : request.AttackName.Trim();
+        var attackName = string.IsNullOrWhiteSpace(request.AttackName)
+            ? (!string.IsNullOrWhiteSpace(request.Archetype) ? $"Ataque de {request.Archetype}" : "Ataque Principal")
+            : request.AttackName.Trim();
         var damageFormula = string.IsNullOrWhiteSpace(request.DamageFormula) ? "1d8" : request.DamageFormula.Trim();
 
         var primaryAttack = new Action(
@@ -208,6 +224,7 @@ public class CreaturesController : ControllerBase
             attackModifierAbility: request.AttackModifierAbility);
 
         creature.AddAction(primaryAttack);
+
 
         await _creatureRepository.AddAsync(creature, ct);
         await _creatureRepository.SaveChangesAsync(ct);

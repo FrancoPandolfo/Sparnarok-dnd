@@ -149,6 +149,10 @@
       "str": "Fuerza (STR)",
       "dex": "Destreza (DEX)",
       "con": "Constitución (CON)",
+      "archetype": "Clase / Arquetipo",
+      "level": "Nivel (1-20)",
+      "expectedDpr": "DPR Estimado",
+      "expectedDprNote": "Daño promedio garantizado por ronda (con ±15% de varianza estocástica). No requiere arma equipada.",
       "attackName": "Nombre de Ataque / Arma",
       "attackNamePlaceholder": "Ej. Mandoble Sagrado, Espada Corta...",
       "damageFormula": "Fórmula de Daño",
@@ -156,6 +160,7 @@
       "cancel": "Cancelar",
       "submit": "Añadir al Simulador",
       "saving": "Guardando Héroe..."
-    }
+    },
+    "noWeaponRequiredDpr": "⚡ DPR de Arquetipo ({{dpr}} DPR) [Sin arma requerida]"
   }
 }

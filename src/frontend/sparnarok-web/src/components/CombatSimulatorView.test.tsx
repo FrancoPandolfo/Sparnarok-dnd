@@ -214,5 +214,43 @@ describe('CombatSimulatorView Component Suite', () => {
 
     expect(document.getElementById('custom-hero-modal')).toBeInTheDocument();
   });
+
+  it('runs Monte Carlo simulation for hero with expectedDpr without requiring weapon', async () => {
+    const heroCreature: CreatureResponseDto = {
+      ...mockCreatures[0],
+      id: 'hero-dpr-1',
+      name: 'Fighter Hero',
+      isPlayerCharacter: true,
+      level: 5,
+      archetype: 'Fighter 2H',
+      expectedDpr: 19.4,
+    };
+
+    const mockRun = vi.fn().mockResolvedValue(mockSimulationResult);
+
+    render(
+      <CombatSimulatorView
+        creatures={[heroCreature, mockCreatures[1]]}
+        weapons={mockWeapons}
+        onRunSimulation={mockRun}
+      />
+    );
+
+    // Weapon A select should be disabled and show DPR baseline text
+    const weaponASelect = document.getElementById('weapon-a-select') as HTMLSelectElement;
+    expect(weaponASelect).toBeDisabled();
+    expect(weaponASelect.value).toBe('');
+
+    const runBtn = screen.getByRole('button', { name: /Simular Combate \(Montecarlo\)/i });
+    await userEvent.click(runBtn);
+
+    expect(mockRun).toHaveBeenCalledWith({
+      combatantAId: 'hero-dpr-1',
+      weaponAId: undefined,
+      combatantBId: 'c-2',
+      weaponBId: 'w-2',
+      iterations: 10000,
+    });
+  });
 });
 

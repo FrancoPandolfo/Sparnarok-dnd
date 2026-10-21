@@ -42,6 +42,7 @@ builder.Services.AddScoped<IOpen5eSyncService, Sparnarok.Api.Infrastructure.Serv
 // 5. Motor de Simulación de Combate y RNG (Fase 2)
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Rng.IRandomProvider, Sparnarok.Api.Domain.Services.Rng.DefaultRandomProvider>();
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Dice.IDiceRoller, Sparnarok.Api.Domain.Services.Dice.DiceRoller>();
+builder.Services.AddSingleton<IDprBaselineService, Sparnarok.Api.Infrastructure.Services.DprBaselineService>();
 builder.Services.AddScoped<ICombatSimulatorService, Sparnarok.Api.Infrastructure.Services.CombatSimulatorService>();
 builder.Services.AddScoped<IMontecarloSimulationService, Sparnarok.Api.Infrastructure.Services.MontecarloSimulationService>();
 

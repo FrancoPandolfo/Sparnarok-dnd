@@ -299,6 +299,9 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
             proficiencyBonus: 3,
             effectiveArmorClass: postData.armorClass || 19,
             isPlayerCharacter: true,
+            level: postData.level || 5,
+            archetype: postData.archetype || 'Fighter 2H',
+            expectedDpr: postData.expectedDpr || 19.4,
             abilityScores: {
               strength: postData.strength || 18,
               strengthModifier: 4,
@@ -327,8 +330,8 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
             actions: [
               {
                 id: 'act-hero-1',
-                name: postData.attackName || 'Martillo Sagrado',
-                description: 'Ataque de arma cuerpo a cuerpo: +7 al impacto, daño 1d8+4 contundente.',
+                name: postData.attackName || 'Fighter 2H Baseline',
+                description: 'Ataque basado en arquetipo Fighter 2H (19.4 DPR)',
               },
             ],
             knownMasteries: [],
@@ -356,15 +359,20 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     const modal = page.locator('#custom-hero-modal');
     await expect(modal).toBeVisible();
 
-    // Fill form
+    // Fill form with Archetype and Level
     await page.locator('#hero-name-input').fill('Paladín Thorgar');
     await page.locator('#hero-ac-input').fill('19');
     await page.locator('#hero-hp-input').fill('55');
     await page.locator('#hero-str-input').fill('18');
     await page.locator('#hero-dex-input').fill('12');
     await page.locator('#hero-con-input').fill('16');
-    await page.locator('#hero-attack-name-input').fill('Martillo Sagrado');
-    await page.locator('#hero-damage-dice-input').fill('1d8+4');
+    await page.locator('#hero-archetype-select').selectOption('Fighter 2H');
+    await page.locator('#hero-level-select').selectOption('5');
+
+    // Verify estimated DPR displays 19.4 DPR
+    const dprDisplay = page.locator('#hero-expected-dpr-display');
+    await expect(dprDisplay).toBeVisible();
+    await expect(dprDisplay).toContainText('19.4 DPR');
 
     // Submit form
     await page.locator('#save-custom-hero-btn').click();
@@ -377,17 +385,142 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await expect(selectA).toBeVisible();
     await expect(selectA).toContainText('Paladín Thorgar');
     await expect(selectA).toContainText('🛡️ [Héroe]');
+    await expect(selectA).toContainText('19.4 DPR');
 
     // Verify it also appears in combatant-b-select options
     const selectB = page.locator('#combatant-b-select');
     await expect(selectB).toBeVisible();
     await expect(selectB).toContainText('Paladín Thorgar');
 
-    // Verify preview card reflects the hero's stats
+    // Verify preview card reflects the hero's stats and DPR badge
     const previewA = page.locator('.initiator-card');
     await expect(previewA).toContainText('Paladín Thorgar');
     await expect(previewA).toContainText('19');
     await expect(previewA).toContainText('55');
+    await expect(previewA).toContainText('19.4');
+
+    // Verify weapon dropdown is disabled and reflects no weapon required
+    const weaponASelect = page.locator('#weapon-a-select');
+    await expect(weaponASelect).toBeDisabled();
+    await expect(weaponASelect).toContainText('Sin arma requerida');
+  });
+
+  test('Level 5 custom hero defeats a monster without requiring an equipped weapon using Expected DPR', async ({ page }) => {
+    // Intercept POST /api/v1/creatures/custom
+    await page.route('**/api/v1/creatures/custom', async (route) => {
+      if (route.request().method() === 'POST') {
+        const postData = JSON.parse(route.request().postData() || '{}');
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'c0000001-0000-0000-0000-111122223333',
+            name: postData.name || 'Valeria Greatsword',
+            size: 'Medium',
+            type: 'Humanoid',
+            alignment: 'Heroic',
+            challengeRating: 5,
+            speedFeet: 30,
+            proficiencyBonus: 3,
+            effectiveArmorClass: postData.armorClass || 18,
+            isPlayerCharacter: true,
+            level: 5,
+            archetype: 'Fighter 2H',
+            expectedDpr: 19.4,
+            abilityScores: {
+              strength: 18,
+              strengthModifier: 4,
+              dexterity: 14,
+              dexterityModifier: 2,
+              constitution: 16,
+              constitutionModifier: 3,
+              intelligence: 10,
+              intelligenceModifier: 0,
+              wisdom: 12,
+              wisdomModifier: 1,
+              charisma: 10,
+              charismaModifier: 0,
+            },
+            hitPoints: { max: 48, current: 48, temporary: 0 },
+            armorClass: { base: 18, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+            actions: [],
+            knownMasteries: [],
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Intercept POST /api/simulation/montecarlo
+    let receivedPayload: any = null;
+    await page.route('**/api/simulation/montecarlo', async (route) => {
+      if (route.request().method() === 'POST') {
+        receivedPayload = JSON.parse(route.request().postData() || '{}');
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            totalIterations: receivedPayload.iterations || 100,
+            combatantAWins: 88,
+            combatantBWins: 12,
+            draws: 0,
+            combatantAWinRate: 88.0,
+            combatantBWinRate: 12.0,
+            drawRate: 0.0,
+            averageRounds: 2.4,
+            combatantAAverageDpr: 19.4,
+            combatantBAverageDpr: 6.2,
+            combatantAName: 'Valeria Greatsword',
+            combatantBName: 'Bugbear Stalker',
+            weaponAName: 'DPR Baseline (Fighter 2H: 19.4 DPR)',
+            weaponBName: 'Longsword',
+            executionTimeMs: 15,
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/');
+
+    // Switch to Simulation tab
+    await page.locator('#tab-simulation-btn').click();
+
+    // Create Level 5 Hero
+    await page.locator('#open-custom-hero-btn').click();
+    await page.locator('#hero-name-input').fill('Valeria Greatsword');
+    await page.locator('#hero-ac-input').fill('18');
+    await page.locator('#hero-hp-input').fill('48');
+    await page.locator('#hero-archetype-select').selectOption('Fighter 2H');
+    await page.locator('#hero-level-select').selectOption('5');
+    await expect(page.locator('#hero-expected-dpr-display')).toContainText('19.4 DPR');
+    await page.locator('#save-custom-hero-btn').click();
+
+    // Verify weapon A select is disabled with DPR label
+    const weaponASelect = page.locator('#weapon-a-select');
+    await expect(weaponASelect).toBeDisabled();
+    await expect(weaponASelect).toContainText('Sin arma requerida');
+
+    // Run simulation
+    const runBtn = page.locator('#run-montecarlo-btn');
+    await expect(runBtn).toBeEnabled();
+    await runBtn.click();
+
+    // Verify simulation results panel appears
+    await expect(page.locator('#montecarlo-results-panel')).toBeVisible();
+
+    // Verify win rate and damage metrics: Hero achieved 88% win rate with 19.4 average DPR
+    const winRateA = page.locator('#win-rate-a');
+    await expect(winRateA).toContainText('88%');
+    const dprMetricA = page.locator('#metric-dpr-a');
+    await expect(dprMetricA).toContainText('19.4');
+
+    // Verify payload sent to simulation did NOT require weaponAId
+    expect(receivedPayload).not.toBeNull();
+    expect(receivedPayload.combatantAId).toBe('c0000001-0000-0000-0000-111122223333');
+    expect(receivedPayload.weaponAId).toBeUndefined();
   });
 });
 

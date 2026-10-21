@@ -44,6 +44,16 @@ public class CreatureConfiguration : IEntityTypeConfiguration<Creature>
             .HasDefaultValue(false)
             .IsRequired();
 
+        builder.Property(c => c.Level)
+            .IsRequired(false);
+
+        builder.Property(c => c.ExpectedDpr)
+            .IsRequired(false);
+
+        builder.Property(c => c.Archetype)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
         // 1. Mapeo de Objeto de Valor: AbilityScores (OwnsOne)
         builder.OwnsOne(c => c.AbilityScores, ab =>
         {

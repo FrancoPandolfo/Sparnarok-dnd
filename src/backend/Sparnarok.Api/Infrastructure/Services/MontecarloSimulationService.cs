@@ -32,19 +32,24 @@ public class MontecarloSimulationService : IMontecarloSimulationService
     /// <inheritdoc />
     public MontecarloResultDto Simulate(
         Creature combatantA,
-        Weapon weaponA,
+        Weapon? weaponA,
         Creature combatantB,
-        Weapon weaponB,
+        Weapon? weaponB,
         int iterations = 10000,
         ICombatSimulatorService? simulatorOverride = null)
     {
         ArgumentNullException.ThrowIfNull(combatantA);
-        ArgumentNullException.ThrowIfNull(weaponA);
         ArgumentNullException.ThrowIfNull(combatantB);
-        ArgumentNullException.ThrowIfNull(weaponB);
+
+        if (weaponA == null && (!combatantA.IsPlayerCharacter || !combatantA.ExpectedDpr.HasValue || combatantA.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weaponA), $"El combatiente {combatantA.Name} requiere un arma al no poseer ExpectedDpr.");
+
+        if (weaponB == null && (!combatantB.IsPlayerCharacter || !combatantB.ExpectedDpr.HasValue || combatantB.ExpectedDpr <= 0))
+            throw new ArgumentNullException(nameof(weaponB), $"El combatiente {combatantB.Name} requiere un arma al no poseer ExpectedDpr.");
 
         if (iterations <= 0 || iterations > 50000)
             throw new ArgumentOutOfRangeException(nameof(iterations), "El número de iteraciones de Monte Carlo debe estar entre 1 y 50,000.");
+
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -117,8 +122,8 @@ public class MontecarloSimulationService : IMontecarloSimulationService
             CombatantBAverageDpr: avgDprB,
             CombatantAName: combatantA.Name,
             CombatantBName: combatantB.Name,
-            WeaponAName: weaponA.Name,
-            WeaponBName: weaponB.Name,
+            WeaponAName: weaponA?.Name ?? (combatantA.ExpectedDpr.HasValue ? $"DPR Baseline ({combatantA.Archetype ?? "Hero"})" : "Unarmed"),
+            WeaponBName: weaponB?.Name ?? (combatantB.ExpectedDpr.HasValue ? $"DPR Baseline ({combatantB.Archetype ?? "Hero"})" : "Unarmed"),
             ExecutionTimeMs: stopwatch.ElapsedMilliseconds);
     }
 
@@ -138,9 +143,17 @@ public class MontecarloSimulationService : IMontecarloSimulationService
             .FirstOrDefaultAsync(c => c.Id == request.CombatantAId, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura A con ID: {request.CombatantAId}");
 
-        var weaponA = await _context.Weapons
-            .FirstOrDefaultAsync(w => w.Id == request.WeaponAId, cancellationToken)
-            ?? throw new KeyNotFoundException($"No se encontró el arma A con ID: {request.WeaponAId}");
+        Weapon? weaponA = null;
+        if (request.WeaponAId.HasValue && request.WeaponAId.Value != Guid.Empty)
+        {
+            weaponA = await _context.Weapons
+                .FirstOrDefaultAsync(w => w.Id == request.WeaponAId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"No se encontró el arma A con ID: {request.WeaponAId.Value}");
+        }
+        else if (!combatantA.IsPlayerCharacter || !combatantA.ExpectedDpr.HasValue || combatantA.ExpectedDpr <= 0)
+        {
+            throw new KeyNotFoundException($"Se requiere un arma para el combatiente A ({combatantA.Name}) al no poseer ExpectedDpr.");
+        }
 
         var combatantB = await _context.Creatures
             .Include(c => c.EquippedArmor)
@@ -148,12 +161,21 @@ public class MontecarloSimulationService : IMontecarloSimulationService
             .FirstOrDefaultAsync(c => c.Id == request.CombatantBId, cancellationToken)
             ?? throw new KeyNotFoundException($"No se encontró la criatura B con ID: {request.CombatantBId}");
 
-        var weaponB = await _context.Weapons
-            .FirstOrDefaultAsync(w => w.Id == request.WeaponBId, cancellationToken)
-            ?? throw new KeyNotFoundException($"No se encontró el arma B con ID: {request.WeaponBId}");
+        Weapon? weaponB = null;
+        if (request.WeaponBId.HasValue && request.WeaponBId.Value != Guid.Empty)
+        {
+            weaponB = await _context.Weapons
+                .FirstOrDefaultAsync(w => w.Id == request.WeaponBId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"No se encontró el arma B con ID: {request.WeaponBId.Value}");
+        }
+        else if (!combatantB.IsPlayerCharacter || !combatantB.ExpectedDpr.HasValue || combatantB.ExpectedDpr <= 0)
+        {
+            throw new KeyNotFoundException($"Se requiere un arma para el combatiente B ({combatantB.Name}) al no poseer ExpectedDpr.");
+        }
 
         return Simulate(combatantA, weaponA, combatantB, weaponB, request.Iterations);
     }
+
 
     /// <summary>
     /// Acumulador local por hilo para eliminar la contención entre núcleos de procesador.
