@@ -1,0 +1,118 @@
+name: CI Pipeline - Sparnarok
+
+on:
+  push:
+    branches: [ main, 'feat/**', 'fix/**' ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-and-integration:
+    name: Backend Build & Tests (.NET 10 & PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sparnarok_test_db
+          POSTGRES_USER: sparnarok_test
+          POSTGRES_PASSWORD: sparnarok_secret_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Backend Dependencies
+        run: dotnet restore Sparnarok.slnx
+
+      - name: Build Backend Solution
+        run: dotnet build Sparnarok.slnx --no-restore --configuration Release
+
+      - name: Run Backend Tests (Unit & Integration with PostgreSQL)
+        run: dotnet test Sparnarok.slnx --no-build --configuration Release --verbosity normal
+        env:
+          CI: "true"
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=sparnarok_test_db;Username=sparnarok_test;Password=sparnarok_secret_test"
+
+  frontend-unit-tests:
+    name: Frontend Build & Unit Tests (React, Vite & Vitest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'src/frontend/sparnarok-web/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: src/frontend/sparnarok-web
+        run: npm ci
+
+      - name: Run Frontend Unit Tests (Vitest & RTL)
+        working-directory: src/frontend/sparnarok-web
+        run: npm test
+
+      - name: Build Frontend Application
+        working-directory: src/frontend/sparnarok-web
+        run: npm run build
+
+  e2e-playwright:
+    name: End-to-End Tests (Playwright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Frontend Dependencies
+        working-directory: src/frontend/sparnarok-web
+        run: npm ci
+
+      - name: Install E2E Dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium Browser
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        working-directory: tests/e2e
+        run: npx playwright test
+        env:
+          CI: "true"
+
+      - name: Upload Playwright Report on Failure
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && failure() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

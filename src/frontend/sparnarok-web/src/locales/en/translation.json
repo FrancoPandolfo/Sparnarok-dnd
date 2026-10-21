@@ -1,0 +1,19 @@
+{
+  "app": {
+    "title": "Sparnarok: The Architect's Codex",
+    "subtitle": "Mathematical Simulation & World Orchestration Engine for D&D 5e",
+    "counterButton": "Simulations executed: {{count}}",
+    "switchLanguage": "Switch to Spanish",
+    "currentLanguage": "Current language: English",
+    "features": {
+      "combatMath": "Real-time probabilistic math and combat damage matrices",
+      "worldOrchestration": "Deterministic campaign state orchestration and world state simulation",
+      "architecture": "Clean architecture and strict end-to-end type safety"
+    },
+    "documentation": {
+      "title": "Architectural Documentation",
+      "swaggerLink": "Explore Swagger / OpenAPI",
+      "adrsLink": "Architecture Decision Records (ADRs)"
+    }
+  }
+}

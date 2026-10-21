@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/Sparnarok.Api/Sparnarok.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/backend/">
+    <Project Path="tests/backend/Sparnarok.IntegrationTests/Sparnarok.IntegrationTests.csproj" />
+    <Project Path="tests/backend/Sparnarok.UnitTests/Sparnarok.UnitTests.csproj" />
+  </Folder>
+</Solution>
