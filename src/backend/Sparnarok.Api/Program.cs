@@ -1,11 +1,21 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Sparnarok.Api.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuración de Internacionalización (i18n)
 builder.Services.AddLocalization();
+
+// 2. Persistencia relacional en PostgreSQL con EF Core
+builder.Services.AddDbContext<SparnarokDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? "Host=localhost;Port=5432;Database=sparnarok_dev_db;Username=sparnarok;Password=sparnarok_secret";
+    options.UseNpgsql(connectionString);
+});
 
 builder.Services.AddControllers();
 

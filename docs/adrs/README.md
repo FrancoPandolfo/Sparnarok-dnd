@@ -10,3 +10,4 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 ## Índice de Decisiones
 - [ADR-0001: Arquitectura Inicial de Monorepo y Stack Tecnológico](file:///docs/adrs/0001-monorepo-initial-architecture.md)
 - [ADR-0002: Modelado del Dominio Central de D&D 5e (2024) y Entidades Clave](file:///docs/adrs/0002-dnd-5e-2024-core-domain-modeling.md)
+- [ADR-0003: Estrategia de Mapeo y Persistencia con Entity Framework Core y PostgreSQL](file:///docs/adrs/0003-efcore-postgresql-persistence-mapping.md)
