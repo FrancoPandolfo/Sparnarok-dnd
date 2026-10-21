@@ -14,3 +14,4 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 - [ADR-0004: Diseño de la Capa de Aplicación, Patrón Repositorio y Endpoints CRUD para Criaturas](file:///docs/adrs/0004-application-cqrs-and-crud-endpoints.md)
 - [ADR-0005: Arquitectura Frontend y Cliente de Consumo para Gestión Táctica de Criaturas](file:///docs/adrs/0005-frontend-creatures-tactical-ui.md)
 - [ADR-0006: Pipeline de Ingesta Masiva de Datos Mediante CSV y CsvHelper](file:///docs/adrs/0006-csv-data-ingestion-pipeline.md)
+- [ADR-0007: Arquitectura de Generación Pseudoaleatoria (RNG) y Evaluación de Dados para el Motor de Combate](file:///docs/adrs/0007-combat-engine-rng-and-dice-evaluation.md)

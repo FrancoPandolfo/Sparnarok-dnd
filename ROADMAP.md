@@ -78,7 +78,7 @@ Con la conclusión de los Pasos 1.1, 1.2, 1.3 y 1.4, la base ontológica, de per
 
 ---
 
-## Fase 1.5: Data Ingestion Pipeline (Combustible del Motor) [Enfoque Actual]
+## Fase 1.5: Data Ingestion Pipeline (Combustible del Motor) [Completado]
 
 Antes de iniciar las simulaciones estocásticas de la Fase 2, se requiere una arquitectura de ingesta de datos masiva y resiliente para cargar reglas, armas, hechizos y monstruos mediante archivos CSV estructurados.
 
@@ -103,9 +103,38 @@ Antes de iniciar las simulaciones estocásticas de la Fase 2, se requiere una ar
 
 ---
 
+## Fase 2: Módulo 1 - Combat Engine Core [Enfoque Actual]
+
+Desarrollo del motor fundacional de combate 1 contra 1 en el backend (`CombatSimulatorService`), modelando la resolución estocástica y determinista de iniciativa, ataques d20, daño contra Armor Class y ciclo de turnos hasta incapacitación.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.1.1 Abstracción de Generación Aleatoria (IRandomProvider)│
+   │ 2.1.2 Parser y Evaluador de Expresiones de Dados (DiceRoller)│
+   │ 2.1.3 Dominio de Combate 1v1 (CombatSimulatorService)  │
+   │ 2.1.4 Pruebas Unitarias Exhaustivas con RNG Determinista│
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - Abstracción de generación de números aleatorios (`IRandomProvider`, `DefaultRandomProvider`, `DeterministicRandomProvider`) permitiendo pruebas 100% deterministas y reproducibles.
+  - Parser robusto de dados (`DiceParser` / `DiceRoller`) que interprete fórmulas estándar de D&D (ej. "1d8", "2d6", "1d4+2", "1") y soporte tiradas de ataque y daño crítico (duplicación de dados).
+  - Servicio de simulación `CombatSimulatorService` que orqueste:
+    - Tirada de iniciativa aleatoria entre dos criaturas (`Creature`).
+    - Resolución de turnos de ataque usando armas del catálogo o acciones tácticas (`d20 + attackBonus` vs `Armor Class`).
+    - Detección de impacto crítico natural 20 (y fallo automático natural 1).
+    - Cálculo y aplicación de daño a los Hit Points del defensor.
+    - Registro detallado de eventos de combate (*Combat Log*) por ronda y declaración del vencedor al llegar los HP a 0.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/combat-engine-core`.
+  - Documentación: [ADR-0007](file:///docs/adrs/0007-combat-engine-rng-and-dice-evaluation.md) justificando la arquitectura de RNG desacoplado y el evaluador de dados.
+  - Testing: Suite exhaustiva de pruebas unitarias en `Sparnarok.UnitTests` con semillas y secuencias RNG controladas para validar críticos, impactos, fallos y victoria.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
-### Fase 2: Combat Engine & Mathematical Simulation
+### Fase 2: Módulo 2 - Mathematical Simulation & DPR Matrices
 - Modelado probabilístico de tiradas d20 con ventaja / desventaja.
 - Matrices de distribución de daño por turno (*Damage per Round - DPR*).
 - Simulador estocástico Monte Carlo para evaluar enfrentamientos tácticos entre grupos de criaturas.

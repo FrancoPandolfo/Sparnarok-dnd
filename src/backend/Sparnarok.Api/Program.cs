@@ -30,7 +30,12 @@ builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
 builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();
 builder.Services.AddScoped<IWeaponIngestionService, Sparnarok.Api.Infrastructure.Services.WeaponIngestionService>();
 
-// 5. Validadores de Aplicación (FluentValidation)
+// 5. Motor de Simulación de Combate y RNG (Fase 2)
+builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Rng.IRandomProvider, Sparnarok.Api.Domain.Services.Rng.DefaultRandomProvider>();
+builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Dice.IDiceRoller, Sparnarok.Api.Domain.Services.Dice.DiceRoller>();
+builder.Services.AddScoped<ICombatSimulatorService, Sparnarok.Api.Infrastructure.Services.CombatSimulatorService>();
+
+// 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
 
 builder.Services.AddControllers()
