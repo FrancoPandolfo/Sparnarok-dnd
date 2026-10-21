@@ -103,7 +103,7 @@ Antes de iniciar las simulaciones estocásticas de la Fase 2, se requiere una ar
 
 ---
 
-## Fase 2: Módulo 1 - Combat Engine Core [Enfoque Actual]
+## Fase 2: Módulo 1 - Combat Engine Core [Completado]
 
 Desarrollo del motor fundacional de combate 1 contra 1 en el backend (`CombatSimulatorService`), modelando la resolución estocástica y determinista de iniciativa, ataques d20, daño contra Armor Class y ciclo de turnos hasta incapacitación.
 
@@ -119,12 +119,7 @@ Desarrollo del motor fundacional de combate 1 contra 1 en el backend (`CombatSim
 - **Alcance:**
   - Abstracción de generación de números aleatorios (`IRandomProvider`, `DefaultRandomProvider`, `DeterministicRandomProvider`) permitiendo pruebas 100% deterministas y reproducibles.
   - Parser robusto de dados (`DiceParser` / `DiceRoller`) que interprete fórmulas estándar de D&D (ej. "1d8", "2d6", "1d4+2", "1") y soporte tiradas de ataque y daño crítico (duplicación de dados).
-  - Servicio de simulación `CombatSimulatorService` que orqueste:
-    - Tirada de iniciativa aleatoria entre dos criaturas (`Creature`).
-    - Resolución de turnos de ataque usando armas del catálogo o acciones tácticas (`d20 + attackBonus` vs `Armor Class`).
-    - Detección de impacto crítico natural 20 (y fallo automático natural 1).
-    - Cálculo y aplicación de daño a los Hit Points del defensor.
-    - Registro detallado de eventos de combate (*Combat Log*) por ronda y declaración del vencedor al llegar los HP a 0.
+  - Servicio de simulación `CombatSimulatorService` que orqueste iniciativa, resolución de turnos de ataque, impacto crítico (natural 20), fallo automático (natural 1), cálculo de daño y logs cronológicos.
 - **Entregables de Calidad & Directivas:**
   - Rama: `feat/combat-engine-core`.
   - Documentación: [ADR-0007](file:///docs/adrs/0007-combat-engine-rng-and-dice-evaluation.md) justificando la arquitectura de RNG desacoplado y el evaluador de dados.
@@ -132,12 +127,38 @@ Desarrollo del motor fundacional de combate 1 contra 1 en el backend (`CombatSim
 
 ---
 
+## Fase 2: Módulo 2 - Monte Carlo Runner & Tactical UI [Completado]
+
+Ejecución concurrente masiva de duelos 1v1 a través de hilos paralelos de CPU (`Parallel.For` con acumuladores locales por hilo), agregación matemática rigurosa (Win Rates, Average Rounds, DPR por combatiente) y visualización táctica en React.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.2.1 Motor Montecarlo Concurrente (Parallel.For)      │
+   │ 2.2.2 FastDuelResult de Asignación Cero en Stack       │
+   │ 2.2.3 Endpoint REST POST /api/simulation/montecarlo    │
+   │ 2.2.4 Vista React CombatSimulatorView & Métricas DPR   │
+   │ 2.2.5 Test Suite Integral: Unitarias & Playwright E2E  │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - `MontecarloSimulationService` con particionamiento eficiente de CPU y reducción libre de contención mediante variables locales por hilo.
+  - DTO de resultado agregado `MontecarloResultDto` con porcentajes de victoria de A y B, tasa de empates, promedio de rondas, y daño promedio por ronda (DPR) de cada combatiente.
+  - Endpoint documentado `POST /api/simulation/montecarlo` con Swagger/XML comments.
+  - Componente de frontend `CombatSimulatorView` con selectores tácticos, barra segmentada de Win Rate y tarjetas de métricas cuantitativas.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/montecarlo-runner-and-ui`.
+  - Documentación: [ADR-0008](file:///docs/adrs/0008-montecarlo-simulation-concurrency-and-metrics.md).
+  - Testing: Pruebas unitarias de agregación matemática en `MontecarloSimulationServiceTests`, pruebas de integración de endpoint en `SimulationControllerIntegrationTests`, pruebas de componente en `CombatSimulatorView.test.tsx` y test E2E de Playwright en `smoke.spec.ts` validando el ciclo de vida completo (Frontend -> Backend -> Motor de Combate -> DOM).
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
-### Fase 2: Módulo 2 - Mathematical Simulation & DPR Matrices
+### Fase 2: Módulo 3 - Mathematical Simulation & DPR Matrices
 - Modelado probabilístico de tiradas d20 con ventaja / desventaja.
-- Matrices de distribución de daño por turno (*Damage per Round - DPR*).
-- Simulador estocástico Monte Carlo para evaluar enfrentamientos tácticos entre grupos de criaturas.
+- Matrices multidimensionales de distribución de daño por turno (*Damage per Round - DPR*).
+- Simulador estocástico Monte Carlo para evaluar enfrentamientos tácticos entre grupos de criaturas (N vs M).
 
 ### Fase 3: World Orchestration & Campaign State Machine
 - Máquina de estados determinista para eventos temporales, descansos cortos y largos.

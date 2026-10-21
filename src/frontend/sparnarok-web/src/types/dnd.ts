@@ -222,3 +222,35 @@ export interface IngestionResultDto {
   updated: number;
   errors: string[];
 }
+
+/**
+ * Parámetros para disparar una simulación estocástica masiva de Monte Carlo.
+ */
+export interface MontecarloRequestDto {
+  combatantAId: string;
+  weaponAId: string;
+  combatantBId: string;
+  weaponBId: string;
+  iterations?: number;
+}
+
+/**
+ * Resultados agregados y distribuciones probabilísticas devueltas por la simulación de Monte Carlo.
+ */
+export interface MontecarloResultDto {
+  totalIterations: number;
+  combatantAWins: number;
+  combatantBWins: number;
+  draws: number;
+  combatantAWinRate: number;
+  combatantBWinRate: number;
+  drawRate: number;
+  averageRounds: number;
+  combatantAAverageDpr: number;
+  combatantBAverageDpr: number;
+  combatantAName: string;
+  combatantBName: string;
+  weaponAName: string;
+  weaponBName: string;
+  executionTimeMs: number;
+}

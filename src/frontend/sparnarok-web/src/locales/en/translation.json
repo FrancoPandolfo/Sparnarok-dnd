@@ -111,5 +111,31 @@
     "errorsEncountered": "Validation Warnings / Errors",
     "noFileSelected": "Please select a valid .csv file first.",
     "errorUploading": "Failed to upload and ingest CSV file."
+  },
+  "simulation": {
+    "title": "Monte Carlo Combat Simulator (1v1)",
+    "subtitle": "Massive concurrent execution across CPU threads with statistical aggregation of Win Rates, DPR, and combat duration.",
+    "combatantA": "Combatant A (Initiator)",
+    "combatantB": "Combatant B (Defender)",
+    "creatureSelect": "Select Creature",
+    "weaponSelect": "Equipped Weapon",
+    "iterationsLabel": "Number of Iterations (Concurrent Duels)",
+    "runButton": "Simulate Combat (Monte Carlo)",
+    "simulating": "Simulating concurrent duels...",
+    "resultsTitle": "Simulation Results",
+    "executionTime": "Computation time: {{ms}} ms",
+    "winRateTitle": "Win Rate Breakdown",
+    "drawRate": "Draws: {{percent}}% ({{count}})",
+    "avgRounds": "Average Rounds",
+    "avgRoundsDesc": "Mean encounter length until a combatant drops to 0 HP",
+    "dprCombatantA": "Average DPR (Combatant A)",
+    "dprCombatantB": "Average DPR (Combatant B)",
+    "dprDesc": "Average damage per round dealt",
+    "totalIterations": "Duels Simulated",
+    "winnerA": "Favorable odds: {{name}} ({{percent}}%)",
+    "winnerB": "Favorable odds: {{name}} ({{percent}}%)",
+    "drawsNotice": "Balanced simulation with {{percent}}% draws",
+    "errorSimulating": "An error occurred while executing the Monte Carlo simulation.",
+    "selectCreatureHint": "Select creatures and weapons to start the tactical analysis."
   }
 }

@@ -153,6 +153,108 @@ public class CombatSimulatorService : ICombatSimulatorService
     }
 
     /// <inheritdoc />
+    public FastDuelResult SimulateFastDuel(
+        Creature combatant1,
+        Weapon weapon1,
+        Creature combatant2,
+        Weapon weapon2)
+    {
+        var dexMod1 = combatant1.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
+        var dexMod2 = combatant2.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
+
+        var initRoll1 = _random.RollD20();
+        var initRoll2 = _random.RollD20();
+
+        var totalInit1 = initRoll1 + dexMod1;
+        var totalInit2 = initRoll2 + dexMod2;
+
+        bool combatant1GoesFirst;
+        if (totalInit1 > totalInit2)
+        {
+            combatant1GoesFirst = true;
+        }
+        else if (totalInit2 > totalInit1)
+        {
+            combatant1GoesFirst = false;
+        }
+        else
+        {
+            combatant1GoesFirst = dexMod1 != dexMod2 ? dexMod1 > dexMod2 : _random.Next(0, 2) == 0;
+        }
+
+        var fighterA = new Fighter(
+            combatant1GoesFirst ? combatant1 : combatant2,
+            combatant1GoesFirst ? weapon1 : weapon2,
+            combatant1GoesFirst ? totalInit1 : totalInit2);
+
+        var fighterB = new Fighter(
+            combatant1GoesFirst ? combatant2 : combatant1,
+            combatant1GoesFirst ? weapon2 : weapon1,
+            combatant1GoesFirst ? totalInit2 : totalInit1);
+
+        int currentRound = 0;
+        const int maxRounds = 100;
+
+        int damageDealtBy1 = 0;
+        int damageDealtBy2 = 0;
+
+        while (fighterA.CurrentHp > 0 && fighterB.CurrentHp > 0 && currentRound < maxRounds)
+        {
+            currentRound++;
+
+            var dmgA = ExecuteFastAttack(fighterA, fighterB);
+            if (fighterA.Creature.Id == combatant1.Id) damageDealtBy1 += dmgA;
+            else damageDealtBy2 += dmgA;
+
+            if (fighterB.CurrentHp <= 0) break;
+
+            var dmgB = ExecuteFastAttack(fighterB, fighterA);
+            if (fighterB.Creature.Id == combatant1.Id) damageDealtBy1 += dmgB;
+            else damageDealtBy2 += dmgB;
+
+            if (fighterA.CurrentHp <= 0) break;
+        }
+
+        Guid? winnerId = null;
+        if (fighterA.CurrentHp > 0 && fighterB.CurrentHp <= 0)
+        {
+            winnerId = fighterA.Creature.Id;
+        }
+        else if (fighterB.CurrentHp > 0 && fighterA.CurrentHp <= 0)
+        {
+            winnerId = fighterB.Creature.Id;
+        }
+
+        return new FastDuelResult(winnerId, currentRound, damageDealtBy1, damageDealtBy2);
+    }
+
+    private int ExecuteFastAttack(Fighter attacker, Fighter defender)
+    {
+        var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
+        var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
+
+        var d20 = _random.RollD20();
+        bool isNatural20 = d20 == 20;
+        bool isNatural1 = d20 == 1;
+
+        if (isNatural1) return 0;
+
+        if (isNatural20 || (d20 + attackBonus) >= defender.EffectiveAc)
+        {
+            var damageResult = _diceRoller.Roll(
+                attacker.Weapon.Damage,
+                additionalModifier: abilityMod,
+                isCritical: isNatural20);
+
+            var damage = damageResult.Total;
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
+            return damage;
+        }
+
+        return 0;
+    }
+
+    /// <inheritdoc />
     public async Task<CombatSimulationResult> SimulateDuelAsync(
         Guid creature1Id,
         Guid weapon1Id,

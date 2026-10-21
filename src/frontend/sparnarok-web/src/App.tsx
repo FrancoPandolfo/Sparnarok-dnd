@@ -6,10 +6,12 @@ import type {
   WeaponMasteryResponseDto,
   CreateCreatureRequestDto,
   CreateActionRequestDto,
+  WeaponDto,
 } from './types/dnd';
 import { apiClient } from './services/apiClient';
 import { Navbar } from './components/Navbar';
 import { BestiaryView } from './components/BestiaryView';
+import { CombatSimulatorView } from './components/CombatSimulatorView';
 import { WeaponIngestionModal } from './components/WeaponIngestionModal';
 
 /**
@@ -26,21 +28,24 @@ export function App() {
 
   const [creatures, setCreatures] = useState<CreatureResponseDto[]>([]);
   const [allMasteries, setAllMasteries] = useState<WeaponMasteryResponseDto[]>([]);
+  const [weapons, setWeapons] = useState<WeaponDto[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
 
-  // Carga inicial de criaturas y catálogo de maestrías
+  // Carga inicial de criaturas, catálogo de maestrías y armas
   useEffect(() => {
     const controller = new AbortController();
 
     const loadData = async () => {
       try {
-        const [creatureList, masteryList] = await Promise.all([
+        const [creatureList, masteryList, weaponList] = await Promise.all([
           apiClient.getCreatures(controller.signal),
           apiClient.getWeaponMasteries(controller.signal),
+          apiClient.getWeapons(controller.signal),
         ]);
         setCreatures(creatureList);
         setAllMasteries(masteryList);
+        setWeapons(weaponList);
       } catch {
         // En caso de error o aborto, el cliente ya maneja fallback local
       }
@@ -145,6 +150,14 @@ export function App() {
           />
         ) : (
           <div className="simulation-tab-container fade-in">
+            {/* Vista del Simulador Táctico de Montecarlo */}
+            <CombatSimulatorView
+              creatures={creatures}
+              weapons={weapons}
+              onRunSimulation={apiClient.runMontecarlo}
+              onSimulationCompleted={handleIncrementSimulation}
+            />
+
             {/* Grid de capacidades del motor de simulación */}
             <section className="features-grid">
               <article className="feature-box">
