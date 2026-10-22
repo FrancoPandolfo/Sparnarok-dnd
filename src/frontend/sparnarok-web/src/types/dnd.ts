@@ -296,16 +296,31 @@ export interface IngestionResultDto {
 }
 
 /**
- * Parámetros para disparar una simulación estocástica masiva de Monte Carlo.
+/// Estrategia de selección de objetivos (Targeting AI) para combates grupales.
+*/
+export type TargetingStrategy = 'Random' | 'LowestHp';
+
+/**
+ * Combatiente individual asignado a un equipo en un encuentro grupal.
  */
-export interface MontecarloRequestDto {
-  combatantAId: string;
-  weaponAId?: string;
-  combatantBId: string;
-  weaponBId?: string;
-  iterations?: number;
+export interface CombatantRequestDto {
+  creatureId: string;
+  weaponId?: string;
 }
 
+/**
+ * Parámetros para disparar una simulación estocástica masiva de Monte Carlo (1v1 o N vs M).
+ */
+export interface MontecarloRequestDto {
+  combatantAId?: string;
+  weaponAId?: string;
+  combatantBId?: string;
+  weaponBId?: string;
+  teamA?: CombatantRequestDto[];
+  teamB?: CombatantRequestDto[];
+  targetingStrategy?: TargetingStrategy;
+  iterations?: number;
+}
 
 /**
  * Resultados agregados y distribuciones probabilísticas devueltas por la simulación de Monte Carlo.
@@ -326,4 +341,7 @@ export interface MontecarloResultDto {
   weaponAName: string;
   weaponBName: string;
   executionTimeMs: number;
+  teamASurvivalRate?: number;
+  teamANames?: string[];
+  teamBNames?: string[];
 }

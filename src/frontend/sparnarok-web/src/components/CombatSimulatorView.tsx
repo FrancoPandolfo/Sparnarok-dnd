@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   CreatureResponseDto,
   WeaponDto,
   MontecarloRequestDto,
   MontecarloResultDto,
+  TargetingStrategy,
 } from '../types/dnd';
 import { CustomHeroModal } from './CustomHeroModal';
 import { apiClient } from '../services/apiClient';
@@ -17,10 +18,16 @@ export interface CombatSimulatorViewProps {
   onHeroCreated?: (hero: CreatureResponseDto) => void;
 }
 
+export interface TeamMemberConfig {
+  id: string;
+  creatureId: string;
+  weaponId?: string;
+}
+
 /**
- * Vista de Simulación Táctica de Montecarlo (1v1).
- * Permite seleccionar combatientes y armas, definir el volumen de iteraciones
- * y ejecutar duelos concurrentes en paralelo visualizando win-rate y métricas agregadas.
+ * Vista de Simulación Táctica de Montecarlo (Party vs Encounter / N vs M).
+ * Permite armar listas dinámicas para la Party (Team A) y el Encuentro de Monstruos (Team B),
+ * configurar la estrategia de Targeting AI (LowestHP o Random), y ejecutar simulaciones estocásticas concurrentes.
  */
 export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   creatures,
@@ -33,76 +40,177 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
 
   const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
 
-  const [combatantAId, setCombatantAId] = useState<string>(() => creatures[0]?.id || '');
-  const [weaponAId, setWeaponAId] = useState<string>(() => weapons[0]?.id || '');
+  // Listas dinámicas de integrantes de cada equipo
+  const [teamA, setTeamA] = useState<TeamMemberConfig[]>(() => [
+    {
+      id: 'member-a-0',
+      creatureId: creatures[0]?.id || '',
+      weaponId: weapons[0]?.id || '',
+    },
+  ]);
 
-  const [combatantBId, setCombatantBId] = useState<string>(
-    () => (creatures.length > 1 ? creatures[1].id : creatures[0]?.id || '')
-  );
-  const [weaponBId, setWeaponBId] = useState<string>(
-    () => (weapons.length > 1 ? weapons[1].id : weapons[0]?.id || '')
-  );
+  const [teamB, setTeamB] = useState<TeamMemberConfig[]>(() => [
+    {
+      id: 'member-b-0',
+      creatureId: (creatures.length > 1 ? creatures[1].id : creatures[0]?.id) || '',
+      weaponId: (weapons.length > 1 ? weapons[1].id : weapons[0]?.id) || '',
+    },
+  ]);
 
-  // Sincronizar selección inicial cuando las criaturas o armas cargan asíncronamente
-  React.useEffect(() => {
-    if (!combatantAId && creatures.length > 0) {
-      setCombatantAId(creatures[0].id);
-    }
-    if (!combatantBId && creatures.length > 0) {
-      setCombatantBId(creatures.length > 1 ? creatures[1].id : creatures[0].id);
-    }
-  }, [creatures, combatantAId, combatantBId]);
-
-  React.useEffect(() => {
-    if (!weaponAId && weapons.length > 0) {
-      setWeaponAId(weapons[0].id);
-    }
-    if (!weaponBId && weapons.length > 0) {
-      setWeaponBId(weapons.length > 1 ? weapons[1].id : weapons[0].id);
-    }
-  }, [weapons, weaponAId, weaponBId]);
-
+  const [targetingStrategy, setTargetingStrategy] = useState<TargetingStrategy>('LowestHp');
   const [iterations, setIterations] = useState<number>(10000);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<MontecarloResultDto | null>(null);
 
-  // Criaturas seleccionadas para vista previa de estadísticas
-  const creatureA = useMemo(
-    () => creatures.find((c) => c.id === combatantAId) || creatures[0],
-    [creatures, combatantAId]
-  );
-  const creatureB = useMemo(
-    () => creatures.find((c) => c.id === combatantBId) || creatures[1] || creatures[0],
-    [creatures, combatantBId]
-  );
+  // Sincronizar selección inicial cuando las criaturas o armas cargan asíncronamente
+  React.useEffect(() => {
+    if (creatures.length > 0) {
+      setTeamA((prev) => {
+        if (prev.length === 0 || !prev[0].creatureId) {
+          const firstCreature = creatures[0];
+          return [
+            {
+              id: 'member-a-0',
+              creatureId: firstCreature.id,
+              weaponId: firstCreature.expectedDpr ? undefined : weapons[0]?.id || '',
+            },
+          ];
+        }
+        return prev;
+      });
+
+      setTeamB((prev) => {
+        if (prev.length === 0 || !prev[0].creatureId) {
+          const secondCreature = creatures.length > 1 ? creatures[1] : creatures[0];
+          return [
+            {
+              id: 'member-b-0',
+              creatureId: secondCreature.id,
+              weaponId: secondCreature.expectedDpr
+                ? undefined
+                : (weapons.length > 1 ? weapons[1].id : weapons[0]?.id) || '',
+            },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [creatures, weapons]);
+
+  // Manejo de miembros del Equipo A
+  const handleAddMemberA = () => {
+    const defaultCreature = creatures[0];
+    if (!defaultCreature) return;
+    const newMember: TeamMemberConfig = {
+      id: `member-a-${Date.now()}-${teamA.length}`,
+      creatureId: defaultCreature.id,
+      weaponId: defaultCreature.expectedDpr ? undefined : weapons[0]?.id || '',
+    };
+    setTeamA((prev) => [...prev, newMember]);
+  };
+
+  const handleRemoveMemberA = (index: number) => {
+    setTeamA((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateMemberA = (index: number, creatureId: string, weaponId?: string) => {
+    setTeamA((prev) => {
+      const updated = [...prev];
+      const creature = creatures.find((c) => c.id === creatureId);
+      updated[index] = {
+        ...updated[index],
+        creatureId,
+        weaponId: creature?.expectedDpr ? undefined : (weaponId ?? updated[index].weaponId ?? weapons[0]?.id ?? ''),
+      };
+      return updated;
+    });
+  };
+
+  // Manejo de miembros del Equipo B
+  const handleAddMemberB = () => {
+    const defaultCreature = creatures.length > 1 ? creatures[1] : creatures[0];
+    if (!defaultCreature) return;
+    const defaultWeapon = weapons.length > 1 ? weapons[1] : weapons[0];
+    const newMember: TeamMemberConfig = {
+      id: `member-b-${Date.now()}-${teamB.length}`,
+      creatureId: defaultCreature.id,
+      weaponId: defaultCreature.expectedDpr ? undefined : defaultWeapon?.id || '',
+    };
+    setTeamB((prev) => [...prev, newMember]);
+  };
+
+  const handleRemoveMemberB = (index: number) => {
+    setTeamB((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateMemberB = (index: number, creatureId: string, weaponId?: string) => {
+    setTeamB((prev) => {
+      const updated = [...prev];
+      const creature = creatures.find((c) => c.id === creatureId);
+      updated[index] = {
+        ...updated[index],
+        creatureId,
+        weaponId: creature?.expectedDpr ? undefined : (weaponId ?? updated[index].weaponId ?? weapons[0]?.id ?? ''),
+      };
+      return updated;
+    });
+  };
 
   const handleRun = async () => {
-    const hasDprA = Boolean(creatureA?.expectedDpr);
-    const hasDprB = Boolean(creatureB?.expectedDpr);
+    if (teamA.length === 0) {
+      setErrorMessage(t('simulation.emptyTeamA'));
+      return;
+    }
+    if (teamB.length === 0) {
+      setErrorMessage(t('simulation.emptyTeamB'));
+      return;
+    }
 
-    if (!combatantAId || !combatantBId) {
-      return;
-    }
-    if (!hasDprA && !weaponAId) {
-      return;
-    }
-    if (!hasDprB && !weaponBId) {
+    const invalidMemberA = teamA.find((m) => {
+      const c = creatures.find((x) => x.id === m.creatureId);
+      return !c || (!c.expectedDpr && !m.weaponId);
+    });
+    const invalidMemberB = teamB.find((m) => {
+      const c = creatures.find((x) => x.id === m.creatureId);
+      return !c || (!c.expectedDpr && !m.weaponId);
+    });
+
+    if (invalidMemberA || invalidMemberB) {
       return;
     }
 
     setIsSimulating(true);
     setErrorMessage(null);
 
-    try {
-      const response = await onRunSimulation({
-        combatantAId,
-        weaponAId: hasDprA ? undefined : weaponAId,
-        combatantBId,
-        weaponBId: hasDprB ? undefined : weaponBId,
-        iterations,
-      });
+    const firstCreatureA = creatures.find((x) => x.id === teamA[0]?.creatureId);
+    const firstCreatureB = creatures.find((x) => x.id === teamB[0]?.creatureId);
 
+    const payload: MontecarloRequestDto = {
+      teamA: teamA.map((m) => {
+        const c = creatures.find((x) => x.id === m.creatureId);
+        return {
+          creatureId: m.creatureId,
+          weaponId: c?.expectedDpr ? undefined : m.weaponId,
+        };
+      }),
+      teamB: teamB.map((m) => {
+        const c = creatures.find((x) => x.id === m.creatureId);
+        return {
+          creatureId: m.creatureId,
+          weaponId: c?.expectedDpr ? undefined : m.weaponId,
+        };
+      }),
+      combatantAId: teamA[0]?.creatureId,
+      weaponAId: firstCreatureA?.expectedDpr ? undefined : teamA[0]?.weaponId,
+      combatantBId: teamB[0]?.creatureId,
+      weaponBId: firstCreatureB?.expectedDpr ? undefined : teamB[0]?.weaponId,
+      targetingStrategy,
+      iterations,
+    };
+
+    try {
+      const response = await onRunSimulation(payload);
       setResult(response);
       onSimulationCompleted?.(response);
     } catch {
@@ -114,7 +222,14 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
 
   const handleHeroSaved = (hero: CreatureResponseDto) => {
     onHeroCreated?.(hero);
-    setCombatantAId(hero.id);
+    setTeamA((prev) => {
+      if (prev.length === 0) {
+        return [{ id: `member-a-${Date.now()}`, creatureId: hero.id, weaponId: undefined }];
+      }
+      const updated = [...prev];
+      updated[0] = { ...updated[0], creatureId: hero.id, weaponId: undefined };
+      return updated;
+    });
   };
 
   return (
@@ -136,73 +251,116 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         </div>
       </header>
 
-      {/* Panel de Configuración de Combatientes */}
+      {/* Panel de Configuración de Equipos Dinámicos */}
       <div className="sim-setup-grid">
-        {/* Combatiente A */}
+        {/* Equipo A (La Party / Héroes) */}
         <div className="combatant-config-card initiator-card">
-          <div className="card-badge initiator-badge">{t('simulation.combatantA')}</div>
-          <div className="field-group">
-            <label htmlFor="combatant-a-select" className="field-label">
-              {t('simulation.creatureSelect')}
-            </label>
-            <select
-              id="combatant-a-select"
-              className="sim-select"
-              value={combatantAId}
-              onChange={(e) => setCombatantAId(e.target.value)}
-              disabled={isSimulating}
-            >
-              {creatures.map((c) => (
-                <option key={`a-${c.id}`} value={c.id}>
-                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
-                  {c.name}
-                  {c.expectedDpr
-                    ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
-                    : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="weapon-a-select" className="field-label">
-              {t('simulation.weaponSelect')}
-            </label>
-            <select
-              id="weapon-a-select"
-              className="sim-select"
-              value={creatureA?.expectedDpr ? '' : weaponAId}
-              onChange={(e) => setWeaponAId(e.target.value)}
-              disabled={isSimulating || Boolean(creatureA?.expectedDpr)}
-            >
-              {creatureA?.expectedDpr ? (
-                <option value="">
-                  {t('simulation.noWeaponRequiredDpr', { dpr: creatureA.expectedDpr })}
-                </option>
-              ) : (
-                weapons.map((w) => (
-                  <option key={`w-a-${w.id}`} value={w.id}>
-                    {w.name} ({w.damage} {w.damageType})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {creatureA && (
-            <div className="creature-preview-strip">
-              <span>🛡️ CA: <strong>{creatureA.effectiveArmorClass}</strong></span>
-              <span>❤️ HP: <strong>{creatureA.hitPoints.max}</strong></span>
-              {creatureA.expectedDpr ? (
-                <span className="dpr-preview-badge">⚡ DPR: <strong>{creatureA.expectedDpr}</strong></span>
-              ) : (
-                <span>⚡ PB: <strong>+{creatureA.proficiencyBonus}</strong></span>
-              )}
-              {creatureA.archetype && (
-                <span className="archetype-preview-badge">🏹 {creatureA.archetype} (Nv {creatureA.level ?? 1})</span>
-              )}
+          <div className="team-card-header">
+            <div className="team-badge-group">
+              <div className="card-badge initiator-badge">{t('simulation.partyTitle')}</div>
+              <span className="team-count-pill">{teamA.length} {teamA.length === 1 ? 'combatiente' : 'combatientes'}</span>
             </div>
-          )}
+            <button
+              type="button"
+              id="add-member-a-btn"
+              className="btn-add-member"
+              onClick={handleAddMemberA}
+              disabled={isSimulating || creatures.length === 0}
+            >
+              {t('simulation.addMember')}
+            </button>
+          </div>
+
+          <div className="team-members-list">
+            {teamA.map((member, idx) => {
+              const creature = creatures.find((c) => c.id === member.creatureId);
+              return (
+                <div key={member.id} className="team-member-item">
+                  <div className="member-item-header">
+                    <span className="member-item-title">
+                      #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
+                    </span>
+                    {teamA.length > 1 && (
+                      <button
+                        type="button"
+                        id={`remove-member-a-btn-${idx}`}
+                        className="remove-member-btn"
+                        onClick={() => handleRemoveMemberA(idx)}
+                        disabled={isSimulating}
+                        title={t('simulation.removeMember')}
+                        aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
+                      >
+                        ✕ {t('simulation.removeMember')}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`} className="field-label">
+                      {t('simulation.creatureSelect')}
+                    </label>
+                    <select
+                      id={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`}
+                      className="sim-select"
+                      value={member.creatureId}
+                      onChange={(e) => handleUpdateMemberA(idx, e.target.value)}
+                      disabled={isSimulating}
+                    >
+                      {creatures.map((c) => (
+                        <option key={`a-${idx}-${c.id}`} value={c.id}>
+                          {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                          {c.name}
+                          {c.expectedDpr
+                            ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                            : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`} className="field-label">
+                      {t('simulation.weaponSelect')}
+                    </label>
+                    <select
+                      id={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`}
+                      className="sim-select"
+                      value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
+                      onChange={(e) => handleUpdateMemberA(idx, member.creatureId, e.target.value)}
+                      disabled={isSimulating || Boolean(creature?.expectedDpr)}
+                    >
+                      {creature?.expectedDpr ? (
+                        <option value="">
+                          {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
+                        </option>
+                      ) : (
+                        weapons.map((w) => (
+                          <option key={`w-a-${idx}-${w.id}`} value={w.id}>
+                            {w.name} ({w.damage} {w.damageType})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {creature && (
+                    <div className="creature-preview-strip">
+                      <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
+                      <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
+                      {creature.expectedDpr ? (
+                        <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
+                      ) : (
+                        <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
+                      )}
+                      {creature.archetype && (
+                        <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Separador Táctico VS */}
@@ -211,76 +369,137 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           <span className="versus-text">VS</span>
         </div>
 
-        {/* Combatiente B */}
+        {/* Equipo B (El Encuentro / Monstruos) */}
         <div className="combatant-config-card defender-card">
-          <div className="card-badge defender-badge">{t('simulation.combatantB')}</div>
-          <div className="field-group">
-            <label htmlFor="combatant-b-select" className="field-label">
-              {t('simulation.creatureSelect')}
-            </label>
-            <select
-              id="combatant-b-select"
-              className="sim-select"
-              value={combatantBId}
-              onChange={(e) => setCombatantBId(e.target.value)}
-              disabled={isSimulating}
-            >
-              {creatures.map((c) => (
-                <option key={`b-${c.id}`} value={c.id}>
-                  {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
-                  {c.name}
-                  {c.expectedDpr
-                    ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
-                    : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="weapon-b-select" className="field-label">
-              {t('simulation.weaponSelect')}
-            </label>
-            <select
-              id="weapon-b-select"
-              className="sim-select"
-              value={creatureB?.expectedDpr ? '' : weaponBId}
-              onChange={(e) => setWeaponBId(e.target.value)}
-              disabled={isSimulating || Boolean(creatureB?.expectedDpr)}
-            >
-              {creatureB?.expectedDpr ? (
-                <option value="">
-                  {t('simulation.noWeaponRequiredDpr', { dpr: creatureB.expectedDpr })}
-                </option>
-              ) : (
-                weapons.map((w) => (
-                  <option key={`w-b-${w.id}`} value={w.id}>
-                    {w.name} ({w.damage} {w.damageType})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {creatureB && (
-            <div className="creature-preview-strip">
-              <span>🛡️ CA: <strong>{creatureB.effectiveArmorClass}</strong></span>
-              <span>❤️ HP: <strong>{creatureB.hitPoints.max}</strong></span>
-              {creatureB.expectedDpr ? (
-                <span className="dpr-preview-badge">⚡ DPR: <strong>{creatureB.expectedDpr}</strong></span>
-              ) : (
-                <span>⚡ PB: <strong>+{creatureB.proficiencyBonus}</strong></span>
-              )}
-              {creatureB.archetype && (
-                <span className="archetype-preview-badge">🏹 {creatureB.archetype} (Nv {creatureB.level ?? 1})</span>
-              )}
+          <div className="team-card-header">
+            <div className="team-badge-group">
+              <div className="card-badge defender-badge">{t('simulation.encounterTitle')}</div>
+              <span className="team-count-pill">{teamB.length} {teamB.length === 1 ? 'combatiente' : 'combatientes'}</span>
             </div>
-          )}
+            <button
+              type="button"
+              id="add-member-b-btn"
+              className="btn-add-member"
+              onClick={handleAddMemberB}
+              disabled={isSimulating || creatures.length === 0}
+            >
+              {t('simulation.addMember')}
+            </button>
+          </div>
+
+          <div className="team-members-list">
+            {teamB.map((member, idx) => {
+              const creature = creatures.find((c) => c.id === member.creatureId);
+              return (
+                <div key={member.id} className="team-member-item">
+                  <div className="member-item-header">
+                    <span className="member-item-title">
+                      #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
+                    </span>
+                    {teamB.length > 1 && (
+                      <button
+                        type="button"
+                        id={`remove-member-b-btn-${idx}`}
+                        className="remove-member-btn"
+                        onClick={() => handleRemoveMemberB(idx)}
+                        disabled={isSimulating}
+                        title={t('simulation.removeMember')}
+                        aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
+                      >
+                        ✕ {t('simulation.removeMember')}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`} className="field-label">
+                      {t('simulation.creatureSelect')}
+                    </label>
+                    <select
+                      id={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`}
+                      className="sim-select"
+                      value={member.creatureId}
+                      onChange={(e) => handleUpdateMemberB(idx, e.target.value)}
+                      disabled={isSimulating}
+                    >
+                      {creatures.map((c) => (
+                        <option key={`b-${idx}-${c.id}`} value={c.id}>
+                          {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                          {c.name}
+                          {c.expectedDpr
+                            ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                            : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="field-group">
+                    <label htmlFor={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`} className="field-label">
+                      {t('simulation.weaponSelect')}
+                    </label>
+                    <select
+                      id={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`}
+                      className="sim-select"
+                      value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
+                      onChange={(e) => handleUpdateMemberB(idx, member.creatureId, e.target.value)}
+                      disabled={isSimulating || Boolean(creature?.expectedDpr)}
+                    >
+                      {creature?.expectedDpr ? (
+                        <option value="">
+                          {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
+                        </option>
+                      ) : (
+                        weapons.map((w) => (
+                          <option key={`w-b-${idx}-${w.id}`} value={w.id}>
+                            {w.name} ({w.damage} {w.damageType})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {creature && (
+                    <div className="creature-preview-strip">
+                      <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
+                      <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
+                      {creature.expectedDpr ? (
+                        <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
+                      ) : (
+                        <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
+                      )}
+                      {creature.archetype && (
+                        <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Barra de Parámetros y Ejecución */}
       <div className="sim-controls-bar">
+        {/* Selector de Targeting AI */}
+        <div className="targeting-control">
+          <label htmlFor="targeting-strategy-select" className="field-label">
+            {t('simulation.targetingStrategyLabel')}
+          </label>
+          <select
+            id="targeting-strategy-select"
+            className="sim-select"
+            value={targetingStrategy}
+            onChange={(e) => setTargetingStrategy(e.target.value as TargetingStrategy)}
+            disabled={isSimulating}
+          >
+            <option value="LowestHp">{t('simulation.targetingLowestHp')}</option>
+            <option value="Random">{t('simulation.targetingRandom')}</option>
+          </select>
+        </div>
+
+        {/* Selector de Iteraciones */}
         <div className="iterations-control">
           <label htmlFor="iterations-select" className="field-label">
             {t('simulation.iterationsLabel')}
@@ -305,7 +524,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           id="run-montecarlo-btn"
           className="run-simulation-btn"
           onClick={handleRun}
-          disabled={isSimulating}
+          disabled={isSimulating || teamA.length === 0 || teamB.length === 0}
         >
           {isSimulating ? (
             <>
@@ -420,6 +639,18 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
 
           {/* Grid de Métricas Agregadas */}
           <div id="metrics-grid-sim" className="metrics-grid-sim">
+            {/* Tasa de Supervivencia de Party */}
+            <article className="sim-metric-card survival-rate-card">
+              <div className="metric-header">
+                <span className="metric-icon">🛡️</span>
+                <span className="metric-title">{t('simulation.partySurvivalRate')}</span>
+              </div>
+              <div id="metric-party-survival-rate" className="metric-value">
+                {result.teamASurvivalRate != null ? `${result.teamASurvivalRate}%` : `${result.combatantAWinRate}%`}
+              </div>
+              <p className="metric-subtitle">{t('simulation.partySurvivalRateDesc')}</p>
+            </article>
+
             {/* Promedio de Rondas */}
             <article className="sim-metric-card">
               <div className="metric-header">
@@ -432,7 +663,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
               <p className="metric-subtitle">{t('simulation.avgRoundsDesc')}</p>
             </article>
 
-            {/* DPR Promedio Combatiente A */}
+            {/* DPR Promedio Equipo A */}
             <article className="sim-metric-card">
               <div className="metric-header">
                 <span className="metric-icon">🗡️</span>
@@ -446,10 +677,10 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
               </p>
             </article>
 
-            {/* DPR Promedio Combatiente B */}
+            {/* DPR Promedio Equipo B */}
             <article className="sim-metric-card">
               <div className="metric-header">
-                <span className="metric-icon">🛡️</span>
+                <span className="metric-icon">🏹</span>
                 <span className="metric-title">{t('simulation.dprCombatantB')}</span>
               </div>
               <div id="metric-dpr-b" className="metric-value">

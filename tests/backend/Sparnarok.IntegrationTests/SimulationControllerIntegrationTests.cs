@@ -152,6 +152,88 @@ public class SimulationControllerIntegrationTests : IClassFixture<CustomWebAppli
     }
 
     [Fact]
+    public async Task RunMontecarlo_WithPartyVsEncounterTeams_ReturnsSurvivalRateAndGroupMetrics()
+    {
+        // Arrange
+        var hero1 = new Creature("Party Hero 1", CreatureSize.Medium, CreatureType.Humanoid, "Neutral", 2.0, 30,
+            new AbilityScores(16, 14, 14, 10, 10, 10), new HitPoints(35), new ArmorClass(16, 0, false));
+        hero1.ConfigurePlayerCharacterProfile(5, 18.0, "Fighter 2H");
+
+        var hero2 = new Creature("Party Hero 2", CreatureSize.Medium, CreatureType.Humanoid, "Neutral", 2.0, 30,
+            new AbilityScores(14, 16, 12, 10, 10, 10), new HitPoints(30), new ArmorClass(15, 0, false));
+        hero2.ConfigurePlayerCharacterProfile(5, 16.0, "Ranger Ranged");
+
+        var monster = new Creature("Encounter Troll", CreatureSize.Large, CreatureType.Giant, "Chaotic Evil", 5.0, 30,
+            new AbilityScores(18, 12, 16, 8, 10, 8), new HitPoints(80), new ArmorClass(15, 0, false));
+        var trollClaw = new Weapon("Troll Claws", "2d6+4", DamageType.Slashing);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var existingCreatures = await context.Creatures
+                .Where(c => c.Name == "Party Hero 1" || c.Name == "Party Hero 2" || c.Name == "Encounter Troll")
+                .ToListAsync();
+            if (existingCreatures.Count > 0)
+            {
+                context.Creatures.RemoveRange(existingCreatures);
+            }
+
+            var existingWeapons = await context.Weapons
+                .Where(w => w.Name == "Troll Claws")
+                .ToListAsync();
+            if (existingWeapons.Count > 0)
+            {
+                context.Weapons.RemoveRange(existingWeapons);
+            }
+
+            await context.SaveChangesAsync();
+
+            context.Creatures.AddRange(hero1, hero2, monster);
+            context.Weapons.Add(trollClaw);
+            await context.SaveChangesAsync();
+        }
+
+        var request = new MontecarloRequestDto(
+            Iterations: 300,
+            TeamA: new List<CombatantRequestDto>
+            {
+                new(hero1.Id),
+                new(hero2.Id)
+            },
+            TeamB: new List<CombatantRequestDto>
+            {
+                new(monster.Id, trollClaw.Id)
+            },
+            TargetingStrategy: Sparnarok.Api.Domain.Enums.TargetingStrategy.LowestHp);
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/simulation/montecarlo", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<MontecarloResultDto>(content, _jsonOptions);
+
+        result.Should().NotBeNull();
+        result!.TotalIterations.Should().Be(300);
+        (result.CombatantAWins + result.CombatantBWins + result.Draws).Should().Be(300);
+        result.TeamASurvivalRate.Should().BeInRange(0.0, 100.0);
+        result.TeamANames.Should().Contain(new[] { "Party Hero 1", "Party Hero 2" });
+        result.TeamBNames.Should().Contain("Encounter Troll");
+
+        // Teardown
+        using (var cleanupScope = _factory.Services.CreateScope())
+        {
+            var context = cleanupScope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var toRemoveCreatures = await context.Creatures.Where(c => c.Id == hero1.Id || c.Id == hero2.Id || c.Id == monster.Id).ToListAsync();
+            var toRemoveWeapons = await context.Weapons.Where(w => w.Id == trollClaw.Id).ToListAsync();
+            context.Creatures.RemoveRange(toRemoveCreatures);
+            context.Weapons.RemoveRange(toRemoveWeapons);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
     public async Task RunMontecarlo_WithNonExistentEntity_ReturnsNotFound()
     {
         var request = new MontecarloRequestDto(

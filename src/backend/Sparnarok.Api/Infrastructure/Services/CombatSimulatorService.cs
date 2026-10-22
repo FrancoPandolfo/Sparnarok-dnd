@@ -11,14 +11,16 @@ namespace Sparnarok.Api.Infrastructure.Services;
 
 /// <summary>
 /// Implementación del servicio de simulación de combate de D&amp;D 5e (2024).
-/// Orquesta la resolución estocástica de iniciativa, ataques d20 contra CA,
-/// cálculo de daño (dados + modificadores), impactos críticos y logs ronda a ronda.
+/// Orquesta la resolución estocástica y determinista de iniciativa global,
+/// ataques d20 contra CA, daño directo por DPR de arquetipo, impactos críticos,
+/// targeting AI heurístico y bucle de turnos en encuentros individuales (1v1) y grupales (N vs M).
 /// </summary>
 public class CombatSimulatorService : ICombatSimulatorService
 {
     private readonly IRandomProvider _random;
     private readonly IDiceRoller _diceRoller;
     private readonly SparnarokDbContext? _context;
+    private const int MaxRounds = 100;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="CombatSimulatorService"/>.
@@ -37,128 +39,185 @@ public class CombatSimulatorService : ICombatSimulatorService
     }
 
     /// <inheritdoc />
+    public CombatSimulationResult SimulateEncounter(
+        IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamA,
+        IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamB,
+        TargetingStrategy targetingStrategy = TargetingStrategy.LowestHp)
+    {
+        ValidateTeam(teamA, nameof(teamA));
+        ValidateTeam(teamB, nameof(teamB));
+
+        var simulationId = Guid.NewGuid();
+        var logs = new List<CombatEventLog>();
+
+        // 1. Instanciación de CombatFighters para cada combatiente
+        var teamAFighters = teamA.Select(t => new CombatFighter(t.Creature, t.Weapon, TeamSide.TeamA)).ToList();
+        var teamBFighters = teamB.Select(t => new CombatFighter(t.Creature, t.Weapon, TeamSide.TeamB)).ToList();
+
+        var allFighters = new List<CombatFighter>(teamAFighters.Count + teamBFighters.Count);
+        allFighters.AddRange(teamAFighters);
+        allFighters.AddRange(teamBFighters);
+
+        // 2. Tirada de Iniciativa Global y ordenación de la cola de turnos
+        var turnOrder = InitiativeQueue.RollAndOrder(allFighters, _random);
+
+        var strategy = TargetingStrategyFactory.GetStrategy(targetingStrategy);
+        int currentRound = 0;
+
+        // 3. Bucle de Combate Ronda a Ronda
+        while (teamAFighters.Any(f => f.IsAlive) && teamBFighters.Any(f => f.IsAlive) && currentRound < MaxRounds)
+        {
+            currentRound++;
+
+            foreach (var attacker in turnOrder)
+            {
+                if (!attacker.IsAlive) continue;
+
+                // Verificar si el equipo enemigo ya fue completamente aniquilado antes del turno
+                var livingEnemies = (attacker.Team == TeamSide.TeamA ? teamBFighters : teamAFighters)
+                    .Where(e => e.IsAlive)
+                    .ToList();
+
+                if (livingEnemies.Count == 0) break;
+
+                // Selección de objetivo mediante IA de Targeting
+                var target = strategy.SelectTarget(attacker, livingEnemies, _random);
+                if (target == null) break;
+
+                // Ejecución del ataque
+                ExecuteAttack(currentRound, attacker, target, logs);
+
+                // Fin inmediato si el equipo opuesto cayó por completo
+                if (attacker.Team == TeamSide.TeamA && !teamBFighters.Any(f => f.IsAlive)) break;
+                if (attacker.Team == TeamSide.TeamB && !teamAFighters.Any(f => f.IsAlive)) break;
+            }
+        }
+
+        // 4. Determinación del Vencedor y Resumen
+        bool teamAWon = teamAFighters.Any(f => f.IsAlive) && !teamBFighters.Any(f => f.IsAlive);
+        bool teamBWon = teamBFighters.Any(f => f.IsAlive) && !teamAFighters.Any(f => f.IsAlive);
+
+        CombatWinner winnerTeam;
+        string winnerName;
+        Guid? winnerId;
+
+        if (teamAWon)
+        {
+            winnerTeam = CombatWinner.TeamA;
+            winnerName = teamAFighters.Count == 1 ? teamAFighters[0].Creature.Name : "Equipo A (La Party)";
+            winnerId = teamAFighters.Count == 1 ? teamAFighters[0].Creature.Id : null;
+        }
+        else if (teamBWon)
+        {
+            winnerTeam = CombatWinner.TeamB;
+            winnerName = teamBFighters.Count == 1 ? teamBFighters[0].Creature.Name : "Equipo B (Los Monstruos)";
+            winnerId = teamBFighters.Count == 1 ? teamBFighters[0].Creature.Id : null;
+        }
+        else
+        {
+            winnerTeam = CombatWinner.Draw;
+            winnerName = "Empate";
+            winnerId = null;
+        }
+
+        var summariesA = teamAFighters.Select(f => CreateSummary(f)).ToList();
+        var summariesB = teamBFighters.Select(f => CreateSummary(f)).ToList();
+
+        var primaryA = summariesA[0];
+        var primaryB = summariesB[0];
+        var teamASurvivors = teamAFighters.Count(f => f.IsAlive);
+
+        return new CombatSimulationResult(
+            simulationId,
+            primaryA,
+            primaryB,
+            winnerName,
+            winnerId,
+            currentRound,
+            logs.AsReadOnly(),
+            DateTime.UtcNow,
+            winnerTeam,
+            teamASurvivors,
+            summariesA.AsReadOnly(),
+            summariesB.AsReadOnly());
+    }
+
+    /// <inheritdoc />
+    public FastEncounterResult SimulateFastEncounter(
+        IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamA,
+        IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamB,
+        TargetingStrategy targetingStrategy = TargetingStrategy.LowestHp)
+    {
+        ValidateTeam(teamA, nameof(teamA));
+        ValidateTeam(teamB, nameof(teamB));
+
+        var teamAFighters = teamA.Select(t => new CombatFighter(t.Creature, t.Weapon, TeamSide.TeamA)).ToList();
+        var teamBFighters = teamB.Select(t => new CombatFighter(t.Creature, t.Weapon, TeamSide.TeamB)).ToList();
+
+        var allFighters = new List<CombatFighter>(teamAFighters.Count + teamBFighters.Count);
+        allFighters.AddRange(teamAFighters);
+        allFighters.AddRange(teamBFighters);
+
+        var turnOrder = InitiativeQueue.RollAndOrder(allFighters, _random);
+        var strategy = TargetingStrategyFactory.GetStrategy(targetingStrategy);
+
+        int currentRound = 0;
+        int totalDamageA = 0;
+        int totalDamageB = 0;
+
+        while (teamAFighters.Any(f => f.IsAlive) && teamBFighters.Any(f => f.IsAlive) && currentRound < MaxRounds)
+        {
+            currentRound++;
+
+            foreach (var attacker in turnOrder)
+            {
+                if (!attacker.IsAlive) continue;
+
+                var opponents = attacker.Team == TeamSide.TeamA ? teamBFighters : teamAFighters;
+                if (!opponents.Any(o => o.IsAlive)) break;
+
+                var target = strategy.SelectTarget(attacker, opponents, _random);
+                if (target == null) break;
+
+                var dmg = ExecuteFastAttack(attacker, target);
+                if (attacker.Team == TeamSide.TeamA) totalDamageA += dmg;
+                else totalDamageB += dmg;
+
+                if (attacker.Team == TeamSide.TeamA && !teamBFighters.Any(f => f.IsAlive)) break;
+                if (attacker.Team == TeamSide.TeamB && !teamAFighters.Any(f => f.IsAlive)) break;
+            }
+        }
+
+        CombatWinner winner;
+        if (teamAFighters.Any(f => f.IsAlive) && !teamBFighters.Any(f => f.IsAlive))
+        {
+            winner = CombatWinner.TeamA;
+        }
+        else if (teamBFighters.Any(f => f.IsAlive) && !teamAFighters.Any(f => f.IsAlive))
+        {
+            winner = CombatWinner.TeamB;
+        }
+        else
+        {
+            winner = CombatWinner.Draw;
+        }
+
+        int teamASurvivors = teamAFighters.Count(f => f.IsAlive);
+        return new FastEncounterResult(winner, currentRound, teamASurvivors, totalDamageA, totalDamageB);
+    }
+
+    /// <inheritdoc />
     public CombatSimulationResult SimulateDuel(
         Creature combatant1,
         Weapon? weapon1,
         Creature combatant2,
         Weapon? weapon2)
     {
-        ArgumentNullException.ThrowIfNull(combatant1);
-        ArgumentNullException.ThrowIfNull(combatant2);
-
-        if (weapon1 == null && (!combatant1.IsPlayerCharacter || !combatant1.ExpectedDpr.HasValue || combatant1.ExpectedDpr <= 0))
-            throw new ArgumentNullException(nameof(weapon1), $"El combatiente {combatant1.Name} requiere un arma equipada al no poseer ExpectedDpr.");
-
-        if (weapon2 == null && (!combatant2.IsPlayerCharacter || !combatant2.ExpectedDpr.HasValue || combatant2.ExpectedDpr <= 0))
-            throw new ArgumentNullException(nameof(weapon2), $"El combatiente {combatant2.Name} requiere un arma equipada al no poseer ExpectedDpr.");
-
-        var simulationId = Guid.NewGuid();
-        var logs = new List<CombatEventLog>();
-
-        // 1. Tirada de Iniciativa: d20 + Modificador de Destreza
-        var dexMod1 = combatant1.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
-        var dexMod2 = combatant2.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
-
-        var initRoll1 = _random.RollD20();
-        var initRoll2 = _random.RollD20();
-
-        var totalInit1 = initRoll1 + dexMod1;
-        var totalInit2 = initRoll2 + dexMod2;
-
-        // Desempate: mayor modificador de Destreza; si persiste, tirada aleatoria de moneda
-        bool combatant1GoesFirst;
-        if (totalInit1 > totalInit2)
-        {
-            combatant1GoesFirst = true;
-        }
-        else if (totalInit2 > totalInit1)
-        {
-            combatant1GoesFirst = false;
-        }
-        else
-        {
-            combatant1GoesFirst = dexMod1 != dexMod2 ? dexMod1 > dexMod2 : _random.Next(0, 2) == 0;
-        }
-
-        var fighterA = new Fighter(
-            combatant1GoesFirst ? combatant1 : combatant2,
-            combatant1GoesFirst ? weapon1 : weapon2,
-            combatant1GoesFirst ? totalInit1 : totalInit2);
-
-        var fighterB = new Fighter(
-            combatant1GoesFirst ? combatant2 : combatant1,
-            combatant1GoesFirst ? weapon2 : weapon1,
-            combatant1GoesFirst ? totalInit2 : totalInit1);
-
-        int currentRound = 0;
-        const int maxRounds = 100; // Salvaguarda contra bucles infinitos
-
-        // 2. Bucle de Combate Ronda a Ronda
-        while (fighterA.CurrentHp > 0 && fighterB.CurrentHp > 0 && currentRound < maxRounds)
-        {
-            currentRound++;
-
-            // Turno del Primer Atacante (Fighter A)
-            ExecuteAttack(currentRound, fighterA, fighterB, logs);
-            if (fighterB.CurrentHp <= 0) break;
-
-            // Turno del Segundo Atacante (Fighter B)
-            ExecuteAttack(currentRound, fighterB, fighterA, logs);
-            if (fighterA.CurrentHp <= 0) break;
-        }
-
-        // 3. Determinación del Vencedor
-        string winnerName;
-        Guid? winnerId;
-
-        if (fighterA.CurrentHp > 0 && fighterB.CurrentHp <= 0)
-        {
-            winnerName = fighterA.Creature.Name;
-            winnerId = fighterA.Creature.Id;
-        }
-        else if (fighterB.CurrentHp > 0 && fighterA.CurrentHp <= 0)
-        {
-            winnerName = fighterB.Creature.Name;
-            winnerId = fighterB.Creature.Id;
-        }
-        else
-        {
-            winnerName = "Empate";
-            winnerId = null;
-        }
-
-        var weaponName1 = weapon1?.Name ?? (combatant1.ExpectedDpr.HasValue ? $"DPR Baseline ({combatant1.Archetype ?? "Hero"})" : "Unarmed");
-        var weaponName2 = weapon2?.Name ?? (combatant2.ExpectedDpr.HasValue ? $"DPR Baseline ({combatant2.Archetype ?? "Hero"})" : "Unarmed");
-
-        var summary1 = new CombatantSummary(
-            combatant1.Id,
-            combatant1.Name,
-            weaponName1,
-            totalInit1,
-            combatant1.HitPoints.Max,
-            combatant1.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp,
-            (combatant1.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp) > 0);
-
-        var summary2 = new CombatantSummary(
-            combatant2.Id,
-            combatant2.Name,
-            weaponName2,
-            totalInit2,
-            combatant2.HitPoints.Max,
-            combatant2.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp,
-            (combatant2.Id == fighterA.Creature.Id ? fighterA.CurrentHp : fighterB.CurrentHp) > 0);
-
-        return new CombatSimulationResult(
-            simulationId,
-            summary1,
-            summary2,
-            winnerName,
-            winnerId,
-            currentRound,
-            logs.AsReadOnly(),
-            DateTime.UtcNow);
+        return SimulateEncounter(
+            new[] { (combatant1, weapon1) },
+            new[] { (combatant2, weapon2) },
+            TargetingStrategy.LowestHp);
     }
-
 
     /// <inheritdoc />
     public FastDuelResult SimulateFastDuel(
@@ -167,123 +226,19 @@ public class CombatSimulatorService : ICombatSimulatorService
         Creature combatant2,
         Weapon? weapon2)
     {
-        ArgumentNullException.ThrowIfNull(combatant1);
-        ArgumentNullException.ThrowIfNull(combatant2);
+        var result = SimulateFastEncounter(
+            new[] { (combatant1, weapon1) },
+            new[] { (combatant2, weapon2) },
+            TargetingStrategy.LowestHp);
 
-        if (weapon1 == null && (!combatant1.IsPlayerCharacter || !combatant1.ExpectedDpr.HasValue || combatant1.ExpectedDpr <= 0))
-            throw new ArgumentNullException(nameof(weapon1), $"El combatiente {combatant1.Name} requiere un arma equipada al no poseer ExpectedDpr.");
-
-        if (weapon2 == null && (!combatant2.IsPlayerCharacter || !combatant2.ExpectedDpr.HasValue || combatant2.ExpectedDpr <= 0))
-            throw new ArgumentNullException(nameof(weapon2), $"El combatiente {combatant2.Name} requiere un arma equipada al no poseer ExpectedDpr.");
-
-        var dexMod1 = combatant1.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
-        var dexMod2 = combatant2.AbilityScores.GetModifier(AbilityScoreType.Dexterity);
-
-        var initRoll1 = _random.RollD20();
-        var initRoll2 = _random.RollD20();
-
-        var totalInit1 = initRoll1 + dexMod1;
-        var totalInit2 = initRoll2 + dexMod2;
-
-        bool combatant1GoesFirst;
-        if (totalInit1 > totalInit2)
+        Guid? winnerId = result.Winner switch
         {
-            combatant1GoesFirst = true;
-        }
-        else if (totalInit2 > totalInit1)
-        {
-            combatant1GoesFirst = false;
-        }
-        else
-        {
-            combatant1GoesFirst = dexMod1 != dexMod2 ? dexMod1 > dexMod2 : _random.Next(0, 2) == 0;
-        }
+            CombatWinner.TeamA => combatant1.Id,
+            CombatWinner.TeamB => combatant2.Id,
+            _ => null
+        };
 
-        var fighterA = new Fighter(
-            combatant1GoesFirst ? combatant1 : combatant2,
-            combatant1GoesFirst ? weapon1 : weapon2,
-            combatant1GoesFirst ? totalInit1 : totalInit2);
-
-        var fighterB = new Fighter(
-            combatant1GoesFirst ? combatant2 : combatant1,
-            combatant1GoesFirst ? weapon2 : weapon1,
-            combatant1GoesFirst ? totalInit2 : totalInit1);
-
-        int currentRound = 0;
-        const int maxRounds = 100;
-
-        int damageDealtBy1 = 0;
-        int damageDealtBy2 = 0;
-
-        while (fighterA.CurrentHp > 0 && fighterB.CurrentHp > 0 && currentRound < maxRounds)
-        {
-            currentRound++;
-
-            var dmgA = ExecuteFastAttack(fighterA, fighterB);
-            if (fighterA.Creature.Id == combatant1.Id) damageDealtBy1 += dmgA;
-            else damageDealtBy2 += dmgA;
-
-            if (fighterB.CurrentHp <= 0) break;
-
-            var dmgB = ExecuteFastAttack(fighterB, fighterA);
-            if (fighterB.Creature.Id == combatant1.Id) damageDealtBy1 += dmgB;
-            else damageDealtBy2 += dmgB;
-
-            if (fighterA.CurrentHp <= 0) break;
-        }
-
-        Guid? winnerId = null;
-        if (fighterA.CurrentHp > 0 && fighterB.CurrentHp <= 0)
-        {
-            winnerId = fighterA.Creature.Id;
-        }
-        else if (fighterB.CurrentHp > 0 && fighterA.CurrentHp <= 0)
-        {
-            winnerId = fighterB.Creature.Id;
-        }
-
-        return new FastDuelResult(winnerId, currentRound, damageDealtBy1, damageDealtBy2);
-    }
-
-    private int ExecuteFastAttack(Fighter attacker, Fighter defender)
-    {
-        // Flujo alternativo de ExpectedDpr para Personajes de Jugador:
-        // Se omite la tirada d20 contra CA y se aplica daño directo con ±15% de varianza
-        if (attacker.Creature.IsPlayerCharacter && attacker.Creature.ExpectedDpr.HasValue && attacker.Creature.ExpectedDpr.Value > 0)
-        {
-            var baseDpr = attacker.Creature.ExpectedDpr.Value;
-            var variancePercent = _random.Next(-15, 16);
-            var factor = 1.0 + (variancePercent / 100.0);
-            var damage = Math.Max(1, (int)Math.Round(baseDpr * factor, MidpointRounding.AwayFromZero));
-            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
-            return damage;
-        }
-
-        if (attacker.Weapon == null)
-            return 0;
-
-        var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
-        var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
-
-        var d20 = _random.RollD20();
-        bool isNatural20 = d20 == 20;
-        bool isNatural1 = d20 == 1;
-
-        if (isNatural1) return 0;
-
-        if (isNatural20 || (d20 + attackBonus) >= defender.EffectiveAc)
-        {
-            var damageResult = _diceRoller.Roll(
-                attacker.Weapon.Damage,
-                additionalModifier: abilityMod,
-                isCritical: isNatural20);
-
-            var damage = damageResult.Total;
-            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
-            return damage;
-        }
-
-        return 0;
+        return new FastDuelResult(winnerId, result.Rounds, result.TeamADamageDealt, result.TeamBDamageDealt);
     }
 
     /// <inheritdoc />
@@ -336,21 +291,56 @@ public class CombatSimulatorService : ICombatSimulatorService
         return SimulateDuel(creature1, weapon1, creature2, weapon2);
     }
 
-    /// <summary>
-    /// Resuelve un ataque individual de un combatiente contra otro siguiendo las reglas canónicas de D&amp;D 5e (2024).
-    /// </summary>
-    private void ExecuteAttack(
-        int round,
-        Fighter attacker,
-        Fighter defender,
-        List<CombatEventLog> logs)
+    private int ExecuteFastAttack(CombatFighter attacker, CombatFighter defender)
     {
-        // Si el atacante es un Player Character con ExpectedDpr configurado,
-        // se omite la tirada de ataque convencional d20 vs CA y se reduce directamente la vida del defensor con ±15% de varianza
+        // 1. Flujo alternativo de ExpectedDpr para Personajes de Jugador (PCs)
         if (attacker.Creature.IsPlayerCharacter && attacker.Creature.ExpectedDpr.HasValue && attacker.Creature.ExpectedDpr.Value > 0)
         {
             var baseDpr = attacker.Creature.ExpectedDpr.Value;
-            var variancePercent = _random.Next(-15, 16); // -15% a +15%
+            var variancePercent = _random.Next(-15, 16);
+            var factor = 1.0 + (variancePercent / 100.0);
+            var damage = Math.Max(1, (int)Math.Round(baseDpr * factor, MidpointRounding.AwayFromZero));
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
+            return damage;
+        }
+
+        if (attacker.Weapon == null)
+            return 0;
+
+        var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
+        var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
+
+        var d20 = _random.RollD20();
+        bool isNatural20 = d20 == 20;
+        bool isNatural1 = d20 == 1;
+
+        if (isNatural1) return 0;
+
+        if (isNatural20 || (d20 + attackBonus) >= defender.EffectiveAc)
+        {
+            var damageResult = _diceRoller.Roll(
+                attacker.Weapon.Damage,
+                additionalModifier: abilityMod,
+                isCritical: isNatural20);
+
+            var damage = damageResult.Total;
+            defender.CurrentHp = Math.Max(0, defender.CurrentHp - damage);
+            return damage;
+        }
+
+        return 0;
+    }
+
+    private void ExecuteAttack(
+        int round,
+        CombatFighter attacker,
+        CombatFighter defender,
+        List<CombatEventLog> logs)
+    {
+        if (attacker.Creature.IsPlayerCharacter && attacker.Creature.ExpectedDpr.HasValue && attacker.Creature.ExpectedDpr.Value > 0)
+        {
+            var baseDpr = attacker.Creature.ExpectedDpr.Value;
+            var variancePercent = _random.Next(-15, 16);
             var factor = 1.0 + (variancePercent / 100.0);
             var dprDamage = Math.Max(1, (int)Math.Round(baseDpr * factor, MidpointRounding.AwayFromZero));
 
@@ -379,11 +369,9 @@ public class CombatSimulatorService : ICombatSimulatorService
             return;
         }
 
-
         if (attacker.Weapon == null)
             throw new InvalidOperationException($"El combatiente {attacker.Creature.Name} no tiene un arma equipada ni ExpectedDpr configurado.");
 
-        // Determinación de la característica gobernante del ataque según propiedades del arma
         var abilityMod = GetWeaponAbilityModifier(attacker.Creature, attacker.Weapon);
         var attackBonus = abilityMod + attacker.Creature.ProficiencyBonus;
 
@@ -394,7 +382,6 @@ public class CombatSimulatorService : ICombatSimulatorService
         int totalAttack = d20 + attackBonus;
         int targetAc = defender.EffectiveAc;
 
-        // Regla 5e: 20 natural impacta críticamente sin importar la CA. 1 natural falla automáticamente.
         bool isHit;
         if (isNatural20)
         {
@@ -414,7 +401,6 @@ public class CombatSimulatorService : ICombatSimulatorService
 
         if (isHit)
         {
-            // Tirada de daño (dados duplicados si es crítico + modificador)
             var damageResult = _diceRoller.Roll(
                 attacker.Weapon.Damage,
                 additionalModifier: abilityMod,
@@ -461,12 +447,37 @@ public class CombatSimulatorService : ICombatSimulatorService
             Description: description));
     }
 
-    /// <summary>
-    /// Selecciona el modificador de característica gobernante de acuerdo con las propiedades de D&amp;D 5e:
-    /// - Finesse: Mayor entre Fuerza y Destreza.
-    /// - Ranged (Ammunition sin Thrown): Destreza.
-    /// - Melee estándar: Fuerza.
-    /// </summary>
+    private static CombatantSummary CreateSummary(CombatFighter fighter)
+    {
+        var weaponName = fighter.Weapon?.Name ?? (fighter.Creature.ExpectedDpr.HasValue ? $"DPR Baseline ({fighter.Creature.Archetype ?? "Hero"})" : "Unarmed");
+        return new CombatantSummary(
+            fighter.Creature.Id,
+            fighter.Creature.Name,
+            weaponName,
+            fighter.Initiative,
+            fighter.StartingHp,
+            fighter.CurrentHp,
+            fighter.IsAlive);
+    }
+
+    private static void ValidateTeam(IReadOnlyList<(Creature Creature, Weapon? Weapon)> team, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(team, paramName);
+        if (team.Count == 0)
+        {
+            throw new ArgumentException("El equipo debe contener al menos un combatiente.", paramName);
+        }
+
+        foreach (var (creature, weapon) in team)
+        {
+            ArgumentNullException.ThrowIfNull(creature, "Combatiente");
+            if (weapon == null && (!creature.IsPlayerCharacter || !creature.ExpectedDpr.HasValue || creature.ExpectedDpr.Value <= 0))
+            {
+                throw new ArgumentNullException(nameof(weapon), $"El combatiente {creature.Name} requiere un arma al no poseer ExpectedDpr.");
+            }
+        }
+    }
+
     private static int GetWeaponAbilityModifier(Creature creature, Weapon? weapon)
     {
         var strMod = creature.AbilityScores.GetModifier(AbilityScoreType.Strength);
@@ -489,26 +500,4 @@ public class CombatSimulatorService : ICombatSimulatorService
 
         return strMod;
     }
-
-    /// <summary>
-    /// Estado mutable interno para el seguimiento del combatiente durante el bucle de simulación.
-    /// </summary>
-    private class Fighter
-    {
-        public Creature Creature { get; }
-        public Weapon? Weapon { get; }
-        public int Initiative { get; }
-        public int CurrentHp { get; set; }
-        public int EffectiveAc { get; }
-
-        public Fighter(Creature creature, Weapon? weapon, int initiative)
-        {
-            Creature = creature;
-            Weapon = weapon;
-            Initiative = initiative;
-            CurrentHp = creature.HitPoints.Current;
-            EffectiveAc = creature.EffectiveArmorClass;
-        }
-    }
 }
-

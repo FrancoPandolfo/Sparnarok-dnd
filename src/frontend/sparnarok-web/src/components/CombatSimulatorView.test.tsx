@@ -5,7 +5,7 @@ import { CombatSimulatorView } from './CombatSimulatorView';
 import i18n from '../i18n';
 import type { CreatureResponseDto, WeaponDto, MontecarloResultDto } from '../types/dnd';
 
-describe('CombatSimulatorView Component Suite', () => {
+describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('es');
   });
@@ -103,14 +103,15 @@ describe('CombatSimulatorView Component Suite', () => {
     averageRounds: 4.25,
     combatantAAverageDpr: 6.8,
     combatantBAverageDpr: 11.4,
-    combatantAName: 'Bugbear Stalker',
-    combatantBName: 'Gorgon Vanguard',
+    combatantAName: 'Party (Bugbear Stalker)',
+    combatantBName: 'Encounter (Gorgon Vanguard)',
     weaponAName: 'Longsword',
     weaponBName: 'Greatsword',
     executionTimeMs: 12,
+    teamASurvivalRate: 28.5,
   };
 
-  it('renders combatant cards, weapon dropdowns, and run button', () => {
+  it('renders team roster cards, dynamic add buttons, targeting selector, and run button', () => {
     const mockRun = vi.fn();
     render(
       <CombatSimulatorView
@@ -120,15 +121,41 @@ describe('CombatSimulatorView Component Suite', () => {
       />
     );
 
-    expect(screen.getByText(/Simulador de Combate de Montecarlo \(1v1\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Combatiente A \(Iniciador\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Simulador de Combate de Montecarlo \(Party vs Encounter\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Equipo A \(La Party \/ Héroes\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Equipo B \(El Encuentro \/ Monstruos\)/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Simular Combate \(Montecarlo\)/i })).toBeInTheDocument();
+    expect(document.getElementById('add-member-a-btn')).toBeInTheDocument();
+    expect(document.getElementById('add-member-b-btn')).toBeInTheDocument();
+    expect(document.getElementById('targeting-strategy-select')).toBeInTheDocument();
     expect(document.getElementById('combatant-a-select')).toBeInTheDocument();
     expect(document.getElementById('combatant-b-select')).toBeInTheDocument();
     expect(document.getElementById('iterations-select')).toBeInTheDocument();
   });
 
-  it('triggers Monte Carlo simulation and renders win rates and metrics', async () => {
+  it('allows adding and removing members dynamically in teams', async () => {
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+      />
+    );
+
+    const addMemberABtn = document.getElementById('add-member-a-btn')!;
+    await userEvent.click(addMemberABtn);
+
+    // Now Team A should have 2 members and a remove button for the second member
+    expect(document.getElementById('combatant-a-select-1')).toBeInTheDocument();
+    const removeBtn = document.getElementById('remove-member-a-btn-1')!;
+    expect(removeBtn).toBeInTheDocument();
+
+    // Clicking remove should remove member 2
+    await userEvent.click(removeBtn);
+    expect(document.getElementById('combatant-a-select-1')).not.toBeInTheDocument();
+  });
+
+  it('triggers Monte Carlo simulation and renders win rates, metrics, and Party Survival Rate', async () => {
     const mockRun = vi.fn().mockResolvedValue(mockSimulationResult);
     const mockCompleted = vi.fn();
 
@@ -144,13 +171,14 @@ describe('CombatSimulatorView Component Suite', () => {
     const runBtn = screen.getByRole('button', { name: /Simular Combate \(Montecarlo\)/i });
     await userEvent.click(runBtn);
 
-    expect(mockRun).toHaveBeenCalledWith({
-      combatantAId: 'c-1',
-      weaponAId: 'w-1',
-      combatantBId: 'c-2',
-      weaponBId: 'w-2',
-      iterations: 10000,
-    });
+    expect(mockRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamA: [{ creatureId: 'c-1', weaponId: 'w-1' }],
+        teamB: [{ creatureId: 'c-2', weaponId: 'w-2' }],
+        targetingStrategy: 'LowestHp',
+        iterations: 10000,
+      })
+    );
 
     await waitFor(() => {
       expect(document.getElementById('montecarlo-results-panel')).toBeInTheDocument();
@@ -162,7 +190,12 @@ describe('CombatSimulatorView Component Suite', () => {
     expect(winRateA).toHaveTextContent('32%');
     expect(winRateB).toHaveTextContent('68%');
 
-    // Check Metric Cards
+    // Check Party Survival Rate
+    const survivalRate = document.getElementById('metric-party-survival-rate');
+    expect(survivalRate).toBeInTheDocument();
+    expect(survivalRate).toHaveTextContent('28.5%');
+
+    // Check Other Metric Cards
     const avgRounds = document.getElementById('metric-avg-rounds');
     const dprA = document.getElementById('metric-dpr-a');
     const dprB = document.getElementById('metric-dpr-b');
@@ -174,6 +207,30 @@ describe('CombatSimulatorView Component Suite', () => {
     expect(totalIt?.textContent).toMatch(/10[.,]000/);
 
     expect(mockCompleted).toHaveBeenCalledWith(mockSimulationResult);
+  });
+
+  it('passes selected targeting strategy to simulation payload', async () => {
+    const mockRun = vi.fn().mockResolvedValue(mockSimulationResult);
+
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={mockRun}
+      />
+    );
+
+    const targetingSelect = document.getElementById('targeting-strategy-select') as HTMLSelectElement;
+    await userEvent.selectOptions(targetingSelect, 'Random');
+
+    const runBtn = screen.getByRole('button', { name: /Simular Combate \(Montecarlo\)/i });
+    await userEvent.click(runBtn);
+
+    expect(mockRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetingStrategy: 'Random',
+      })
+    );
   });
 
   it('displays error alert when simulation service throws an error', async () => {
@@ -244,13 +301,11 @@ describe('CombatSimulatorView Component Suite', () => {
     const runBtn = screen.getByRole('button', { name: /Simular Combate \(Montecarlo\)/i });
     await userEvent.click(runBtn);
 
-    expect(mockRun).toHaveBeenCalledWith({
-      combatantAId: 'hero-dpr-1',
-      weaponAId: undefined,
-      combatantBId: 'c-2',
-      weaponBId: 'w-2',
-      iterations: 10000,
-    });
+    expect(mockRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamA: [{ creatureId: 'hero-dpr-1', weaponId: undefined }],
+        teamB: [{ creatureId: 'c-2', weaponId: 'w-2' }],
+      })
+    );
   });
 });
-

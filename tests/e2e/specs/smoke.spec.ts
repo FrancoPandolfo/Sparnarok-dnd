@@ -522,6 +522,93 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     expect(receivedPayload.combatantAId).toBe('c0000001-0000-0000-0000-111122223333');
     expect(receivedPayload.weaponAId).toBeUndefined();
   });
+
+  test('Party vs Encounter simulation: 4 Heroes vs 1 Boss Monster renders Party Survival Rate in DOM', async ({ page }) => {
+    // Intercept POST /api/simulation/montecarlo to return deterministic Party vs Encounter results
+    let receivedPayload: any = null;
+    await page.route('**/api/simulation/montecarlo', async (route) => {
+      if (route.request().method() === 'POST') {
+        receivedPayload = JSON.parse(route.request().postData() || '{}');
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            totalIterations: receivedPayload.iterations || 1000,
+            combatantAWins: 840,
+            combatantBWins: 160,
+            draws: 0,
+            combatantAWinRate: 84.0,
+            combatantBWinRate: 16.0,
+            drawRate: 0.0,
+            averageRounds: 3.2,
+            combatantAAverageDpr: 42.5,
+            combatantBAverageDpr: 21.0,
+            combatantAName: 'Party (4 Héroes)',
+            combatantBName: 'Gorgon Vanguard',
+            weaponAName: 'Arsenal de Party',
+            weaponBName: 'Iron Gore Strike',
+            executionTimeMs: 18,
+            teamASurvivalRate: 78.5,
+            teamANames: ['Héroe 1', 'Héroe 2', 'Héroe 3', 'Héroe 4'],
+            teamBNames: ['Gorgon Vanguard'],
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/');
+
+    // Switch to Simulation tab
+    await page.locator('#tab-simulation-btn').click();
+
+    // Verify initial single member in Team A and Team B
+    await expect(page.locator('#combatant-a-select')).toBeVisible();
+    await expect(page.locator('#combatant-b-select')).toBeVisible();
+
+    // Add 3 more members to Team A (total 4 heroes in Party)
+    const addMemberABtn = page.locator('#add-member-a-btn');
+    await addMemberABtn.click();
+    await addMemberABtn.click();
+    await addMemberABtn.click();
+
+    // Verify 4 members in Team A
+    await expect(page.locator('#combatant-a-select-1')).toBeVisible();
+    await expect(page.locator('#combatant-a-select-2')).toBeVisible();
+    await expect(page.locator('#combatant-a-select-3')).toBeVisible();
+
+    // Verify Team B has Boss monster
+    const bossSelect = page.locator('#combatant-b-select');
+    await bossSelect.selectOption({ index: 1 });
+
+    // Select Targeting Strategy: LowestHp
+    const targetingSelect = page.locator('#targeting-strategy-select');
+    await targetingSelect.selectOption('LowestHp');
+
+    // Run Monte Carlo Party simulation
+    const runBtn = page.locator('#run-montecarlo-btn');
+    await expect(runBtn).toBeEnabled();
+    await runBtn.click();
+
+    // Verify results panel renders
+    await expect(page.locator('#montecarlo-results-panel')).toBeVisible();
+
+    // Verify Party Survival Rate metric card is rendered in the DOM
+    const survivalRateCard = page.locator('#metric-party-survival-rate');
+    await expect(survivalRateCard).toBeVisible();
+    await expect(survivalRateCard).toContainText('78.5%');
+
+    // Verify win rates and rounds
+    await expect(page.locator('#win-rate-a')).toContainText('84%');
+    await expect(page.locator('#win-rate-b')).toContainText('16%');
+
+    // Verify payload contained 4 heroes in Team A and 1 in Team B
+    expect(receivedPayload).not.toBeNull();
+    expect(receivedPayload.teamA).toHaveLength(4);
+    expect(receivedPayload.teamB).toHaveLength(1);
+    expect(receivedPayload.targetingStrategy).toBe('LowestHp');
+  });
 });
 
 

@@ -31,6 +31,25 @@ public class MontecarloSimulationServiceTests
         public CombatSimulationResult SimulateDuel(Creature combatant1, Weapon? weapon1, Creature combatant2, Weapon? weapon2) =>
             throw new NotImplementedException();
 
+        public FastEncounterResult SimulateFastEncounter(
+            IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamA,
+            IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamB,
+            TargetingStrategy targetingStrategy = TargetingStrategy.LowestHp)
+        {
+            var duel = _resultFactory();
+            CombatWinner winner = CombatWinner.Draw;
+            if (duel.WinnerId == teamA[0].Creature.Id) winner = CombatWinner.TeamA;
+            else if (duel.WinnerId == teamB[0].Creature.Id) winner = CombatWinner.TeamB;
+            int survivors = winner == CombatWinner.TeamA ? teamA.Count : 0;
+            return new FastEncounterResult(winner, duel.Rounds, survivors, duel.DamageDealtA, duel.DamageDealtB);
+        }
+
+        public CombatSimulationResult SimulateEncounter(
+            IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamA,
+            IReadOnlyList<(Creature Creature, Weapon? Weapon)> teamB,
+            TargetingStrategy targetingStrategy = TargetingStrategy.LowestHp) =>
+            throw new NotImplementedException();
+
         public Task<CombatSimulationResult> SimulateDuelAsync(Guid creature1Id, Guid? weapon1Id, Guid creature2Id, Guid? weapon2Id, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
     }
