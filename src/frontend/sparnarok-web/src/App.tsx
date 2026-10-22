@@ -20,6 +20,8 @@ const GOOGLE_CLIENT_ID =
   (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
   'mock-google-client-id.apps.googleusercontent.com';
 
+
+
 /**
  * Componente principal de la interfaz de usuario de Sparnarok: The Architect's Codex.
  * Orquesta la navegación entre el Bestiario de D&D 5e (2024) y el Simulador Matemático de Combate.

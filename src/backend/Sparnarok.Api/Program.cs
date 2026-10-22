@@ -11,6 +11,9 @@ using Sparnarok.Api.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Soporte para credenciales locales no versionadas (appsettings.private.json)
+builder.Configuration.AddJsonFile("appsettings.private.json", optional: true, reloadOnChange: true);
+
 // 1. Configuración de Internacionalización (i18n)
 builder.Services.AddLocalization();
 
