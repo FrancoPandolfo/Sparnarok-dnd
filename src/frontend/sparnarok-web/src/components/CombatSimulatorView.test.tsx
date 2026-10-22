@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { CombatSimulatorView } from './CombatSimulatorView';
 import i18n from '../i18n';
 import type { CreatureResponseDto, WeaponDto, MontecarloResultDto } from '../types/dnd';
+import { apiClient } from '../services/apiClient';
 
 describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
   beforeEach(async () => {
@@ -336,5 +337,112 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
       })
     );
   });
+
+  it('loads and populates Team A when a saved party is selected from dropdown', async () => {
+    const mockParty = {
+      id: 'party-test-1',
+      name: 'Heroes of the Vale',
+      ownerUserId: 'user-1',
+      createdAt: new Date().toISOString(),
+      members: [
+        {
+          ...mockCreatures[0],
+          id: 'hero-1',
+          name: 'Warrior Hero',
+          isPlayerCharacter: true,
+          expectedDpr: 15.0,
+        },
+        {
+          ...mockCreatures[1],
+          id: 'hero-2',
+          name: 'Mage Hero',
+          isPlayerCharacter: true,
+          expectedDpr: 18.0,
+        },
+      ],
+    };
+
+    vi.spyOn(apiClient, 'getParties').mockResolvedValue([mockParty]);
+
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+        isAuthenticated={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Heroes of the Vale/i)).toBeInTheDocument();
+    });
+
+    const partySelect = document.getElementById('saved-party-select') as HTMLSelectElement;
+    await userEvent.selectOptions(partySelect, 'party-test-1');
+
+    // Team A should now contain the 2 heroes from the party
+    expect(screen.getByText(/#1 Warrior Hero/i)).toBeInTheDocument();
+    expect(screen.getByText(/#2 Mage Hero/i)).toBeInTheDocument();
+  });
+
+  it('clears Team A when clear team button is clicked', async () => {
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+        isAuthenticated={true}
+      />
+    );
+
+    const clearBtn = document.getElementById('clear-team-a-btn')!;
+    expect(clearBtn).toBeInTheDocument();
+
+    await userEvent.click(clearBtn);
+
+    expect(document.getElementById('empty-team-a-placeholder')).toBeInTheDocument();
+    expect(screen.getByText(/No hay combatientes en este equipo/i)).toBeInTheDocument();
+  });
+
+  it('opens save party modal and creates a party with current Team A members', async () => {
+    const createPartySpy = vi.spyOn(apiClient, 'createParty').mockResolvedValue({
+      id: 'party-created-1',
+      name: 'Nuevos Conquistadores',
+      ownerUserId: 'user-1',
+      createdAt: new Date().toISOString(),
+      members: [mockCreatures[0]],
+    });
+
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+        isAuthenticated={true}
+      />
+    );
+
+    const savePartyBtn = document.getElementById('save-party-btn')!;
+    await userEvent.click(savePartyBtn);
+
+    expect(document.getElementById('save-party-modal')).toBeInTheDocument();
+
+    const nameInput = document.getElementById('party-name-input')!;
+    await userEvent.type(nameInput, 'Nuevos Conquistadores');
+
+    const confirmBtn = document.getElementById('confirm-save-party-btn')!;
+    await userEvent.click(confirmBtn);
+
+    expect(createPartySpy).toHaveBeenCalledWith({
+      name: 'Nuevos Conquistadores',
+      memberCreatureIds: ['c-1'],
+    });
+
+    await waitFor(() => {
+      expect(document.getElementById('save-party-modal')).not.toBeInTheDocument();
+      expect(document.getElementById('status-feedback-banner')).toBeInTheDocument();
+    });
+  });
 });
+
 

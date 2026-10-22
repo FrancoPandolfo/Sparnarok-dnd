@@ -14,6 +14,12 @@ import type {
   DprBaselineDto,
 } from '../types/dnd';
 import type { AuthResponseDto } from '../types/auth';
+import type {
+  CreatePartyRequestDto,
+  PartyResponseDto,
+  CreateEncounterRequestDto,
+  EncounterResponseDto,
+} from '../types/partyEncounter';
 
 const API_BASE_URL = '/api/v1';
 
@@ -475,6 +481,8 @@ export function calculateExpectedDpr(archetype: string, level: number): number {
 
 // Almacén en memoria para cuando el backend no está disponible
 let inMemoryCreatures: CreatureResponseDto[] = [...INITIAL_CREATURES];
+let inMemoryParties: PartyResponseDto[] = [];
+let inMemoryEncounters: EncounterResponseDto[] = [];
 
 
 /**
@@ -1142,5 +1150,184 @@ export const apiClient = {
       teamANames: teamACreatures.map(c => c.name),
       teamBNames: teamBCreatures.map(c => c.name),
     };
+  },
+
+  /**
+   * Obtiene todas las Partys guardadas pertenecientes al usuario actual.
+   */
+  async getParties(): Promise<PartyResponseDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryParties = data;
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+    return inMemoryParties;
+  },
+
+  /**
+   * Obtiene una Party por su ID.
+   */
+  async getPartyById(id: string): Promise<PartyResponseDto | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${id}`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return inMemoryParties.find((p) => p.id === id) || null;
+  },
+
+  /**
+   * Crea una nueva Party de héroes.
+   */
+  async createParty(request: CreatePartyRequestDto): Promise<PartyResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryParties = [data, ...inMemoryParties.filter((p) => p.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const members = request.memberCreatureIds
+      .map((id) => inMemoryCreatures.find((c) => c.id === id))
+      .filter(Boolean) as CreatureResponseDto[];
+
+    const newParty: PartyResponseDto = {
+      id: `party-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: request.name,
+      ownerUserId: 'mock-user-id',
+      createdAt: new Date().toISOString(),
+      members,
+    };
+    inMemoryParties = [newParty, ...inMemoryParties];
+    return newParty;
+  },
+
+  /**
+   * Elimina una Party por su ID.
+   */
+  async deleteParty(id: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemoryParties = inMemoryParties.filter((p) => p.id !== id);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
+    inMemoryParties = inMemoryParties.filter((p) => p.id !== id);
+  },
+
+  /**
+   * Obtiene todos los Encuentros guardados pertenecientes al usuario actual.
+   */
+  async getEncounters(): Promise<EncounterResponseDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/encounters`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryEncounters = data;
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+    return inMemoryEncounters;
+  },
+
+  /**
+   * Obtiene un Encuentro por su ID.
+   */
+  async getEncounterById(id: string): Promise<EncounterResponseDto | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/encounters/${id}`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return inMemoryEncounters.find((e) => e.id === id) || null;
+  },
+
+  /**
+   * Crea un nuevo Encuentro táctico.
+   */
+  async createEncounter(request: CreateEncounterRequestDto): Promise<EncounterResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/encounters`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryEncounters = [data, ...inMemoryEncounters.filter((e) => e.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const creatures = request.creatureIds
+      .map((id) => inMemoryCreatures.find((c) => c.id === id))
+      .filter(Boolean) as CreatureResponseDto[];
+
+    const newEncounter: EncounterResponseDto = {
+      id: `enc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: request.name,
+      ownerUserId: 'mock-user-id',
+      difficultyNotes: request.difficultyNotes,
+      createdAt: new Date().toISOString(),
+      creatures,
+    };
+    inMemoryEncounters = [newEncounter, ...inMemoryEncounters];
+    return newEncounter;
+  },
+
+  /**
+   * Elimina un Encuentro por su ID.
+   */
+  async deleteEncounter(id: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/encounters/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemoryEncounters = inMemoryEncounters.filter((e) => e.id !== id);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
+    inMemoryEncounters = inMemoryEncounters.filter((e) => e.id !== id);
   },
 };

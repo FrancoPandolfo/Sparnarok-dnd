@@ -2056,5 +2056,104 @@ button:disabled {
   pointer-events: auto;
 }
 
+/* ---------------------------------------------------- */
+/* Gestor de Partys y Encuentros (Fase 3.5)              */
+/* ---------------------------------------------------- */
+.team-persistence-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.persistence-select-wrapper {
+  width: 100%;
+}
+
+.party-encounter-dropdown {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #f8fafc;
+  font-weight: 500;
+}
+
+.defender-card .party-encounter-dropdown {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.party-encounter-dropdown:focus {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+}
+
+.team-persistence-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  border-radius: 6px;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.empty-team-placeholder {
+  padding: 2rem 1rem;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.status-feedback-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.25) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #a7f3d0;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);
+}
+
+.modal-info-text {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0.75rem 0;
+  line-height: 1.4;
+}
+
+.input-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+
 
 

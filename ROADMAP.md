@@ -306,9 +306,51 @@ Implementación de un sistema de cuentas de usuario soberano utilizando autentic
 
 ---
 
+## Fase 3.5: Gestor de Partys y Encuentros [Completado]
+
+Cierre del Módulo 1 (Combat Engine) con soporte completo para persistencia relacional de grupos de combate (Partys para Team A y Encuentros para Team B), gestión de composiciones mediante relaciones Many-to-Many en EF Core PostgreSQL, prevención de ciclos JSON y autorización a nivel de recursos.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 3.5.1 Entidades Party y Encounter (OwnerUserId)        │
+   │ 3.5.2 Mapeo Many-to-Many EF Core (Shadow Join Tables)  │
+   │ 3.5.3 Migración PostgreSQL (AddPartiesAndEncounters)   │
+   │ 3.5.4 Repositorios & Controladores REST [Authorize]    │
+   │ 3.5.5 Proyecciones DTO Planas (0% Ciclos JSON)         │
+   │ 3.5.6 Verificación de Autorización a Nivel de Recursos │
+   │ 3.5.7 Dropdowns Tácticos y Modales de Guardado (React) │
+   │ 3.5.8 ADR-0014, Tests Unitarios, Integración y E2E     │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - **Modelado de Datos (Backend):**
+    - Entidad `Party` (`Id`, `Name`, `OwnerUserId`, `CreatedAt`, `Members`) con relación Many-to-Many hacia `Creature` restringida por invariante de dominio (`IsPlayerCharacter == true`).
+    - Entidad `Encounter` (`Id`, `Name`, `OwnerUserId`, `DifficultyNotes`, `CreatedAt`, `Creatures`) con relación Many-to-Many hacia `Creature` (monstruos del bestiario).
+    - Tablas intermedias relacionales `PartyCreatures` y `EncounterCreatures` configuradas vía `UsingEntity` con claves compuestas y eliminación en cascada.
+    - Migración de base de datos EF Core para PostgreSQL: `20261022170158_AddPartiesAndEncounters.cs`.
+  - **API y Servicios REST:**
+    - `PartiesController` (`/api/v1/parties`) y `EncountersController` (`/api/v1/encounters`) con endpoints CRUD completos.
+    - Endpoints protegidos con `[Authorize]` y filtrado estricto por `OwnerUserId`.
+    - Operaciones de asociación y desasociación con validación de propiedad a nivel de recurso (retornando `403 Forbidden` si el usuario intenta alterar un encuentro ajeno).
+    - DTOs planos (`PartyResponseDto`, `EncounterResponseDto`, `CreatureResponseDto`) que previenen de forma absoluta ciclos infinitos de serialización JSON.
+  - **Interfaz de Usuario (React):**
+    - Selectores desplegables en `CombatSimulatorView`: "Cargar Party Guardada" (`#saved-party-select`) para Team A y "Cargar Encuentro" (`#saved-encounter-select`) para Team B.
+    - Poblado automático e instantáneo de miembros y monstruos al seleccionar un grupo guardado.
+    - Botones y modales para guardar composiciones: "Guardar Team A como nueva Party" (`#save-party-btn`) y "Guardar Team B como nuevo Encuentro" (`#save-encounter-btn`).
+    - Botones de reseteo rápido para limpiar combatientes (`#clear-team-a-btn`, `#clear-team-b-btn`).
+    - Notificaciones contextuales mediante `#status-feedback-banner` y soporte bilingüe en i18n (`es`/`en`).
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/party-and-encounter-manager`.
+  - Documentación: [ADR-0014](file:///docs/adrs/0014-many-to-many-party-encounter-persistence.md) y comentarios XML/TSDoc exhaustivos.
+  - Testing: 173 tests unitarios backend en `Sparnarok.UnitTests`, 30 tests de integración en `Sparnarok.IntegrationTests`, 31 tests de componentes frontend en Vitest y 11 tests E2E en Playwright (incluyendo simulación completa de creación de party con 3 héroes custom, persistencia, limpieza de pantalla y recarga desde dropdown).
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 ### Fase 4: Telemetría, Optimización y Exportación
 - Exportación de métricas matemáticas en PDF / Markdown / JSON.
 - Panel de analítica de combate en tiempo real.
+
 
