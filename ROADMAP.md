@@ -241,6 +241,33 @@ Abstracción estadística del daño de Personajes de Jugadores (PCs) mediante ma
 
 ---
 
+## Fase 2.4: Party vs. Encounter Engine (N vs. M) [En Desarrollo / Completado]
+
+Evolución del motor de combate para permitir enfrentamientos tácticos entre grupos de criaturas (Party de Héroes vs. Encuentro de Monstruos), con resolución de cola de iniciativa global, inteligencia artificial de targeting extensible y métricas agregadas de supervivencia de la party.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 2.4.1 Cola Global de Iniciativa (InitiativeQueue)      │
+   │ 2.4.2 Targeting AI Extensible (Random & LowestHP)      │
+   │ 2.4.3 Motor Grupal N vs M & TPK Condition Resolution   │
+   │ 2.4.4 Montecarlo Concurrente & Party Survival Rate     │
+   │ 2.4.5 UI React con Listas Dinámicas & Playwright E2E   │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - `InitiativeQueue`: Tirada de iniciativa $1d20 + \text{DexMod}$ para todas las criaturas, con desempates por Destreza y orden de turno decreciente.
+  - Interfaz `ITargetingStrategy` desacoplada y estrategias `RandomTargetingStrategy` y `LowestHpTargetingStrategy` (Focus Fire) con factoría `TargetingStrategyFactory`.
+  - Simulación de encuentros grupales en `CombatSimulatorService` (`SimulateEncounter` y `SimulateFastEncounter`) con condición de victoria por eliminación total del equipo contrario.
+  - Métricas agregadas de supervivencia en `MontecarloSimulationService`: Party Survival Rate porcentual promedio.
+  - Interfaz gráfica en React con dos listas dinámicas (Team A - Party y Team B - Encuentro), permitiendo añadir/eliminar múltiples combatientes, configurar estrategia de aggro y visualizar métricas de supervivencia del grupo.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/party-vs-encounter-engine`.
+  - Documentación: [ADR-0012](file:///docs/adrs/0012-party-vs-encounter-initiative-and-targeting-ai.md).
+  - Testing: Tests unitarios de cola de iniciativa, heurísticas de targeting y victoria de grupo en `Sparnarok.UnitTests`, tests de integración en `Sparnarok.IntegrationTests`, tests de componentes en Vitest y test E2E de Playwright (4 Héroes vs 1 Jefe).
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 

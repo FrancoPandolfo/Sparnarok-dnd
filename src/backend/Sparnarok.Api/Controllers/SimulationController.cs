@@ -53,10 +53,25 @@ public class SimulationController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
+        bool hasTeamA = (request.TeamA != null && request.TeamA.Count > 0) || (request.CombatantAId.HasValue && request.CombatantAId.Value != Guid.Empty);
+        bool hasTeamB = (request.TeamB != null && request.TeamB.Count > 0) || (request.CombatantBId.HasValue && request.CombatantBId.Value != Guid.Empty);
+
+        if (!hasTeamA || !hasTeamB)
+        {
+            ModelState.AddModelError("Teams", "Se debe especificar al menos un combatiente para el Equipo A y para el Equipo B.");
+            return ValidationProblem(ModelState);
+        }
+
         try
         {
             var result = await _montecarloService.SimulateAsync(request, cancellationToken);
             return Ok(result);
+        }
+        catch (ArgumentException aex)
+        {
+            _logger.LogWarning(aex, "Parámetros de encuentro inválidos.");
+            ModelState.AddModelError("Encounter", aex.Message);
+            return ValidationProblem(ModelState);
         }
         catch (KeyNotFoundException knf)
         {

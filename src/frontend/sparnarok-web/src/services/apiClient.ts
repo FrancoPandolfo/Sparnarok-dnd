@@ -1018,30 +1018,44 @@ export const apiClient = {
     }
 
     const it = request.iterations || 10000;
-    const creatureA = inMemoryCreatures.find((c) => c.id === request.combatantAId);
-    const creatureB = inMemoryCreatures.find((c) => c.id === request.combatantBId);
+    const teamAReqs = request.teamA && request.teamA.length > 0
+      ? request.teamA
+      : request.combatantAId ? [{ creatureId: request.combatantAId, weaponId: request.weaponAId }] : [];
+    const teamBReqs = request.teamB && request.teamB.length > 0
+      ? request.teamB
+      : request.combatantBId ? [{ creatureId: request.combatantBId, weaponId: request.weaponBId }] : [];
+
+    const teamACreatures = teamAReqs.map(r => inMemoryCreatures.find(c => c.id === r.creatureId)).filter(Boolean) as CreatureResponseDto[];
+    const teamBCreatures = teamBReqs.map(r => inMemoryCreatures.find(c => c.id === r.creatureId)).filter(Boolean) as CreatureResponseDto[];
+
+    const creatureA = teamACreatures[0];
+    const creatureB = teamBCreatures[0];
     const weaponA = request.weaponAId ? CANONICAL_WEAPONS.find((w) => w.id === request.weaponAId) : null;
     const weaponB = request.weaponBId ? CANONICAL_WEAPONS.find((w) => w.id === request.weaponBId) : null;
 
-    const aWins = Math.round(it * 0.61);
+    const aWins = Math.round(it * 0.65);
     const bWins = it - aWins;
+    const survivalRate = aWins > bWins ? 78.5 : 32.0;
 
     return {
       totalIterations: it,
       combatantAWins: aWins,
       combatantBWins: bWins,
       draws: 0,
-      combatantAWinRate: 61.0,
-      combatantBWinRate: 39.0,
+      combatantAWinRate: 65.0,
+      combatantBWinRate: 35.0,
       drawRate: 0.0,
       averageRounds: 3.8,
       combatantAAverageDpr: creatureA?.expectedDpr ?? 8.5,
       combatantBAverageDpr: creatureB?.expectedDpr ?? 5.7,
-      combatantAName: creatureA?.name ?? 'Combatant A',
-      combatantBName: creatureB?.name ?? 'Combatant B',
+      combatantAName: teamACreatures.length > 1 ? `Party (${teamACreatures.map(c => c.name).join(', ')})` : (creatureA?.name ?? 'Combatant A'),
+      combatantBName: teamBCreatures.length > 1 ? `Encounter (${teamBCreatures.map(c => c.name).join(', ')})` : (creatureB?.name ?? 'Combatant B'),
       weaponAName: weaponA?.name ?? (creatureA?.expectedDpr ? `DPR Baseline (${creatureA.expectedDpr} DPR)` : 'Unarmed'),
       weaponBName: weaponB?.name ?? (creatureB?.expectedDpr ? `DPR Baseline (${creatureB.expectedDpr} DPR)` : 'Unarmed'),
       executionTimeMs: 14,
+      teamASurvivalRate: survivalRate,
+      teamANames: teamACreatures.map(c => c.name),
+      teamBNames: teamBCreatures.map(c => c.name),
     };
   },
 };
