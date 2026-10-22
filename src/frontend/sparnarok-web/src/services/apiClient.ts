@@ -13,9 +13,19 @@ import type {
   MontecarloResultDto,
   DprBaselineDto,
 } from '../types/dnd';
-
+import type { AuthResponseDto } from '../types/auth';
 
 const API_BASE_URL = '/api/v1';
+
+let currentAuthToken: string | null = null;
+
+function getAuthHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...additionalHeaders };
+  if (currentAuthToken) {
+    headers['Authorization'] = `Bearer ${currentAuthToken}`;
+  }
+  return headers;
+}
 
 /**
  * Catálogo canónico de las 8 Maestrías de Armas (D&D 5e - 2024).
@@ -472,11 +482,83 @@ let inMemoryCreatures: CreatureResponseDto[] = [...INITIAL_CREATURES];
  */
 export const apiClient = {
   /**
+   * Obtiene el token de autenticación JWT actual.
+   */
+  getAuthToken(): string | null {
+    return currentAuthToken;
+  },
+
+  /**
+   * Establece el token de autenticación JWT para peticiones protegidas.
+   */
+  setAuthToken(token: string | null): void {
+    currentAuthToken = token;
+  },
+
+  /**
+   * Inicia sesión intercambiando un ID Token de Google OAuth2 por un JWT propio del backend.
+   */
+  async loginWithGoogle(idToken: string): Promise<AuthResponseDto> {
+    try {
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (response.ok) {
+        const data: AuthResponseDto = await response.json();
+        this.setAuthToken(data.token);
+        return data;
+      } else {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Error autenticando con Google');
+      }
+    } catch (err) {
+      if (err instanceof Error && !err.message.includes('fetch') && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+        throw err;
+      }
+      // Fallback para entornos offline o de prueba sin backend activo
+      const syntheticUser: AuthResponseDto = {
+        token: `mock-jwt-${Date.now()}`,
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'offline-adventurer@sparnarok.dnd',
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+      };
+      this.setAuthToken(syntheticUser.token);
+      return syntheticUser;
+    }
+  },
+
+  /**
+   * Obtiene el perfil del usuario autenticado actual.
+   */
+  async getCurrentUser(signal?: AbortSignal): Promise<AuthResponseDto | null> {
+    if (!currentAuthToken) return null;
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: getAuthHeaders(),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  },
+
+  /**
    * Obtiene la lista completa de criaturas desde el backend o almacén local.
    */
   async getCreatures(signal?: AbortSignal): Promise<CreatureResponseDto[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/creatures`, { signal });
+      const response = await fetch(`${API_BASE_URL}/creatures`, {
+        headers: getAuthHeaders(),
+        signal,
+      });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -495,7 +577,10 @@ export const apiClient = {
    */
   async getCreatureById(id: string, signal?: AbortSignal): Promise<CreatureResponseDto> {
     try {
-      const response = await fetch(`${API_BASE_URL}/creatures/${id}`, { signal });
+      const response = await fetch(`${API_BASE_URL}/creatures/${id}`, {
+        headers: getAuthHeaders(),
+        signal,
+      });
       if (response.ok) {
         return await response.json();
       }
@@ -887,7 +972,7 @@ export const apiClient = {
     try {
       const response = await fetch('/api/v1/creatures/custom', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(request),
       });
 

@@ -1,8 +1,10 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Sparnarok.Api.Application.DTOs;
+using Sparnarok.Api.Application.Extensions;
 using Sparnarok.Api.Application.Interfaces;
 using Sparnarok.Api.Domain.Entities;
 using Sparnarok.Api.Domain.Enums;
@@ -60,7 +62,8 @@ public class CreaturesController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<CreatureResponseDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<CreatureResponseDto>>> GetAll(CancellationToken ct)
     {
-        var creatures = await _creatureRepository.GetAllAsync(ct);
+        var currentUserId = User.GetUserId();
+        var creatures = await _creatureRepository.GetAllAsync(currentUserId, ct);
         var dtos = creatures.Select(CreatureResponseDto.FromEntity).ToList();
         return Ok(dtos);
     }
@@ -77,7 +80,8 @@ public class CreaturesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CreatureResponseDto>> GetById(Guid id, CancellationToken ct)
     {
-        var creature = await _creatureRepository.GetByIdAsync(id, ct);
+        var currentUserId = User.GetUserId();
+        var creature = await _creatureRepository.GetByIdAsync(id, currentUserId, ct);
         if (creature is null)
         {
             return NotFound(new ProblemDetails
@@ -154,14 +158,28 @@ public class CreaturesController : ControllerBase
     /// <param name="ct">Token de cancelación.</param>
     /// <response code="201">Retorna el héroe creado con IsPlayerCharacter = true.</response>
     /// <response code="400">Si los datos provistos violan las validaciones del perfil.</response>
+    /// <response code="401">Si el usuario no está autenticado.</response>
+    [Authorize]
     [HttpPost("custom")]
     [ProducesResponseType(typeof(CreatureResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<CreatureResponseDto>> CreateCustomHero(
         [FromBody] CreateCustomHeroRequestDto request,
         [FromServices] IValidator<CreateCustomHeroRequestDto> customValidator,
         CancellationToken ct)
     {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "No autorizado",
+                Detail = "No se pudo identificar al usuario en el token de autorización.",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
         var validationResult = await customValidator.ValidateAsync(request, ct);
         if (!validationResult.IsValid)
         {
@@ -204,7 +222,8 @@ public class CreaturesController : ControllerBase
             isPlayerCharacter: true,
             level: level,
             expectedDpr: expectedDpr,
-            archetype: request.Archetype);
+            archetype: request.Archetype,
+            ownerUserId: userId.Value);
 
         // Acción de ataque principal del héroe
         var attackName = string.IsNullOrWhiteSpace(request.AttackName)

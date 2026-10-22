@@ -35,6 +35,11 @@ public class SparnarokDbContext : DbContext
     public DbSet<Armor> Armors => Set<Armor>();
 
     /// <summary>
+    /// Conjunto de datos para los usuarios federados mediante autenticación social (Google OAuth2).
+    /// </summary>
+    public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
+
+    /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.
     /// </summary>
     /// <param name="options">Opciones de configuración del contexto.</param>

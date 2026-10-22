@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Sparnarok Codex Smoke Suite', () => {
+  test.beforeEach(async ({ page }) => {
+    // Pre-seed localStorage with authenticated session so standard tests operate smoothly
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'sparnarok_auth',
+        JSON.stringify({
+          id: '00000000-0000-0000-0000-000000000001',
+          email: 'dungeonmaster@sparnarok.dnd',
+          displayName: 'Master Architect',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=64&q=80',
+          token: 'e2e-valid-jwt-token',
+        })
+      );
+    });
+  });
+
   test('Application loads with localized Spanish copy and simulation counter responds to interaction', async ({ page }) => {
     await page.goto('/');
 
@@ -609,7 +625,89 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     expect(receivedPayload.teamB).toHaveLength(1);
     expect(receivedPayload.targetingStrategy).toBe('LowestHp');
   });
+
+  test('Unauthenticated user is blocked from custom hero creation; Google OAuth login via network mocking enables Add Custom Hero and simulation', async ({ page }) => {
+    // Clear localStorage to test explicitly unauthenticated user state
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+    });
+
+    // Intercept POST /api/auth/google with network mocking
+    let authRouteCalled = false;
+    await page.route('**/api/auth/google', async (route) => {
+      if (route.request().method() === 'POST') {
+        authRouteCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            token: 'mock-jwt-e2e-token-xyz',
+            userId: 'user-00000000-0000-0000-0000-000000000099',
+            email: 'adventurer@sparnarok.dnd',
+            displayName: 'Aventurero del Códice',
+            avatarUrl: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/');
+
+    // Verify Navbar displays Google login button and no user profile
+    const googleLoginBtn = page.locator('#google-login-btn');
+    await expect(googleLoginBtn).toBeVisible();
+    await expect(page.locator('#user-profile-badge')).not.toBeVisible();
+
+    // Navigate to Tactical Simulation tab
+    const simTabBtn = page.locator('#tab-simulation-btn');
+    await expect(simTabBtn).toBeVisible();
+    await simTabBtn.click();
+
+    // Verify authentication banner is visible in Tactical Simulation
+    const authBanner = page.locator('#sim-auth-banner');
+    await expect(authBanner).toBeVisible();
+    await expect(authBanner).toContainText('Autenticación Requerida');
+
+    // Verify "Añadir Héroe Custom" is disabled for unauthenticated user
+    const openHeroBtn = page.locator('#open-custom-hero-btn');
+    await expect(openHeroBtn).toBeDisabled();
+
+    // Verify "Simular Combate" is also disabled
+    const runBtn = page.locator('#run-montecarlo-btn');
+    await expect(runBtn).toBeDisabled();
+
+    // Click Google Login button to trigger OAuth exchange intercepted by network mock
+    await googleLoginBtn.click();
+
+    // Verify API was intercepted
+    expect(authRouteCalled).toBe(true);
+
+    // Verify authentication banner disappears upon successful login
+    await expect(authBanner).not.toBeVisible();
+
+    // Verify "Añadir Héroe Custom" is now enabled
+    await expect(openHeroBtn).toBeEnabled();
+
+    // Verify "Simular Combate" is now enabled
+    await expect(runBtn).toBeEnabled();
+
+    // Verify user profile is rendered in Navbar
+    const profileBadge = page.locator('#user-profile-badge');
+    await expect(profileBadge).toBeVisible();
+    await expect(page.locator('#user-display-name')).toHaveText('Aventurero del Códice');
+    await expect(page.locator('#user-avatar')).toBeVisible();
+
+    // Verify modal can now be opened
+    await openHeroBtn.click();
+    const heroModal = page.locator('#custom-hero-modal');
+    await expect(heroModal).toBeVisible();
+    await page.locator('#cancel-custom-hero-btn').click();
+    await expect(heroModal).not.toBeVisible();
+  });
 });
+
 
 
 

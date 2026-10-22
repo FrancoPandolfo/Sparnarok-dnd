@@ -9,6 +9,7 @@ import type {
 } from '../types/dnd';
 import { CustomHeroModal } from './CustomHeroModal';
 import { apiClient } from '../services/apiClient';
+import { useAuth } from '../context/AuthContext';
 
 export interface CombatSimulatorViewProps {
   creatures: CreatureResponseDto[];
@@ -16,6 +17,7 @@ export interface CombatSimulatorViewProps {
   onRunSimulation: (request: MontecarloRequestDto) => Promise<MontecarloResultDto>;
   onSimulationCompleted?: (result: MontecarloResultDto) => void;
   onHeroCreated?: (hero: CreatureResponseDto) => void;
+  isAuthenticated?: boolean;
 }
 
 export interface TeamMemberConfig {
@@ -35,8 +37,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   onRunSimulation,
   onSimulationCompleted,
   onHeroCreated,
+  isAuthenticated,
 }) => {
   const { t } = useTranslation();
+  const auth = useAuth();
+  const isAuthed = isAuthenticated !== undefined ? isAuthenticated : auth.isAuthenticated;
 
   const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
 
@@ -158,6 +163,10 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   };
 
   const handleRun = async () => {
+    if (!isAuthed) {
+      setErrorMessage(t('simulation.authRequiredDesc'));
+      return;
+    }
     if (teamA.length === 0) {
       setErrorMessage(t('simulation.emptyTeamA'));
       return;
@@ -234,6 +243,17 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
 
   return (
     <div className="combat-simulator-view fade-in">
+      {/* Banner de Autenticación Requerida */}
+      {!isAuthed && (
+        <div id="sim-auth-banner" className="sim-auth-banner" role="status">
+          <div className="auth-banner-icon">🔐</div>
+          <div className="auth-banner-content">
+            <h3 className="auth-banner-title">{t('simulation.authRequiredTitle')}</h3>
+            <p className="auth-banner-desc">{t('simulation.authRequiredDesc')}</p>
+          </div>
+        </div>
+      )}
+
       <header className="simulator-header">
         <div>
           <h2 className="section-title">{t('simulation.title')}</h2>
@@ -243,8 +263,14 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           <button
             type="button"
             id="open-custom-hero-btn"
-            className="btn btn-primary hero-btn"
-            onClick={() => setIsHeroModalOpen(true)}
+            className={`btn btn-primary hero-btn ${!isAuthed ? 'btn-disabled' : ''}`}
+            onClick={() => {
+              if (isAuthed) {
+                setIsHeroModalOpen(true);
+              }
+            }}
+            disabled={!isAuthed}
+            title={!isAuthed ? t('simulation.authRequiredTooltip') : t('simulation.addCustomHero')}
           >
             🛡️ {t('simulation.addCustomHero')}
           </button>
@@ -524,7 +550,8 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           id="run-montecarlo-btn"
           className="run-simulation-btn"
           onClick={handleRun}
-          disabled={isSimulating || teamA.length === 0 || teamB.length === 0}
+          disabled={!isAuthed || isSimulating || teamA.length === 0 || teamB.length === 0}
+          title={!isAuthed ? t('simulation.authRequiredTooltip') : undefined}
         >
           {isSimulating ? (
             <>

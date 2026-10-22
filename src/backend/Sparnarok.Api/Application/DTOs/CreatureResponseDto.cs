@@ -31,7 +31,8 @@ public record CreatureResponseDto(
     bool IsPlayerCharacter = false,
     int? Level = null,
     double? ExpectedDpr = null,
-    string? Archetype = null)
+    string? Archetype = null,
+    Guid? OwnerUserId = null)
 {
     /// <summary>
     /// Mapea una entidad <see cref="Creature"/> a su correspondiente DTO de respuesta.
@@ -85,7 +86,8 @@ public record CreatureResponseDto(
             entity.IsPlayerCharacter,
             entity.Level,
             entity.ExpectedDpr,
-            entity.Archetype);
+            entity.Archetype,
+            entity.OwnerUserId);
     }
 }
 

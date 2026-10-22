@@ -14,9 +14,19 @@ public interface ICreatureRepository
     Task<IReadOnlyList<Creature>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Obtiene las criaturas visibles para el usuario actual (públicas del bestiario y héroes custom propios).
+    /// </summary>
+    Task<IReadOnlyList<Creature>> GetAllAsync(Guid? currentUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Obtiene una criatura por su identificador único incluyendo sus acciones y maestrías asociadas.
     /// </summary>
     Task<Creature?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene una criatura por su identificador único asegurando que sea pública o pertenezca al usuario actual.
+    /// </summary>
+    Task<Creature?> GetByIdAsync(Guid id, Guid? currentUserId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Agrega una nueva criatura al almacén de persistencia.

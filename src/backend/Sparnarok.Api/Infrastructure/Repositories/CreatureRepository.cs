@@ -23,7 +23,13 @@ public class CreatureRepository : ICreatureRepository
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<Creature>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<Creature>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return GetAllAsync(null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Creature>> GetAllAsync(Guid? currentUserId, CancellationToken cancellationToken = default)
     {
         return await _context.Creatures
             .Include(c => c.Actions)
@@ -31,12 +37,19 @@ public class CreatureRepository : ICreatureRepository
             .Include(c => c.KnownMasteries)
             .Include(c => c.EquippedArmor)
             .Include(c => c.EquippedShield)
+            .Where(c => c.OwnerUserId == null || (currentUserId.HasValue && c.OwnerUserId == currentUserId.Value))
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<Creature?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<Creature?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return GetByIdAsync(id, null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Creature?> GetByIdAsync(Guid id, Guid? currentUserId, CancellationToken cancellationToken = default)
     {
         return await _context.Creatures
             .Include(c => c.Actions)
@@ -44,7 +57,7 @@ public class CreatureRepository : ICreatureRepository
             .Include(c => c.KnownMasteries)
             .Include(c => c.EquippedArmor)
             .Include(c => c.EquippedShield)
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == id && (c.OwnerUserId == null || (currentUserId.HasValue && c.OwnerUserId == currentUserId.Value)), cancellationToken);
     }
 
     /// <inheritdoc />

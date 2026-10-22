@@ -118,6 +118,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         creatures={mockCreatures}
         weapons={mockWeapons}
         onRunSimulation={mockRun}
+        isAuthenticated={true}
       />
     );
 
@@ -133,12 +134,34 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
     expect(document.getElementById('iterations-select')).toBeInTheDocument();
   });
 
+  it('displays friendly auth banner and disables custom hero and simulation buttons when unauthenticated', () => {
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+        isAuthenticated={false}
+      />
+    );
+
+    expect(document.getElementById('sim-auth-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Autenticación Requerida/i)).toBeInTheDocument();
+    expect(screen.getByText(/Inicia sesión con tu cuenta de Google/i)).toBeInTheDocument();
+
+    const openHeroBtn = document.getElementById('open-custom-hero-btn');
+    expect(openHeroBtn).toBeDisabled();
+
+    const runBtn = document.getElementById('run-montecarlo-btn');
+    expect(runBtn).toBeDisabled();
+  });
+
   it('allows adding and removing members dynamically in teams', async () => {
     render(
       <CombatSimulatorView
         creatures={mockCreatures}
         weapons={mockWeapons}
         onRunSimulation={vi.fn()}
+        isAuthenticated={true}
       />
     );
 
@@ -165,6 +188,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         weapons={mockWeapons}
         onRunSimulation={mockRun}
         onSimulationCompleted={mockCompleted}
+        isAuthenticated={true}
       />
     );
 
@@ -217,6 +241,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         creatures={mockCreatures}
         weapons={mockWeapons}
         onRunSimulation={mockRun}
+        isAuthenticated={true}
       />
     );
 
@@ -241,6 +266,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         creatures={mockCreatures}
         weapons={mockWeapons}
         onRunSimulation={mockRun}
+        isAuthenticated={true}
       />
     );
 
@@ -261,6 +287,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         creatures={mockCreatures}
         weapons={mockWeapons}
         onRunSimulation={vi.fn()}
+        isAuthenticated={true}
       />
     );
 
@@ -290,6 +317,7 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
         creatures={[heroCreature, mockCreatures[1]]}
         weapons={mockWeapons}
         onRunSimulation={mockRun}
+        isAuthenticated={true}
       />
     );
 
@@ -309,3 +337,4 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
     );
   });
 });
+
