@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { PartyStashModal } from './PartyStashModal';
 import { apiClient } from '../services/apiClient';
 import i18n from '../i18n';
-import type { PartyStashDto, ReferenceItemDetailDto, ReferenceItemSummaryDto, StashItemDto } from '../types/stash';
+import type { ReferenceItemDetailDto, ReferenceItemSummaryDto, StashItemDto } from '../types/stash';
 
 vi.mock('../services/apiClient', () => ({
   apiClient: {
@@ -40,9 +40,10 @@ describe('PartyStashModal Component Suite', () => {
   it('renders party stash modal with empty items list and accumulated weight', async () => {
     vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
       partyId: mockPartyId,
+      partyName: mockPartyName,
       totalWeight: 0,
       items: [],
-    } as PartyStashDto);
+    });
 
     render(
       <PartyStashModal
@@ -73,7 +74,7 @@ describe('PartyStashModal Component Suite', () => {
         itemType: 'Wondrous Items',
         isOfficialSrd: true,
         referenceIndex: 'rope-of-climbing',
-        createdAtUtc: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 'item-2',
@@ -86,15 +87,16 @@ describe('PartyStashModal Component Suite', () => {
         itemType: 'Potions',
         isOfficialSrd: false,
         referenceIndex: null,
-        createdAtUtc: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
     ];
 
     vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
       partyId: mockPartyId,
+      partyName: mockPartyName,
       totalWeight: 5.0,
       items: mockItems,
-    } as PartyStashDto);
+    });
 
     render(
       <PartyStashModal
@@ -116,9 +118,10 @@ describe('PartyStashModal Component Suite', () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
       partyId: mockPartyId,
+      partyName: mockPartyName,
       totalWeight: 0,
       items: [],
-    } as PartyStashDto);
+    });
 
     const mockSearchResults: ReferenceItemSummaryDto[] = [
       { index: 'dagger', name: 'Dagger', url: '/api/2024/equipment/dagger' },
@@ -132,6 +135,7 @@ describe('PartyStashModal Component Suite', () => {
       description: 'Finesse, light, thrown (range 20/60). Simple Melee Weapon.',
       rarity: 'Common',
       itemType: 'Weapons',
+      isOfficialSrd: true,
     };
     vi.mocked(apiClient.getReferenceEquipmentDetail).mockResolvedValue(mockDetail);
 
@@ -146,7 +150,7 @@ describe('PartyStashModal Component Suite', () => {
       itemType: 'Weapons',
       isOfficialSrd: true,
       referenceIndex: 'dagger',
-      createdAtUtc: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
     vi.mocked(apiClient.addStashItem).mockResolvedValue(mockCreatedItem);
 
@@ -225,15 +229,16 @@ describe('PartyStashModal Component Suite', () => {
         itemType: 'Weapons',
         isOfficialSrd: false,
         referenceIndex: null,
-        createdAtUtc: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
     ];
 
     vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
       partyId: mockPartyId,
+      partyName: mockPartyName,
       totalWeight: 6.0,
       items: mockItems,
-    } as PartyStashDto);
+    });
 
     vi.mocked(apiClient.deleteStashItem).mockResolvedValueOnce();
 

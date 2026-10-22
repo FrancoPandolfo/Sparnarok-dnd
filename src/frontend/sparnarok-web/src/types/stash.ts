@@ -20,6 +20,8 @@ export interface ReferenceEquipmentDetailDto {
   cost?: string | null;
 }
 
+export type ReferenceItemDetailDto = ReferenceEquipmentDetailDto;
+
 export interface StashItemDto {
   id: string;
   partyId: string;
