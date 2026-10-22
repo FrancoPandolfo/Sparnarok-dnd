@@ -39,5 +39,14 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
 
         builder.Navigation(p => p.Members)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Relación One-to-Many con StashItem
+        builder.HasMany(p => p.StashItems)
+            .WithOne()
+            .HasForeignKey(s => s.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(p => p.StashItems)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

@@ -33,6 +33,7 @@ public class PartyRepository : IPartyRepository
                 .ThenInclude(m => m.EquippedArmor)
             .Include(p => p.Members)
                 .ThenInclude(m => m.EquippedShield)
+            .Include(p => p.StashItems)
             .Where(p => p.OwnerUserId == userId)
             .OrderByDescending(p => p.CreatedAt)
             .AsNoTracking()
@@ -52,6 +53,7 @@ public class PartyRepository : IPartyRepository
                 .ThenInclude(m => m.EquippedArmor)
             .Include(p => p.Members)
                 .ThenInclude(m => m.EquippedShield)
+            .Include(p => p.StashItems)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
@@ -75,6 +77,21 @@ public class PartyRepository : IPartyRepository
     {
         ArgumentNullException.ThrowIfNull(party);
         _context.Parties.Remove(party);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task AddStashItemAsync(StashItem item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        await _context.StashItems.AddAsync(item, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task RemoveStashItemAsync(StashItem item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        _context.StashItems.Remove(item);
         return Task.CompletedTask;
     }
 

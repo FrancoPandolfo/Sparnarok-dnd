@@ -901,6 +901,163 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Lyra la Cazadora' })).toBeVisible();
     await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Ignis el Brujo' })).toBeVisible();
   });
+
+  test('Collaborative Party Stash: Opens stash modal, searches official D&D 5e SRD items with debounced typeahead, autofills tactical stats, edits quantity, and persists item', async ({ page }) => {
+    const partyId = 'party-stash-e2e-1';
+    let stashItems: any[] = [];
+
+    // Intercept Parties GET
+    await page.route('**/api/v1/parties', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: partyId,
+              name: 'La Compañía del Dragón',
+              ownerUserId: '00000000-0000-0000-0000-000000000001',
+              createdAt: new Date().toISOString(),
+              members: [],
+            },
+          ]),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Intercept Stash GET & POST
+    await page.route(`**/api/v1/parties/${partyId}/stash`, async (route) => {
+      if (route.request().method() === 'GET') {
+        const totalWeight = stashItems.reduce((acc, item) => acc + (item.weight * item.quantity), 0);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            partyId,
+            totalWeight,
+            items: stashItems,
+          }),
+        });
+      } else if (route.request().method() === 'POST') {
+        const body = JSON.parse(route.request().postData() || '{}');
+        const createdItem = {
+          id: `stash-item-${stashItems.length + 1}`,
+          partyId,
+          name: body.name,
+          quantity: body.quantity || 1,
+          weight: body.weight ?? 0,
+          description: body.description || '',
+          rarity: body.rarity || 'Common',
+          itemType: body.itemType || 'Adventuring Gear',
+          isOfficialSrd: Boolean(body.isOfficialSrd),
+          referenceIndex: body.referenceIndex || null,
+          createdAtUtc: new Date().toISOString(),
+        };
+        stashItems.unshift(createdItem);
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(createdItem),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Intercept D&D 5e API Reference Equipment Search
+    await page.route('**/api/v1/reference/equipment?name=*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { index: 'dagger', name: 'Dagger', url: '/api/2024/equipment/dagger' },
+          { index: 'bag-of-holding', name: 'Bag of Holding', url: '/api/2024/magic-items/bag-of-holding' },
+        ]),
+      });
+    });
+
+    // Intercept D&D 5e API Reference Detail
+    await page.route('**/api/v1/reference/equipment/dagger', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          index: 'dagger',
+          name: 'Dagger',
+          weight: 1.0,
+          description: 'Finesse, light, thrown (range 20/60). Simple Melee Weapon.',
+          rarity: 'Common',
+          itemType: 'Weapons',
+        }),
+      });
+    });
+
+    await page.goto('/');
+
+    // 1. Navegar a la pestaña de Simulación de Combate
+    await page.locator('#tab-simulation-btn').click();
+
+    // 2. Abrir el modal de Party Stash
+    const openStashBtn = page.locator('#open-party-stash-btn');
+    await expect(openStashBtn).toBeVisible();
+    await openStashBtn.click();
+
+    // 3. Verificar que el modal de Party Stash esté visible con peso acumulado inicial 0.0 lbs
+    const stashModal = page.locator('#party-stash-modal');
+    await expect(stashModal).toBeVisible();
+    await expect(page.locator('#stash-total-weight')).toContainText('0.0 lbs');
+
+    // 4. Abrir el formulario para añadir un nuevo ítem
+    const openAddBtn = page.locator('#open-add-stash-item-btn');
+    await expect(openAddBtn).toBeVisible();
+    await openAddBtn.click();
+
+    const addForm = page.locator('#add-stash-item-modal');
+    await expect(addForm).toBeVisible();
+
+    // 5. Escribir en el campo de texto con debounce para buscar en compendio oficial D&D 5e SRD
+    const nameInput = page.locator('#stash-item-name-input');
+    await nameInput.fill('Dagger');
+
+    // 6. Esperar a que aparezcan las sugerencias del combobox
+    const suggestionsList = page.locator('#stash-item-suggestions');
+    await expect(suggestionsList).toBeVisible();
+
+    const daggerSuggestion = page.locator('#suggestion-dagger');
+    await expect(daggerSuggestion).toBeVisible();
+    await daggerSuggestion.click();
+
+    // 7. Verificar que los datos se completaron automáticamente
+    await expect(page.locator('#stash-item-srd-badge')).toBeVisible();
+    await expect(page.locator('#stash-item-weight-input')).toHaveValue('1');
+    await expect(page.locator('#stash-item-type-input')).toHaveValue('Weapons');
+    await expect(page.locator('#stash-item-description-input')).toHaveValue('Finesse, light, thrown (range 20/60). Simple Melee Weapon.');
+
+    // 8. Modificar la cantidad a 3
+    const qtyInput = page.locator('#stash-item-quantity-input');
+    await qtyInput.fill('3');
+
+    // 9. Guardar ítem en el Stash
+    const saveItemBtn = page.locator('#save-stash-item-btn');
+    await saveItemBtn.click();
+
+    // 10. Verificar que el formulario se cierra y la tabla contiene el ítem guardado
+    await expect(addForm).not.toBeVisible();
+    const stashTable = page.locator('#stash-items-table');
+    await expect(stashTable).toBeVisible();
+    await expect(stashTable).toContainText('Dagger');
+    await expect(stashTable).toContainText('x3');
+
+    // 11. Verificar que el peso total acumulado se actualizó a 3.0 lbs (1.0 lb * 3)
+    await expect(page.locator('#stash-total-weight')).toContainText('3.0 lbs');
+
+    // 12. Cerrar el modal de Party Stash
+    const closeStashBtn = page.locator('#close-party-stash-btn');
+    await closeStashBtn.click();
+    await expect(stashModal).not.toBeVisible();
+  });
 });
 
 

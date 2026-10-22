@@ -20,6 +20,13 @@ import type {
   CreateEncounterRequestDto,
   EncounterResponseDto,
 } from '../types/partyEncounter';
+import type {
+  ReferenceItemSummaryDto,
+  ReferenceEquipmentDetailDto,
+  StashItemDto,
+  CreateStashItemRequestDto,
+  PartyStashDto,
+} from '../types/stash';
 
 const API_BASE_URL = '/api/v1';
 
@@ -483,6 +490,7 @@ export function calculateExpectedDpr(archetype: string, level: number): number {
 let inMemoryCreatures: CreatureResponseDto[] = [...INITIAL_CREATURES];
 let inMemoryParties: PartyResponseDto[] = [];
 let inMemoryEncounters: EncounterResponseDto[] = [];
+let inMemoryStashItems: StashItemDto[] = [];
 
 
 /**
@@ -1330,4 +1338,202 @@ export const apiClient = {
     }
     inMemoryEncounters = inMemoryEncounters.filter((e) => e.id !== id);
   },
+
+  /**
+   * Busca equipamiento u objetos mágicos en el SRD mediante el proxy backend con debounce.
+   */
+  async searchReferenceEquipment(name: string, signal?: AbortSignal): Promise<ReferenceItemSummaryDto[]> {
+    try {
+      const queryParam = name ? `?name=${encodeURIComponent(name)}` : '';
+      const response = await fetch(`${API_BASE_URL}/reference/equipment${queryParam}`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const lower = name.toLowerCase().trim();
+    const fallbackCatalog: ReferenceItemSummaryDto[] = [
+      { index: 'dagger', name: 'Dagger', url: '/api/v1/reference/equipment/dagger' },
+      { index: 'bag-of-holding', name: 'Bag of Holding', url: '/api/v1/reference/equipment/bag-of-holding' },
+      { index: 'potion-of-healing', name: 'Potion of Healing', url: '/api/v1/reference/equipment/potion-of-healing' },
+      { index: 'ring-of-protection', name: 'Ring of Protection', url: '/api/v1/reference/equipment/ring-of-protection' },
+      { index: 'cloak-of-elvenkind', name: 'Cloak of Elvenkind', url: '/api/v1/reference/equipment/cloak-of-elvenkind' },
+      { index: 'boots-of-speed', name: 'Boots of Speed', url: '/api/v1/reference/equipment/boots-of-speed' },
+      { index: 'sun-blade', name: 'Sun Blade', url: '/api/v1/reference/equipment/sun-blade' },
+      { index: 'longsword', name: 'Longsword', url: '/api/v1/reference/equipment/longsword' },
+      { index: 'abacus', name: 'Abacus', url: '/api/v1/reference/equipment/abacus' },
+      { index: 'rope-hempen-50-feet', name: 'Rope, Hempen (50 feet)', url: '/api/v1/reference/equipment/rope-hempen-50-feet' },
+    ];
+
+    if (!lower) return fallbackCatalog;
+    return fallbackCatalog.filter((item) =>
+      item.name.toLowerCase().includes(lower) || item.index.toLowerCase().includes(lower)
+    );
+  },
+
+  /**
+   * Obtiene los detalles completos de un objeto de referencia oficial SRD.
+   */
+  async getReferenceEquipmentDetail(index: string, signal?: AbortSignal): Promise<ReferenceEquipmentDetailDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reference/equipment/${encodeURIComponent(index)}`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const fallbackDetails: Record<string, ReferenceEquipmentDetailDto> = {
+      'dagger': {
+        index: 'dagger',
+        name: 'Dagger',
+        weight: 1,
+        description: 'Daga de combate 1d4 perforante con propiedades Sutil, Ligera y Arrojadiza.',
+        rarity: 'Common',
+        itemType: 'Weapons',
+        isOfficialSrd: true,
+        cost: '2 gp',
+      },
+      'bag-of-holding': {
+        index: 'bag-of-holding',
+        name: 'Bag of Holding',
+        weight: 15,
+        description: 'Bolsa con espacio extradimensional que soporta hasta 500 libras.',
+        rarity: 'Uncommon',
+        itemType: 'Wondrous Items',
+        isOfficialSrd: true,
+      },
+      'potion-of-healing': {
+        index: 'potion-of-healing',
+        name: 'Potion of Healing',
+        weight: 0.5,
+        description: 'Líquido mágico rojo brillante que restaura 2d4 + 2 puntos de golpe al beberse.',
+        rarity: 'Common',
+        itemType: 'Potion',
+        isOfficialSrd: true,
+        cost: '50 gp',
+      },
+      'ring-of-protection': {
+        index: 'ring-of-protection',
+        name: 'Ring of Protection',
+        weight: 0,
+        description: 'Otorga un bonificador +1 a la CA y a todas las tiradas de salvación.',
+        rarity: 'Rare',
+        itemType: 'Ring',
+        isOfficialSrd: true,
+      },
+    };
+
+    return (
+      fallbackDetails[index] || {
+        index,
+        name: index.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+        weight: 1,
+        description: `Objeto oficial SRD (${index}).`,
+        rarity: 'Common',
+        itemType: 'Adventuring Gear',
+        isOfficialSrd: true,
+      }
+    );
+  },
+
+  /**
+   * Consulta el inventario del alijo compartido (Collaborative Party Stash) de una Party.
+   */
+  async getPartyStash(partyId: string, signal?: AbortSignal): Promise<PartyStashDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    // Filtrar objetos en memoria para esta party
+    const party = inMemoryParties.find((p) => p.id === partyId);
+    const items = inMemoryStashItems.filter((i) => i.partyId === partyId);
+    const totalWeight = items.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0);
+
+    return {
+      partyId,
+      partyName: party ? party.name : 'Party Desconocida',
+      totalWeight,
+      items,
+    };
+  },
+
+  /**
+   * Agrega un nuevo objeto al alijo compartido de la Party.
+   */
+  async addStashItem(partyId: string, request: CreateStashItemRequestDto): Promise<StashItemDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryStashItems = [data, ...inMemoryStashItems.filter((i) => i.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const newItem: StashItemDto = {
+      id: `stash-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      partyId,
+      name: request.name,
+      quantity: request.quantity,
+      weight: request.weight,
+      description: request.description || '',
+      rarity: request.rarity || 'Common',
+      itemType: request.itemType || 'Adventuring Gear',
+      isOfficialSrd: !!request.isOfficialSrd,
+      referenceIndex: request.referenceIndex || null,
+      assignedCreatureId: request.assignedCreatureId || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    inMemoryStashItems = [newItem, ...inMemoryStashItems];
+    return newItem;
+  },
+
+  /**
+   * Remueve un objeto del alijo compartido de la Party.
+   */
+  async deleteStashItem(partyId: string, itemId: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash/${itemId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemoryStashItems = inMemoryStashItems.filter((i) => i.id !== itemId);
+        return;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    inMemoryStashItems = inMemoryStashItems.filter((i) => i.id !== itemId);
+  },
 };
+

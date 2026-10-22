@@ -199,5 +199,31 @@
     "saveSuccessEncounter": "¡Encuentro guardado exitosamente!",
     "members": "miembros",
     "monsters": "monstruos"
+  },
+  "stash": {
+    "title": "Alijo de la Party (Party Stash)",
+    "openStashBtn": "Party Stash",
+    "totalWeightLabel": "Peso Acumulado:",
+    "addItemBtn": "Añadir Objeto al Stash",
+    "closeFormBtn": "Cancelar",
+    "formTitle": "Nuevo Objeto para el Alijo",
+    "itemNameLabel": "Nombre del Objeto (SRD Oficial o Homebrew)",
+    "namePlaceholder": "Ej. Bag of Holding, Dagger, Potion of Healing...",
+    "srdVerified": "Objeto oficial importado de D&D 5e SRD",
+    "quantityLabel": "Cantidad",
+    "weightLabel": "Peso Unitario (lbs)",
+    "rarityLabel": "Rareza",
+    "typeLabel": "Tipo / Categoría",
+    "descLabel": "Descripción y Propiedades",
+    "descPlaceholder": "Notas mágicas, reglas, efectos o procedencia...",
+    "saveItemBtn": "Guardar en el Stash",
+    "emptyMsg": "El alijo de esta Party está vacío. ¡Añade objetos oficiales o tesoros homebrew!",
+    "colName": "Objeto",
+    "colType": "Categoría",
+    "colRarity": "Rareza",
+    "colQty": "Cant.",
+    "colUnitWeight": "Peso Un.",
+    "colTotalWeight": "Peso Total",
+    "colActions": "Acciones"
   }
 }

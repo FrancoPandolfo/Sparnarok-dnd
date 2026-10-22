@@ -49,6 +49,11 @@ public class SparnarokDbContext : DbContext
     /// </summary>
     public DbSet<Encounter> Encounters => Set<Encounter>();
 
+    /// <summary>
+    /// Conjunto de datos para los objetos y equipo en los alijos compartidos de las Parties (Collaborative Party Stash).
+    /// </summary>
+    public DbSet<StashItem> StashItems => Set<StashItem>();
+
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.

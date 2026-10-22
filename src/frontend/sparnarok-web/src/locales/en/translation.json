@@ -199,5 +199,31 @@
     "saveSuccessEncounter": "Encounter saved successfully!",
     "members": "members",
     "monsters": "monsters"
+  },
+  "stash": {
+    "title": "Party Stash",
+    "openStashBtn": "Party Stash",
+    "totalWeightLabel": "Accumulated Weight:",
+    "addItemBtn": "Add Item to Stash",
+    "closeFormBtn": "Cancel",
+    "formTitle": "New Item for Stash",
+    "itemNameLabel": "Item Name (Official SRD or Homebrew)",
+    "namePlaceholder": "E.g. Bag of Holding, Dagger, Potion of Healing...",
+    "srdVerified": "Official item imported from D&D 5e SRD",
+    "quantityLabel": "Quantity",
+    "weightLabel": "Unit Weight (lbs)",
+    "rarityLabel": "Rarity",
+    "typeLabel": "Type / Category",
+    "descLabel": "Description and Properties",
+    "descPlaceholder": "Magical properties, rules, effects, or lore...",
+    "saveItemBtn": "Save to Stash",
+    "emptyMsg": "This party's stash is currently empty. Add official SRD items or custom homebrew treasures!",
+    "colName": "Item",
+    "colType": "Category",
+    "colRarity": "Rarity",
+    "colQty": "Qty.",
+    "colUnitWeight": "Unit Wt.",
+    "colTotalWeight": "Total Wt.",
+    "colActions": "Actions"
   }
 }

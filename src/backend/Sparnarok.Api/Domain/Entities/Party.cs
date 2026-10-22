@@ -9,6 +9,7 @@ namespace Sparnarok.Api.Domain.Entities;
 public class Party
 {
     private readonly List<Creature> _members = [];
+    private readonly List<StashItem> _stashItems = [];
 
     /// <summary>Identificador único de la Party.</summary>
     public Guid Id { get; private set; }
@@ -24,6 +25,12 @@ public class Party
 
     /// <summary>Colección de héroes y personajes que componen la Party.</summary>
     public IReadOnlyCollection<Creature> Members => _members.AsReadOnly();
+
+    /// <summary>Colección de objetos y tesoros en el alijo compartido (Collaborative Party Stash).</summary>
+    public IReadOnlyCollection<StashItem> StashItems => _stashItems.AsReadOnly();
+
+    /// <summary>Peso total acumulado en libras (lbs) de todos los objetos en el alijo de la Party.</summary>
+    public decimal TotalStashWeight => _stashItems.Sum(i => i.Weight * i.Quantity);
 
     /// <summary>Constructor protegido para Entity Framework Core.</summary>
     protected Party() { }
@@ -85,4 +92,22 @@ public class Party
     {
         _members.Clear();
     }
+
+    /// <summary>
+    /// Añade un objeto al alijo compartido de la Party.
+    /// </summary>
+    public void AddStashItem(StashItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        _stashItems.Add(item);
+    }
+
+    /// <summary>
+    /// Remueve un objeto del alijo compartido de la Party por su identificador.
+    /// </summary>
+    public void RemoveStashItem(Guid itemId)
+    {
+        _stashItems.RemoveAll(i => i.Id == itemId);
+    }
 }
+

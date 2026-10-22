@@ -177,7 +177,8 @@ public class PartyAndEncounterTests
             .Returns(monster);
 
         var validator = new CreatePartyRequestValidator();
-        var controller = new PartiesController(partyRepo, creatureRepo, validator);
+        var stashValidator = new CreateStashItemRequestValidator();
+        var controller = new PartiesController(partyRepo, creatureRepo, validator, stashValidator);
 
         var claims = new[]
         {

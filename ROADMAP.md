@@ -347,6 +347,48 @@ Cierre del Módulo 1 (Combat Engine) con soporte completo para persistencia rela
 
 ---
 
+## Fase 3.6: Collaborative Party Stash & D&D 5e API Reference Proxy [Completado]
+
+Gestión colaborativa del inventario de la Party (Party Stash) con cálculo reactivo de capacidad de carga / peso acumulado, integración con el compendio oficial de D&D 5e (SRD 2024) mediante un cliente proxy tipado con caché en memoria (`IMemoryCache`), componente frontend de autocompletado (Typeahead con debounce), edición libre de homebrew y persistencia relacional protegida.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 3.6.1 Entidad StashItem & Invariantes en Party         │
+   │ 3.6.2 Relación 1-a-N en EF Core & Migración PostgreSQL │
+   │ 3.6.3 Cliente Proxy Tipado IDnd5eApiClient             │
+   │ 3.6.4 In-Memory Caching multinivel (IMemoryCache)      │
+   │ 3.6.5 Endpoints GET /api/v1/reference/equipment       │
+   │ 3.6.6 Endpoints CRUD /api/v1/parties/{id}/stash        │
+   │ 3.6.7 Componente React PartyStashModal con Typeahead   │
+   │ 3.6.8 ADR-0015, Tests Unitarios, Integración y E2E     │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - **Dominio y Persistencia (Backend):**
+    - Entidad `StashItem` con invariantes (`Quantity >= 1`, `Weight >= 0`, nombre no vacío, rareza, categoría y metadatos SRD).
+    - Entidad `Party`: propiedad computada `TotalStashWeight` y métodos de dominio `AddStashItem` y `RemoveStashItem`.
+    - Relación 1-a-Muchos con eliminación en cascada en EF Core y migración PostgreSQL `20261022175716_AddPartyStashAndItems.cs`.
+  - **Integración D&D 5e API & Gateway Proxy:**
+    - Cliente tipado `IDnd5eApiClient` / `Dnd5eApiClient` apuntando a `https://www.dnd5eapi.co/api/2024/`.
+    - Unificación y búsqueda en catálogos duales (`/equipment` y `/magic-items`).
+    - Deserialización segura y mapeo defensivo para objetos con peso nulo o descripciones en array.
+    - Estrategia de caché en memoria con `IMemoryCache` (1 hora para catálogos, 30 min para búsquedas, 2 horas para detalles).
+    - Controladores REST `ReferenceEquipmentController` y `PartiesController` (subrecurso stash con autorización 403 Forbidden).
+  - **Interfaz de Usuario (React):**
+    - Modal `PartyStashModal` con contador visual de peso acumulado (`#stash-total-weight`).
+    - Formulario con Typeahead/Combobox debounceado (250ms) (`#stash-item-name-input`, `#stash-item-suggestions`).
+    - Autocompletado instantáneo de peso, rareza, tipo y descripción con badge visual de verificación SRD (`#stash-item-srd-badge`).
+    - Edición flexible para tesoros homebrew o ajustes personalizados del DM.
+    - Tabla responsiva de objetos con acciones de eliminación y cálculo instantáneo.
+    - Soporte bilingüe en i18n (`es`/`en`).
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/collaborative-party-stash`.
+  - Documentación: [ADR-0015](file:///docs/adrs/0015-collaborative-party-stash-and-dnd5e-api-reference-proxy.md) y comentarios XML/TSDoc exhaustivos.
+  - Testing: 180 tests unitarios backend en `Sparnarok.UnitTests`, 32 tests de integración en `Sparnarok.IntegrationTests`, 36 tests de componentes frontend en Vitest (incluyendo suite para `PartyStashModal`) y 12 tests E2E en Playwright.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 ### Fase 4: Telemetría, Optimización y Exportación

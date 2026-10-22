@@ -20,6 +20,7 @@ public class PartiesController : ControllerBase
     private readonly IPartyRepository _partyRepository;
     private readonly ICreatureRepository _creatureRepository;
     private readonly IValidator<CreatePartyRequestDto> _partyValidator;
+    private readonly IValidator<CreateStashItemRequest> _stashItemValidator;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="PartiesController"/>.
@@ -27,11 +28,13 @@ public class PartiesController : ControllerBase
     public PartiesController(
         IPartyRepository partyRepository,
         ICreatureRepository creatureRepository,
-        IValidator<CreatePartyRequestDto> partyValidator)
+        IValidator<CreatePartyRequestDto> partyValidator,
+        IValidator<CreateStashItemRequest> stashItemValidator)
     {
         _partyRepository = partyRepository;
         _creatureRepository = creatureRepository;
         _partyValidator = partyValidator;
+        _stashItemValidator = stashItemValidator;
     }
 
     /// <summary>
@@ -288,6 +291,190 @@ public class PartiesController : ControllerBase
         }
 
         await _partyRepository.DeleteAsync(party, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Consulta el inventario y peso total del alijo compartido (Collaborative Party Stash) de la Party.
+    /// </summary>
+    /// <param name="id">Identificador único de la Party.</param>
+    /// <param name="ct">Token de cancelación cooperativa.</param>
+    /// <response code="200">Retorna los ítems del alijo y el peso acumulado.</response>
+    /// <response code="401">Si no está autenticado.</response>
+    /// <response code="403">Si la Party pertenece a otro usuario.</response>
+    /// <response code="404">Si la Party no existe.</response>
+    [HttpGet("{id:guid}/stash")]
+    [ProducesResponseType(typeof(PartyStashResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PartyStashResponseDto>> GetStash(Guid id, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para consultar el Stash de una Party que pertenece a otro usuario."
+            });
+        }
+
+        var stashItemsDto = party.StashItems.Select(StashItemResponseDto.FromEntity).ToList();
+        return Ok(new PartyStashResponseDto(party.Id, party.Name, party.TotalStashWeight, stashItemsDto));
+    }
+
+    /// <summary>
+    /// Añade un nuevo objeto al alijo compartido de la Party.
+    /// </summary>
+    /// <param name="id">Identificador único de la Party.</param>
+    /// <param name="request">Datos del objeto a agregar (oficial SRD o Homebrew).</param>
+    /// <param name="ct">Token de cancelación cooperativa.</param>
+    /// <response code="201">Retorna el objeto creado con su ID asignado.</response>
+    /// <response code="400">Si los datos de validación fallan.</response>
+    /// <response code="401">Si no está autenticado.</response>
+    /// <response code="403">Si la Party pertenece a otro usuario.</response>
+    /// <response code="404">Si la Party no existe.</response>
+    [HttpPost("{id:guid}/stash")]
+    [ProducesResponseType(typeof(StashItemResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<StashItemResponseDto>> AddStashItem(
+        Guid id,
+        [FromBody] CreateStashItemRequest request,
+        CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var validationResult = await _stashItemValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para modificar el Stash de una Party que pertenece a otro usuario."
+            });
+        }
+
+        var item = new StashItem(
+            Guid.NewGuid(),
+            party.Id,
+            request.Name,
+            request.Quantity,
+            request.Weight,
+            request.Description ?? string.Empty,
+            request.Rarity ?? "Common",
+            request.ItemType ?? "Adventuring Gear",
+            request.IsOfficialSrd,
+            request.ReferenceIndex,
+            request.AssignedCreatureId
+        );
+
+        await _partyRepository.AddStashItemAsync(item, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        var dto = StashItemResponseDto.FromEntity(item);
+        return CreatedAtAction(nameof(GetStash), new { id = party.Id }, dto);
+    }
+
+    /// <summary>
+    /// Elimina un objeto del alijo compartido de la Party.
+    /// </summary>
+    /// <param name="id">Identificador único de la Party.</param>
+    /// <param name="itemId">Identificador del objeto a remover.</param>
+    /// <param name="ct">Token de cancelación cooperativa.</param>
+    /// <response code="204">Si el objeto fue eliminado exitosamente.</response>
+    /// <response code="401">Si no está autenticado.</response>
+    /// <response code="403">Si la Party pertenece a otro usuario.</response>
+    /// <response code="404">Si la Party o el objeto no existen.</response>
+    [HttpDelete("{id:guid}/stash/{itemId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteStashItem(Guid id, Guid itemId, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para modificar el Stash de una Party que pertenece a otro usuario."
+            });
+        }
+
+        var item = party.StashItems.FirstOrDefault(i => i.Id == itemId);
+        if (item is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Objeto no encontrado",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró el objeto con ID '{itemId}' en el alijo de la Party."
+            });
+        }
+
+        await _partyRepository.RemoveStashItemAsync(item, ct);
         await _partyRepository.SaveChangesAsync(ct);
 
         return NoContent();

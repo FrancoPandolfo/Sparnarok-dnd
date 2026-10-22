@@ -33,6 +33,16 @@ public interface IPartyRepository
     Task DeleteAsync(Party party, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Agrega un nuevo objeto al alijo compartido de la Party.
+    /// </summary>
+    Task AddStashItemAsync(StashItem item, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remueve un objeto del alijo compartido de la Party.
+    /// </summary>
+    Task RemoveStashItemAsync(StashItem item, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Persiste los cambios pendientes en el almacenamiento.
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

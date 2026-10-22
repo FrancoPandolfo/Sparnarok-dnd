@@ -337,6 +337,72 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("Parties", (string)null);
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedCreatureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<bool>("IsOfficialSrd")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("Adventuring Gear");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("Rarity")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Common");
+
+                    b.Property<string>("ReferenceIndex")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal>("Weight")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)")
+                        .HasDefaultValue(0m);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
+
+                    b.ToTable("StashItems", (string)null);
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Weapon", b =>
                 {
                     b.Property<Guid>("Id")
@@ -659,6 +725,15 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashItem", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
+                        .WithMany("StashItems")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.ApplicationUser", b =>
                 {
                     b.Navigation("CustomHeroes");
@@ -667,6 +742,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
                 {
                     b.Navigation("Actions");
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Party", b =>
+                {
+                    b.Navigation("StashItems");
                 });
 #pragma warning restore 612, 618
         }
