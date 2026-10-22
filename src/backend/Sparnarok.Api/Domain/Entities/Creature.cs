@@ -83,6 +83,11 @@ public class Creature
     /// <summary>Arquetipo táctico o clase del personaje (ej. 'Fighter 2H', 'Ranger Ranged').</summary>
     public string? Archetype { get; private set; }
 
+    /// <summary>
+    /// Identificador del usuario propietario (null para monstruos del bestiario público, obligatorio para Héroes Custom).
+    /// </summary>
+    public Guid? OwnerUserId { get; private set; }
+
     /// <summary>Constructor protegido para EF Core.</summary>
     protected Creature() { }
 
@@ -103,6 +108,7 @@ public class Creature
     /// <param name="level">Nivel del personaje (1 a 20, opcional).</param>
     /// <param name="expectedDpr">Daño promedio por ronda esperado (opcional).</param>
     /// <param name="archetype">Arquetipo o clase (opcional).</param>
+    /// <param name="ownerUserId">Identificador del usuario creador (opcional).</param>
     public Creature(
         string name,
         CreatureSize size,
@@ -117,7 +123,8 @@ public class Creature
         bool isPlayerCharacter = false,
         int? level = null,
         double? expectedDpr = null,
-        string? archetype = null)
+        string? archetype = null,
+        Guid? ownerUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("El nombre de la criatura no puede estar vacío.", nameof(name));
@@ -148,6 +155,19 @@ public class Creature
         Level = level;
         ExpectedDpr = expectedDpr;
         Archetype = string.IsNullOrWhiteSpace(archetype) ? null : archetype.Trim();
+        OwnerUserId = ownerUserId;
+    }
+
+    /// <summary>
+    /// Asigna o transfiere la propiedad de la criatura / héroe al usuario especificado.
+    /// </summary>
+    /// <param name="ownerUserId">Identificador del usuario propietario.</param>
+    public void SetOwnerUser(Guid ownerUserId)
+    {
+        if (ownerUserId == Guid.Empty)
+            throw new ArgumentException("El ID de usuario propietario no puede ser Guid.Empty.", nameof(ownerUserId));
+
+        OwnerUserId = ownerUserId;
     }
 
     /// <summary>

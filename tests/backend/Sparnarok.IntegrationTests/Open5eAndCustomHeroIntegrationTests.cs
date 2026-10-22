@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -255,7 +256,20 @@ public class Open5eAndCustomHeroIntegrationTests : IClassFixture<CustomWebApplic
             AttackModifierAbility = AbilityScoreType.Strength
         };
 
-        // Act
+        // Act 1: Sin autenticación debe responder 401 Unauthorized
+        _client.DefaultRequestHeaders.Authorization = null;
+        var unauthResponse = await _client.PostAsJsonAsync("/api/v1/creatures/custom", request);
+        unauthResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Act 2: Con autenticación JWT válida mediante Google OAuth
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/auth/google",
+            new GoogleLoginRequestDto("mock-google-token:valeria@test.dnd:Valeria Paladin:valeria-google-sub-1"));
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var authData = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        authData.Should().NotBeNull();
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authData!.Token);
         var response = await _client.PostAsJsonAsync("/api/v1/creatures/custom", request);
 
         // Assert

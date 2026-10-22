@@ -54,6 +54,11 @@ public class CreatureConfiguration : IEntityTypeConfiguration<Creature>
             .HasMaxLength(100)
             .IsRequired(false);
 
+        builder.Property(c => c.OwnerUserId)
+            .IsRequired(false);
+
+        builder.HasIndex(c => c.OwnerUserId);
+
         // 1. Mapeo de Objeto de Valor: AbilityScores (OwnsOne)
         builder.OwnsOne(c => c.AbilityScores, ab =>
         {

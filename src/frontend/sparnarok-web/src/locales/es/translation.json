@@ -11,6 +11,11 @@
       "ingestCsv": "Importar Armas (CSV)",
       "newCreature": "+ Nueva Criatura"
     },
+    "auth": {
+      "loginWithGoogle": "Iniciar sesión con Google",
+      "logout": "Cerrar Sesión",
+      "userProfile": "Perfil de usuario"
+    },
     "features": {
       "combatMath": "Cálculo probabilístico y matrices de daño en tiempo real",
       "worldOrchestration": "Orquestación determinista y simulación de estados de campaña",
@@ -149,6 +154,9 @@
     "errorSimulating": "Ocurrió un error al ejecutar la simulación de Montecarlo.",
     "selectCreatureHint": "Configura los integrantes de ambos equipos para iniciar el análisis táctico.",
     "addCustomHero": "Añadir Héroe Custom",
+    "authRequiredTitle": "Autenticación Requerida",
+    "authRequiredDesc": "Inicia sesión con tu cuenta de Google para crear Héroes Custom y ejecutar simulaciones tácticas de combate.",
+    "authRequiredTooltip": "Debes iniciar sesión con Google para usar esta función",
     "customHeroModal": {
       "title": "Añadir Héroe Custom (Perfil Táctico)",
       "subtitle": "Ingresa las estadísticas finales del personaje para evaluar su desempeño en combate de inmediato.",

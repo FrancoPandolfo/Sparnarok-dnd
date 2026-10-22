@@ -7,12 +7,18 @@ obj/
 *.sln.docstates
 .vs/
 .idea/
+appsettings.private.json
+appsettings.*.private.json
+
 
 # Node / Frontend
 node_modules/
 dist/
 dist-ssr/
 *.local
+.env
+.env.*
+!.env.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

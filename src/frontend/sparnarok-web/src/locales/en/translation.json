@@ -11,6 +11,11 @@
       "ingestCsv": "Import Weapons (CSV)",
       "newCreature": "+ New Creature"
     },
+    "auth": {
+      "loginWithGoogle": "Sign in with Google",
+      "logout": "Sign Out",
+      "userProfile": "User profile"
+    },
     "features": {
       "combatMath": "Real-time probabilistic math and combat damage matrices",
       "worldOrchestration": "Deterministic campaign state orchestration and world state simulation",
@@ -149,6 +154,9 @@
     "errorSimulating": "An error occurred while executing the Monte Carlo simulation.",
     "selectCreatureHint": "Configure members of both teams to start tactical analysis.",
     "addCustomHero": "Add Custom Hero",
+    "authRequiredTitle": "Authentication Required",
+    "authRequiredDesc": "Sign in with your Google account to create Custom Heroes and execute tactical combat simulations.",
+    "authRequiredTooltip": "You must sign in with Google to use this feature",
     "customHeroModal": {
       "title": "Add Custom Hero (Tactical Profile)",
       "subtitle": "Enter the character's final stats to evaluate their combat performance immediately.",

@@ -11,6 +11,9 @@ using Sparnarok.Api.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Soporte para credenciales locales no versionadas (appsettings.private.json)
+builder.Configuration.AddJsonFile("appsettings.private.json", optional: true, reloadOnChange: true);
+
 // 1. Configuración de Internacionalización (i18n)
 builder.Services.AddLocalization();
 
@@ -46,6 +49,41 @@ builder.Services.AddSingleton<IDprBaselineService, Sparnarok.Api.Infrastructure.
 builder.Services.AddScoped<ICombatSimulatorService, Sparnarok.Api.Infrastructure.Services.CombatSimulatorService>();
 builder.Services.AddScoped<IMontecarloSimulationService, Sparnarok.Api.Infrastructure.Services.MontecarloSimulationService>();
 
+// 5.1 Identidad y Autenticación Federada (Google OAuth2 & JWT)
+builder.Services.AddSingleton<IJwtTokenService, Sparnarok.Api.Infrastructure.Services.JwtTokenService>();
+builder.Services.AddScoped<IGoogleAuthService, Sparnarok.Api.Infrastructure.Services.GoogleAuthService>();
+
+var jwtKey = builder.Configuration["Authentication:Jwt:Key"]
+    ?? Sparnarok.Api.Infrastructure.Services.JwtTokenService.DefaultDevKey;
+var jwtIssuer = builder.Configuration["Authentication:Jwt:Issuer"]
+    ?? Sparnarok.Api.Infrastructure.Services.JwtTokenService.DefaultIssuer;
+var jwtAudience = builder.Configuration["Authentication:Jwt:Audience"]
+    ?? Sparnarok.Api.Infrastructure.Services.JwtTokenService.DefaultAudience;
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(5)
+    };
+});
+
+builder.Services.AddAuthorization();
+
 // 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
 
@@ -73,6 +111,22 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xmlPath);
     }
+
+    // Configuración de Seguridad JWT Bearer para Swagger UI
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Ingresa el token JWT en el formato: Bearer {tu_token}"
+    };
+    options.AddSecurityDefinition("Bearer", securityScheme);
+    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+    {
+        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
+    });
 });
 
 var app = builder.Build();
@@ -99,6 +153,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

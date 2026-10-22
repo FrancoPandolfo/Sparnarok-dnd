@@ -241,7 +241,7 @@ Abstracción estadística del daño de Personajes de Jugadores (PCs) mediante ma
 
 ---
 
-## Fase 2.4: Party vs. Encounter Engine (N vs. M) [En Desarrollo / Completado]
+## Fase 2.4: Party vs. Encounter Engine (N vs. M) [Completado]
 
 Evolución del motor de combate para permitir enfrentamientos tácticos entre grupos de criaturas (Party de Héroes vs. Encuentro de Monstruos), con resolución de cola de iniciativa global, inteligencia artificial de targeting extensible y métricas agregadas de supervivencia de la party.
 
@@ -268,19 +268,47 @@ Evolución del motor de combate para permitir enfrentamientos tácticos entre gr
 
 ---
 
+## Fase 3: Cloud Persistence & Identity [Completado]
+
+Implementación de un sistema de cuentas de usuario soberano utilizando autenticación social federada (Google OAuth2) y segregación de persistencia multi-usuario para asociar entidades personalizadas (Héroes Custom) al usuario que las creó, manteniendo el bestiario canónico público.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 3.1 Infraestructura JWT & Seguridad en .NET 10 API     │
+   │ 3.2 Integración Google OAuth2 (Google.Apis.Auth)       │
+   │ 3.3 Entidad ApplicationUser & Segregación OwnerUserId  │
+   │ 3.4 Controladores [Authorize] & Filtro de Repositorio  │
+   │ 3.5 Frontend @react-oauth/google, AuthContext & UI     │
+   │ 3.6 Gating Amigable de Simulación & Creación de Héroes │
+   │ 3.7 ADR-0013, Tests Unitarios, Integración & Playwright│
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - **Backend Identity & JWT:** Configuración de autenticación `Bearer` en .NET 10 API con `Microsoft.AspNetCore.Authentication.JwtBearer` y `JwtSecurityTokenHandler`. Emisión de tokens firmados con HMAC-SHA256 conteniendo claims `NameIdentifier` (`UserId`), `Email`, `Name` y `avatar_url`.
+  - **Google OAuth2 Integration:** Endpoint `POST /api/auth/google` con validación criptográfica de Google ID Tokens mediante `GoogleJsonWebSignature` de `Google.Apis.Auth`, con soporte de tokens sintéticos para tests y offline. Aprovisionamiento JIT de usuarios en `ApplicationUser`.
+  - **Esquema Relacional & Segregación de Datos:**
+    - Entidad `ApplicationUser` (`Id`, `GoogleSubjectId`, `Email`, `DisplayName`, `AvatarUrl`, `CreatedAt`, `LastLoginAt`).
+    - Modificación de la entidad `Creature` añadiendo `OwnerUserId` (Guid? nulo para monstruos públicos del bestiario, obligatorio para Héroes Custom).
+    - `CreatureRepository` con filtrado determinista: `Where(c => c.OwnerUserId == null || (currentUserId.HasValue && c.OwnerUserId == currentUserId.Value))`.
+  - **Seguridad & Autorización:**
+    - Endpoint `POST /api/v1/creatures/custom` protegido obligatoriamente con `[Authorize]`.
+    - Atributos Swagger OpenAPI para Bearer Token Authentication.
+  - **Frontend React:**
+    - Integración de `@react-oauth/google` con `<GoogleOAuthProvider>` y `<GoogleLogin>`.
+    - `AuthContext` con persistencia segura en `localStorage`, sincronización automática con `apiClient` e inyección del header `Authorization: Bearer <token>`.
+    - Navbar con badge de usuario (foto de perfil, nombre, botón de logout) o botón de inicio de sesión con Google.
+    - Gating táctico: banner interactivo `#sim-auth-banner` y bloqueo de `#open-custom-hero-btn` y `#run-montecarlo-btn` para usuarios anónimos.
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/google-auth-and-user-persistence`.
+  - Documentación: [ADR-0013](file:///docs/adrs/0013-google-oauth2-jwt-spa-authentication.md), `.env.example`, comentarios XML y TSDoc exhaustivos.
+  - Testing: 168 tests unitarios backend en `Sparnarok.UnitTests`, 28 tests de integración en `Sparnarok.IntegrationTests`, 28 tests unitarios frontend en Vitest, 10 tests E2E en Playwright con network mocking del flujo Google OAuth2.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
-
-
-### Fase 2: Módulo 3 - Mathematical Simulation & DPR Matrices
-- Modelado probabilístico de tiradas d20 con ventaja / desventaja.
-- Matrices multidimensionales de distribución de daño por turno (*Damage per Round - DPR*).
-- Simulador estocástico Monte Carlo para evaluar enfrentamientos tácticos entre grupos de criaturas (N vs M).
-
-### Fase 3: World Orchestration & Campaign State Machine
-- Máquina de estados determinista para eventos temporales, descansos cortos y largos.
-- Rastreador de recursos de grupo (espacios de conjuro, dados de golpe, consumibles).
-- Motor de orquestación de eventos climatológicos y encuentros dinámicos.
 
 ### Fase 4: Telemetría, Optimización y Exportación
 - Exportación de métricas matemáticas en PDF / Markdown / JSON.
 - Panel de analítica de combate en tiempo real.
+

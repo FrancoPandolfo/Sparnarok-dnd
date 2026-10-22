@@ -13,6 +13,14 @@ import { Navbar } from './components/Navbar';
 import { BestiaryView } from './components/BestiaryView';
 import { CombatSimulatorView } from './components/CombatSimulatorView';
 import { WeaponIngestionModal } from './components/WeaponIngestionModal';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from './context/AuthContext';
+
+const GOOGLE_CLIENT_ID =
+  (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+  'mock-google-client-id.apps.googleusercontent.com';
+
+
 
 /**
  * Componente principal de la interfaz de usuario de Sparnarok: The Architect's Codex.
@@ -20,7 +28,7 @@ import { WeaponIngestionModal } from './components/WeaponIngestionModal';
  *
  * @returns {JSX.Element} Vista renderizada del Códice con soporte de internacionalización (i18n).
  */
-export function App() {
+export function AppContent() {
   const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState<'bestiary' | 'simulation'>('bestiary');
@@ -211,4 +219,15 @@ export function App() {
   );
 }
 
+export function App() {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </GoogleOAuthProvider>
+  );
+}
+
 export default App;
+

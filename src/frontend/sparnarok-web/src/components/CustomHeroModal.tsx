@@ -283,6 +283,7 @@ export const CustomHeroModal: React.FC<CustomHeroModalProps> = ({
           <div className="modal-actions">
             <button
               type="button"
+              id="cancel-custom-hero-btn"
               className="btn btn-secondary"
               onClick={handleClose}
               disabled={isSubmitting}

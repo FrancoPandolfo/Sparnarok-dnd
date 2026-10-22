@@ -20,3 +20,5 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 - [ADR-0010: Integración de Bestiario Open5e y Perfiles Estáticos de Combatientes Custom (PCs)](file:///docs/adrs/0010-open5e-integration-and-custom-combatant-profiles.md)
 - [ADR-0011: Abstracción de Personajes de Jugadores mediante Líneas Base de DPR Esperado (Expected DPR Baselines)](file:///docs/adrs/0011-dpr-baselines-and-archetype-abstraction.md)
 - [ADR-0012: Arquitectura de Cola Global de Iniciativa y Estrategias Extensibles de Targeting AI para Encuentros Grupales (N vs. M)](file:///docs/adrs/0012-party-vs-encounter-initiative-and-targeting-ai.md)
+- [ADR-0013: Autenticación Social con Google OAuth2 y Emisión de JWT Propios para Persistencia e Identidad en SPA](file:///docs/adrs/0013-google-oauth2-jwt-spa-authentication.md)
+
