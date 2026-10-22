@@ -22,4 +22,6 @@ Este directorio almacena los Registros de Decisiones de Arquitectura (ADRs) para
 - [ADR-0012: Arquitectura de Cola Global de Iniciativa y Estrategias Extensibles de Targeting AI para Encuentros Grupales (N vs. M)](file:///docs/adrs/0012-party-vs-encounter-initiative-and-targeting-ai.md)
 - [ADR-0013: Autenticación Social con Google OAuth2 y Emisión de JWT Propios para Persistencia e Identidad en SPA](file:///docs/adrs/0013-google-oauth2-jwt-spa-authentication.md)
 - [ADR-0014: Diseño de Relaciones Many-to-Many para Partys y Encuentros, Gestión de Tablas Intermedias en EF Core y Prevención de Ciclos de Serialización JSON](file:///docs/adrs/0014-many-to-many-party-encounter-persistence.md)
+- [ADR-0015: Alijo Colaborativo de la Party (Collaborative Party Stash) y Proxy de Referencia D&D 5e API con Caché en Memoria](file:///docs/adrs/0015-collaborative-party-stash-and-dnd5e-api-reference-proxy.md)
+- [ADR-0016: Reactividad en Tiempo Real con SignalR (WebSockets), Cola de Fabricación (Downtime Crafting) e Historial de Auditoría en el Alijo Colaborativo](file:///docs/adrs/0016-real-time-stash-signalr-crafting-and-audit-log.md)
 

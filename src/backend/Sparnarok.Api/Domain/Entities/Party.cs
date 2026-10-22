@@ -1,14 +1,17 @@
-using Sparnarok.Api.Domain.Entities;
-
 namespace Sparnarok.Api.Domain.Entities;
 
 /// <summary>
 /// Entidad de dominio que modela un grupo estructurado de aventureros o personajes de jugadores (Party).
 /// Mantiene una relación Many-to-Many con criaturas que son Personajes de Jugadores (IsPlayerCharacter == true).
+/// Incluye inventario colaborativo (Stash), tesoro común (Party Fund), cola de fabricación (Downtime Crafting)
+/// y registro de auditoría (Activity Log).
 /// </summary>
 public class Party
 {
     private readonly List<Creature> _members = [];
+    private readonly List<StashItem> _stashItems = [];
+    private readonly List<CraftingQueueItem> _craftingQueue = [];
+    private readonly List<StashActivityLog> _activityLogs = [];
 
     /// <summary>Identificador único de la Party.</summary>
     public Guid Id { get; private set; }
@@ -22,8 +25,41 @@ public class Party
     /// <summary>Fecha y hora UTC de creación de la Party.</summary>
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
+    #region Party Fund (Monedas y Tesoro Común)
+    /// <summary>Piezas de cobre (PC / cp).</summary>
+    public decimal CopperPieces { get; private set; } = 0;
+
+    /// <summary>Piezas de plata (PP / sp).</summary>
+    public decimal SilverPieces { get; private set; } = 0;
+
+    /// <summary>Piezas de electro (PE / ep).</summary>
+    public decimal ElectrumPieces { get; private set; } = 0;
+
+    /// <summary>Piezas de oro (PO / gp).</summary>
+    public decimal GoldPieces { get; private set; } = 0;
+
+    /// <summary>Piezas de platino (PL / pp).</summary>
+    public decimal PlatinumPieces { get; private set; } = 0;
+
+    /// <summary>Total consolidado en su equivalente a Piezas de Oro (PO / gp).</summary>
+    public decimal TotalGoldEquivalent =>
+        (PlatinumPieces * 10m) + GoldPieces + (ElectrumPieces * 0.5m) + (SilverPieces * 0.1m) + (CopperPieces * 0.01m);
+    #endregion
+
     /// <summary>Colección de héroes y personajes que componen la Party.</summary>
     public IReadOnlyCollection<Creature> Members => _members.AsReadOnly();
+
+    /// <summary>Colección de objetos y tesoros en el alijo compartido (Collaborative Party Stash).</summary>
+    public IReadOnlyCollection<StashItem> StashItems => _stashItems.AsReadOnly();
+
+    /// <summary>Cola de objetos actualmente en fabricación durante el tiempo de descanso (Downtime Crafting).</summary>
+    public IReadOnlyCollection<CraftingQueueItem> CraftingQueue => _craftingQueue.AsReadOnly();
+
+    /// <summary>Historial de transacciones y auditoría del alijo y fondos.</summary>
+    public IReadOnlyCollection<StashActivityLog> ActivityLogs => _activityLogs.AsReadOnly();
+
+    /// <summary>Peso total acumulado en libras (lbs) de todos los objetos en el alijo de la Party.</summary>
+    public decimal TotalStashWeight => _stashItems.Sum(i => i.Weight * i.Quantity);
 
     /// <summary>Constructor protegido para Entity Framework Core.</summary>
     protected Party() { }
@@ -50,6 +86,54 @@ public class Party
         }
 
         Name = name.Trim();
+    }
+
+    /// <summary>
+    /// Actualiza los fondos del Party Fund asegurando que ninguna denominación sea negativa.
+    /// </summary>
+    public void UpdateFunds(decimal cp, decimal sp, decimal ep, decimal gp, decimal pp)
+    {
+        if (cp < 0 || sp < 0 || ep < 0 || gp < 0 || pp < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cp), "Ninguna cantidad de monedas en el Party Fund puede ser negativa.");
+        }
+
+        CopperPieces = cp;
+        SilverPieces = sp;
+        ElectrumPieces = ep;
+        GoldPieces = gp;
+        PlatinumPieces = pp;
+    }
+
+    /// <summary>
+    /// Descuenta una cantidad en piezas de oro (gp) del fondo de la party.
+    /// </summary>
+    public void DeductGold(decimal amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), "La cantidad de oro a descontar no puede ser negativa.");
+        }
+
+        if (GoldPieces < amount)
+        {
+            throw new InvalidOperationException($"Fondos insuficientes: se requieren {amount:F1} PO, pero el alijo dispone de {GoldPieces:F1} PO.");
+        }
+
+        GoldPieces -= amount;
+    }
+
+    /// <summary>
+    /// Incrementa las piezas de oro (gp) del fondo de la party.
+    /// </summary>
+    public void AddGold(decimal amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), "La cantidad de oro a añadir no puede ser negativa.");
+        }
+
+        GoldPieces += amount;
     }
 
     /// <summary>
@@ -84,5 +168,48 @@ public class Party
     public void ClearMembers()
     {
         _members.Clear();
+    }
+
+    /// <summary>
+    /// Añade un objeto al alijo compartido de la Party.
+    /// </summary>
+    public void AddStashItem(StashItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        _stashItems.Add(item);
+    }
+
+    /// <summary>
+    /// Remueve un objeto del alijo compartido de la Party por su identificador.
+    /// </summary>
+    public void RemoveStashItem(Guid itemId)
+    {
+        _stashItems.RemoveAll(i => i.Id == itemId);
+    }
+
+    /// <summary>
+    /// Añade un nuevo trabajo a la cola de fabricación de la party.
+    /// </summary>
+    public void AddCraftingItem(CraftingQueueItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        _craftingQueue.Add(item);
+    }
+
+    /// <summary>
+    /// Remueve un trabajo de la cola de fabricación.
+    /// </summary>
+    public void RemoveCraftingItem(Guid itemId)
+    {
+        _craftingQueue.RemoveAll(i => i.Id == itemId);
+    }
+
+    /// <summary>
+    /// Registra un evento de auditoría en el historial de la party.
+    /// </summary>
+    public void AddActivityLog(StashActivityLog log)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+        _activityLogs.Add(log);
     }
 }

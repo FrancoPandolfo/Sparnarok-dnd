@@ -20,6 +20,19 @@ import type {
   CreateEncounterRequestDto,
   EncounterResponseDto,
 } from '../types/partyEncounter';
+import type {
+  ReferenceItemSummaryDto,
+  ReferenceEquipmentDetailDto,
+  StashItemDto,
+  CreateStashItemRequestDto,
+  PartyFundDto,
+  UpdatePartyFundsRequestDto,
+  CraftingQueueItemDto,
+  QueueCraftingItemRequestDto,
+  StashActivityLogDto,
+  DowntimeAdvanceResultDto,
+  PartyStashDto,
+} from '../types/stash';
 
 const API_BASE_URL = '/api/v1';
 
@@ -483,6 +496,10 @@ export function calculateExpectedDpr(archetype: string, level: number): number {
 let inMemoryCreatures: CreatureResponseDto[] = [...INITIAL_CREATURES];
 let inMemoryParties: PartyResponseDto[] = [];
 let inMemoryEncounters: EncounterResponseDto[] = [];
+let inMemoryStashItems: StashItemDto[] = [];
+let inMemoryPartyFunds: Record<string, PartyFundDto> = {};
+let inMemoryCraftingQueue: CraftingQueueItemDto[] = [];
+let inMemoryActivityLogs: StashActivityLogDto[] = [];
 
 
 /**
@@ -1330,4 +1347,502 @@ export const apiClient = {
     }
     inMemoryEncounters = inMemoryEncounters.filter((e) => e.id !== id);
   },
+
+  /**
+   * Busca equipamiento u objetos mágicos en el SRD mediante el proxy backend con debounce.
+   */
+  async searchReferenceEquipment(name: string, signal?: AbortSignal): Promise<ReferenceItemSummaryDto[]> {
+    try {
+      const queryParam = name ? `?name=${encodeURIComponent(name)}` : '';
+      const response = await fetch(`${API_BASE_URL}/reference/equipment${queryParam}`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const lower = name.toLowerCase().trim();
+    const fallbackCatalog: ReferenceItemSummaryDto[] = [
+      { index: 'dagger', name: 'Dagger', url: '/api/v1/reference/equipment/dagger' },
+      { index: 'bag-of-holding', name: 'Bag of Holding', url: '/api/v1/reference/equipment/bag-of-holding' },
+      { index: 'potion-of-healing', name: 'Potion of Healing', url: '/api/v1/reference/equipment/potion-of-healing' },
+      { index: 'ring-of-protection', name: 'Ring of Protection', url: '/api/v1/reference/equipment/ring-of-protection' },
+      { index: 'cloak-of-elvenkind', name: 'Cloak of Elvenkind', url: '/api/v1/reference/equipment/cloak-of-elvenkind' },
+      { index: 'boots-of-speed', name: 'Boots of Speed', url: '/api/v1/reference/equipment/boots-of-speed' },
+      { index: 'sun-blade', name: 'Sun Blade', url: '/api/v1/reference/equipment/sun-blade' },
+      { index: 'longsword', name: 'Longsword', url: '/api/v1/reference/equipment/longsword' },
+      { index: 'abacus', name: 'Abacus', url: '/api/v1/reference/equipment/abacus' },
+      { index: 'rope-hempen-50-feet', name: 'Rope, Hempen (50 feet)', url: '/api/v1/reference/equipment/rope-hempen-50-feet' },
+    ];
+
+    if (!lower) return fallbackCatalog;
+    return fallbackCatalog.filter((item) =>
+      item.name.toLowerCase().includes(lower) || item.index.toLowerCase().includes(lower)
+    );
+  },
+
+  /**
+   * Obtiene los detalles completos de un objeto de referencia oficial SRD.
+   */
+  async getReferenceEquipmentDetail(index: string, signal?: AbortSignal): Promise<ReferenceEquipmentDetailDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reference/equipment/${encodeURIComponent(index)}`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const fallbackDetails: Record<string, ReferenceEquipmentDetailDto> = {
+      'dagger': {
+        index: 'dagger',
+        name: 'Dagger',
+        weight: 1,
+        description: 'Daga de combate 1d4 perforante con propiedades Sutil, Ligera y Arrojadiza.',
+        rarity: 'Common',
+        itemType: 'Weapons',
+        isOfficialSrd: true,
+        cost: '2 gp',
+      },
+      'bag-of-holding': {
+        index: 'bag-of-holding',
+        name: 'Bag of Holding',
+        weight: 15,
+        description: 'Bolsa con espacio extradimensional que soporta hasta 500 libras.',
+        rarity: 'Uncommon',
+        itemType: 'Wondrous Items',
+        isOfficialSrd: true,
+      },
+      'potion-of-healing': {
+        index: 'potion-of-healing',
+        name: 'Potion of Healing',
+        weight: 0.5,
+        description: 'Líquido mágico rojo brillante que restaura 2d4 + 2 puntos de golpe al beberse.',
+        rarity: 'Common',
+        itemType: 'Potion',
+        isOfficialSrd: true,
+        cost: '50 gp',
+      },
+      'ring-of-protection': {
+        index: 'ring-of-protection',
+        name: 'Ring of Protection',
+        weight: 0,
+        description: 'Otorga un bonificador +1 a la CA y a todas las tiradas de salvación.',
+        rarity: 'Rare',
+        itemType: 'Ring',
+        isOfficialSrd: true,
+      },
+    };
+
+    return (
+      fallbackDetails[index] || {
+        index,
+        name: index.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+        weight: 1,
+        description: `Objeto oficial SRD (${index}).`,
+        rarity: 'Common',
+        itemType: 'Adventuring Gear',
+        isOfficialSrd: true,
+      }
+    );
+  },
+
+  /**
+   * Consulta el inventario, fondos y cola de fabricación del alijo compartido de una Party.
+   */
+  async getPartyStash(partyId: string, signal?: AbortSignal): Promise<PartyStashDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    // Filtrar objetos en memoria para esta party
+    const party = inMemoryParties.find((p) => p.id === partyId);
+    const items = inMemoryStashItems.filter((i) => i.partyId === partyId);
+    const totalWeight = items.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0);
+    const funds = inMemoryPartyFunds[partyId] || {
+      partyId,
+      copperPieces: 0,
+      silverPieces: 0,
+      electrumPieces: 0,
+      goldPieces: 100,
+      platinumPieces: 0,
+      totalGoldEquivalent: 100,
+    };
+    const craftingQueue = inMemoryCraftingQueue.filter((c) => c.partyId === partyId);
+
+    return {
+      partyId,
+      partyName: party ? party.name : 'Party Desconocida',
+      totalWeight,
+      items,
+      funds,
+      craftingQueue,
+    };
+  },
+
+  /**
+   * Agrega un nuevo objeto al alijo compartido de la Party.
+   */
+  async addStashItem(partyId: string, request: CreateStashItemRequestDto): Promise<StashItemDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryStashItems = [data, ...inMemoryStashItems.filter((i) => i.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const newItem: StashItemDto = {
+      id: `stash-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      partyId,
+      name: request.name,
+      quantity: request.quantity,
+      weight: request.weight,
+      description: request.description || '',
+      rarity: request.rarity || 'Common',
+      itemType: request.itemType || 'Adventuring Gear',
+      isOfficialSrd: !!request.isOfficialSrd,
+      referenceIndex: request.referenceIndex || null,
+      assignedCreatureId: request.assignedCreatureId || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    inMemoryStashItems = [newItem, ...inMemoryStashItems];
+    inMemoryActivityLogs = [
+      {
+        id: `log-${Date.now()}`,
+        partyId,
+        userDisplayName: 'Héroe',
+        actionType: 'ItemAdded',
+        description: `Añadido ${newItem.quantity}x ${newItem.name} al alijo.`,
+        timestampUtc: new Date().toISOString(),
+      },
+      ...inMemoryActivityLogs,
+    ];
+    return newItem;
+  },
+
+  /**
+   * Remueve un objeto del alijo compartido de la Party.
+   */
+  async deleteStashItem(partyId: string, itemId: string): Promise<void> {
+    const item = inMemoryStashItems.find((i) => i.id === itemId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash/${itemId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemoryStashItems = inMemoryStashItems.filter((i) => i.id !== itemId);
+        return;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    inMemoryStashItems = inMemoryStashItems.filter((i) => i.id !== itemId);
+    if (item) {
+      inMemoryActivityLogs = [
+        {
+          id: `log-${Date.now()}`,
+          partyId,
+          userDisplayName: 'Héroe',
+          actionType: 'ItemDeleted',
+          description: `Eliminado ${item.name} del alijo.`,
+          timestampUtc: new Date().toISOString(),
+        },
+        ...inMemoryActivityLogs,
+      ];
+    }
+  },
+
+  /**
+   * Consulta los fondos monetarios (Party Fund) de una Party.
+   */
+  async getPartyFunds(partyId: string, signal?: AbortSignal): Promise<PartyFundDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/funds`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    return (
+      inMemoryPartyFunds[partyId] || {
+        partyId,
+        copperPieces: 0,
+        silverPieces: 0,
+        electrumPieces: 0,
+        goldPieces: 100,
+        platinumPieces: 0,
+        totalGoldEquivalent: 100,
+      }
+    );
+  },
+
+  /**
+   * Actualiza las monedas del tesoro compartido (Party Fund).
+   */
+  async updatePartyFunds(partyId: string, request: UpdatePartyFundsRequestDto): Promise<PartyFundDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/funds`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryPartyFunds[partyId] = data;
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const totalGoldEquivalent =
+      request.copperPieces / 100 +
+      request.silverPieces / 10 +
+      request.electrumPieces / 2 +
+      request.goldPieces +
+      request.platinumPieces * 10;
+
+    const funds: PartyFundDto = {
+      partyId,
+      copperPieces: request.copperPieces,
+      silverPieces: request.silverPieces,
+      electrumPieces: request.electrumPieces,
+      goldPieces: request.goldPieces,
+      platinumPieces: request.platinumPieces,
+      totalGoldEquivalent,
+    };
+
+    inMemoryPartyFunds[partyId] = funds;
+    inMemoryActivityLogs = [
+      {
+        id: `log-${Date.now()}`,
+        partyId,
+        userDisplayName: 'Héroe',
+        actionType: 'FundsUpdated',
+        description: `Fondos actualizados a ${funds.goldPieces} PO, ${funds.silverPieces} PP. Total: ${totalGoldEquivalent.toFixed(1)} PO.`,
+        timestampUtc: new Date().toISOString(),
+      },
+      ...inMemoryActivityLogs,
+    ];
+
+    return funds;
+  },
+
+  /**
+   * Consulta los proyectos en cola de fabricación de una Party.
+   */
+  async getCraftingQueue(partyId: string, signal?: AbortSignal): Promise<CraftingQueueItemDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/crafting`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    return inMemoryCraftingQueue.filter((c) => c.partyId === partyId);
+  },
+
+  /**
+   * Encola un nuevo objeto para fabricar durante el downtime.
+   */
+  async queueCraftingItem(partyId: string, request: QueueCraftingItemRequestDto): Promise<CraftingQueueItemDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/crafting`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryCraftingQueue = [data, ...inMemoryCraftingQueue.filter((c) => c.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    // Descontar oro en memoria si existe fondo
+    const funds = inMemoryPartyFunds[partyId] || {
+      partyId,
+      copperPieces: 0,
+      silverPieces: 0,
+      electrumPieces: 0,
+      goldPieces: 100,
+      platinumPieces: 0,
+      totalGoldEquivalent: 100,
+    };
+    if (funds.goldPieces >= request.goldCost) {
+      funds.goldPieces -= request.goldCost;
+      funds.totalGoldEquivalent -= request.goldCost;
+      inMemoryPartyFunds[partyId] = { ...funds };
+    }
+
+    const newItem: CraftingQueueItemDto = {
+      id: `craft-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      partyId,
+      itemName: request.itemName,
+      itemType: request.itemType || 'Adventuring Gear',
+      rarity: request.rarity || 'Common',
+      goldCost: request.goldCost,
+      daysRequired: request.daysRequired,
+      daysRemaining: request.daysRequired,
+      weight: request.weight,
+      description: request.description || '',
+      isOfficialSrd: !!request.isOfficialSrd,
+      referenceIndex: request.referenceIndex || null,
+      crafterName: request.crafterName || null,
+      status: 'InProgress',
+      createdAtUtc: new Date().toISOString(),
+    };
+
+    inMemoryCraftingQueue = [newItem, ...inMemoryCraftingQueue];
+    inMemoryActivityLogs = [
+      {
+        id: `log-${Date.now()}`,
+        partyId,
+        userDisplayName: 'Héroe',
+        actionType: 'CraftingStarted',
+        description: `Iniciada fabricación de '${newItem.itemName}' (${newItem.daysRequired} días, -${newItem.goldCost} PO).`,
+        timestampUtc: new Date().toISOString(),
+      },
+      ...inMemoryActivityLogs,
+    ];
+
+    return newItem;
+  },
+
+  /**
+   * Acción del DM: Avanza 1 día de downtime para todos los proyectos activos de la Party.
+   */
+  async advanceDowntimeDay(partyId: string): Promise<DowntimeAdvanceResultDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/crafting/advance-day`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const activeItems = inMemoryCraftingQueue.filter(
+      (c) => c.partyId === partyId && c.status === 'InProgress'
+    );
+    const completedNames: string[] = [];
+
+    activeItems.forEach((item) => {
+      item.daysRemaining = Math.max(0, item.daysRemaining - 1);
+      if (item.daysRemaining === 0) {
+        item.status = 'Completed';
+        completedNames.push(item.itemName);
+        // Transferir al stash
+        inMemoryStashItems = [
+          {
+            id: `stash-crafted-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            partyId,
+            name: item.itemName,
+            quantity: 1,
+            weight: item.weight,
+            description: item.description,
+            rarity: item.rarity,
+            itemType: item.itemType,
+            isOfficialSrd: item.isOfficialSrd,
+            referenceIndex: item.referenceIndex,
+            assignedCreatureId: null,
+            createdAt: new Date().toISOString(),
+          },
+          ...inMemoryStashItems,
+        ];
+      }
+    });
+
+    const updatedQueue = inMemoryCraftingQueue.filter((c) => c.partyId === partyId);
+    const updatedStash = inMemoryStashItems.filter((i) => i.partyId === partyId);
+
+    inMemoryActivityLogs = [
+      {
+        id: `log-${Date.now()}`,
+        partyId,
+        userDisplayName: 'Dungeon Master',
+        actionType: 'DowntimeAdvanced',
+        description: `Avanzado 1 día de Downtime. ${completedNames.length} objeto(s) completado(s).`,
+        timestampUtc: new Date().toISOString(),
+      },
+      ...inMemoryActivityLogs,
+    ];
+
+    return {
+      daysAdvanced: 1,
+      completedItemsCount: completedNames.length,
+      activeItemsCount: updatedQueue.filter((c) => c.status === 'InProgress').length,
+      completedItemNames: completedNames,
+      updatedQueue,
+      updatedStash,
+    };
+  },
+
+  /**
+   * Consulta el historial de actividad y transacciones de la Party.
+   */
+  async getStashActivityLogs(partyId: string, limit = 50, signal?: AbortSignal): Promise<StashActivityLogDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash/logs?limit=${limit}`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    return inMemoryActivityLogs.filter((l) => l.partyId === partyId).slice(0, limit);
+  },
 };
+

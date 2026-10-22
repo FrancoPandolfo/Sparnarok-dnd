@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Sparnarok.Api.Application.Interfaces;
 using Sparnarok.Api.Application.Validators;
+using Sparnarok.Api.Infrastructure.External.Dnd5eApi;
 using Sparnarok.Api.Infrastructure.Persistence;
 using Sparnarok.Api.Infrastructure.Repositories;
 
@@ -16,6 +17,9 @@ builder.Configuration.AddJsonFile("appsettings.private.json", optional: true, re
 
 // 1. Configuración de Internacionalización (i18n)
 builder.Services.AddLocalization();
+
+// 1.1 Soporte de Memoria Caché para Endpoints de Referencia
+builder.Services.AddMemoryCache();
 
 // 2. Persistencia relacional en PostgreSQL con EF Core
 builder.Services.AddDbContext<SparnarokDbContext>(options =>
@@ -43,6 +47,15 @@ builder.Services.AddHttpClient<IOpen5eBestiaryClient, Sparnarok.Api.Infrastructu
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddScoped<IOpen5eSyncService, Sparnarok.Api.Infrastructure.Services.Open5eSyncService>();
+
+// 4.2 Cliente D&D 5e API (SRD 2024 Reference) & Equipment Proxy
+builder.Services.AddHttpClient<IDnd5eApiClient, Dnd5eApiClient>(client =>
+{
+    var baseUrl = builder.Configuration["Dnd5eApi:BaseUrl"] ?? "https://www.dnd5eapi.co/api/2024/";
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
 // 5. Motor de Simulación de Combate y RNG (Fase 2)
 builder.Services.AddSingleton<Sparnarok.Api.Domain.Services.Rng.IRandomProvider, Sparnarok.Api.Domain.Services.Rng.DefaultRandomProvider>();
@@ -82,9 +95,26 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(5)
     };
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
+
+// 5.2 Tiempo Real (SignalR) para Alijo Colaborativo y Sesiones en Vivo
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IStashNotificationService, Sparnarok.Api.Infrastructure.Hubs.StashNotificationService>();
 
 // 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
@@ -159,6 +189,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<Sparnarok.Api.Infrastructure.Hubs.StashHub>("/hubs/stash");
 
 app.Run();
 

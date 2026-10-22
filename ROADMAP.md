@@ -347,6 +347,66 @@ Cierre del Módulo 1 (Combat Engine) con soporte completo para persistencia rela
 
 ---
 
+## Fase 3.6: Collaborative Party Stash & D&D 5e API Reference Proxy [Completado]
+
+Gestión colaborativa del inventario de la Party (Party Stash) con cálculo reactivo de capacidad de carga / peso acumulado, integración con el compendio oficial de D&D 5e (SRD 2024) mediante un cliente proxy tipado con caché en memoria (`IMemoryCache`), componente frontend de autocompletado (Typeahead con debounce), edición libre de homebrew y persistencia relacional protegida.
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │ 3.6.1 Entidad StashItem & Invariantes en Party         │
+   │ 3.6.2 Relación 1-a-N en EF Core & Migración PostgreSQL │
+   │ 3.6.3 Cliente Proxy Tipado IDnd5eApiClient             │
+   │ 3.6.4 In-Memory Caching multinivel (IMemoryCache)      │
+   │ 3.6.5 Endpoints GET /api/v1/reference/equipment       │
+   │ 3.6.6 Endpoints CRUD /api/v1/parties/{id}/stash        │
+   │ 3.6.7 Componente React PartyStashModal con Typeahead   │
+   │ 3.6.8 ADR-0015, Tests Unitarios, Integración y E2E     │
+   └────────────────────────────────────────────────────────┘
+```
+
+- **Alcance:**
+  - **Dominio y Persistencia (Backend):**
+    - Entidad `StashItem` con invariantes (`Quantity >= 1`, `Weight >= 0`, nombre no vacío, rareza, categoría y metadatos SRD).
+    - Entidad `Party`: propiedad computada `TotalStashWeight` y métodos de dominio `AddStashItem` y `RemoveStashItem`.
+    - Relación 1-a-Muchos con eliminación en cascada en EF Core y migración PostgreSQL `20261022175716_AddPartyStashAndItems.cs`.
+  - **Integración D&D 5e API & Gateway Proxy:**
+    - Cliente tipado `IDnd5eApiClient` / `Dnd5eApiClient` apuntando a `https://www.dnd5eapi.co/api/2024/`.
+    - Unificación y búsqueda en catálogos duales (`/equipment` y `/magic-items`).
+    - Deserialización segura y mapeo defensivo para objetos con peso nulo o descripciones en array.
+    - Estrategia de caché en memoria con `IMemoryCache` (1 hora para catálogos, 30 min para búsquedas, 2 horas para detalles).
+    - Controladores REST `ReferenceEquipmentController` y `PartiesController` (subrecurso stash con autorización 403 Forbidden).
+  - **Interfaz de Usuario (React):**
+    - Modal `PartyStashModal` con contador visual de peso acumulado (`#stash-total-weight`).
+    - Formulario con Typeahead/Combobox debounceado (250ms) (`#stash-item-name-input`, `#stash-item-suggestions`).
+    - Autocompletado instantáneo de peso, rareza, tipo y descripción con badge visual de verificación SRD (`#stash-item-srd-badge`).
+    - Edición flexible para tesoros homebrew o ajustes personalizados del DM.
+    - Tabla responsiva de objetos con acciones de eliminación y cálculo instantáneo.
+    - Soporte bilingüe en i18n (`es`/`en`).
+- **Entregables de Calidad & Directivas:**
+  - Rama: `feat/collaborative-party-stash`.
+  - Documentación: [ADR-0015](file:///docs/adrs/0015-collaborative-party-stash-and-dnd5e-api-reference-proxy.md) y [ADR-0016](file:///docs/adrs/0016-real-time-stash-signalr-crafting-and-audit-log.md).
+  - Testing: 193 tests unitarios backend en `Sparnarok.UnitTests`, 33 tests de integración en `Sparnarok.IntegrationTests` con Testcontainers PostgreSQL, 37 tests de componentes frontend en Vitest (7 suites completas).
+
+### 3.6.9 QoL: Reactividad en Tiempo Real (SignalR), Downtime Crafting y Audit Log [Completado]
+
+Optimización de la experiencia en vivo durante sesiones de juego mediante sincronización reactiva, automatización de tiempos de descanso y trazabilidad auditada de recursos:
+1. **Sincronización en Tiempo Real (SignalR):**
+   - Configuración de `StashHub` en `/hubs/stash` de ASP.NET Core (.NET 10).
+   - Suscripción por grupos aislados `$"party_{partyId}"` y autenticación WebSockets vía query token `access_token`.
+   - Servicio tipado `IStashNotificationService` que emite eventos reactivos (`ItemAdded`, `ItemDeleted`, `FundsUpdated`, `CraftingQueueUpdated`, `ActivityLogged`, `DowntimeAdvanced`, `StashUpdated`).
+   - Cliente React `@microsoft/signalr` en `stashHubService.ts` con reconexión automática y actualización de estado sin recarga del navegador.
+2. **Historial de Transacciones (Audit Log):**
+   - Entidad `StashActivityLog` con índices en `PartyId` y `TimestampUtc`.
+   - Registro automático inmutable de mutaciones de monedas, objetos agregados/eliminados y avances de downtime.
+   - Pestaña secundaria "Historial / Auditoría" en `PartyStashModal` con timeline cronológico e insignias de acción.
+3. **Módulo de Fabricación (Downtime Crafting) & Party Fund:**
+   - Modelado de las 5 monedas canónicas (PC, PP, PE, PO, PL) con cálculo dinámico de `TotalGoldEquivalent`.
+   - Pestaña secundaria "Cola de Fabricación" con tabla de seguimiento y barra de progreso.
+   - Encolado de objetos con deducción automática de oro del Party Fund y asignación de "Días Restantes".
+   - Acción exclusiva del DM: "👑 Avanzar 1 día de Downtime", reduciendo contadores de proyectos activos y transfiriendo automáticamente al alijo principal al llegar a 0 días restantes.
+
+---
+
 ## Fases Futuras (Visión de Proyecto)
 
 ### Fase 4: Telemetría, Optimización y Exportación

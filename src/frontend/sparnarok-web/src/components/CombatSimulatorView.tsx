@@ -9,6 +9,7 @@ import type {
 } from '../types/dnd';
 import type { PartyResponseDto, EncounterResponseDto } from '../types/partyEncounter';
 import { CustomHeroModal } from './CustomHeroModal';
+import { PartyStashModal } from './PartyStashModal';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -80,6 +81,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   const [isSavingEncounter, setIsSavingEncounter] = useState(false);
 
   const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
+  const [isPartyStashModalOpen, setIsPartyStashModalOpen] = useState<boolean>(false);
 
   const [targetingStrategy, setTargetingStrategy] = useState<TargetingStrategy>('LowestHp');
   const [iterations, setIterations] = useState<number>(10000);
@@ -514,6 +516,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                 title={t('simulation.saveTeamAAsParty')}
               >
                 💾 {t('simulation.saveTeamAAsParty')}
+              </button>
+              <button
+                type="button"
+                id="open-party-stash-btn"
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsPartyStashModalOpen(true)}
+                disabled={isSimulating}
+                title={t('stash.openStashBtn', 'Abrir Alijo de la Party (Stash)')}
+              >
+                🎒 {t('stash.openStashBtn', 'Party Stash')}
               </button>
               <button
                 type="button"
@@ -1157,6 +1169,17 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Inventario Compartido de la Party (Collaborative Party Stash) */}
+      <PartyStashModal
+        isOpen={isPartyStashModalOpen}
+        partyId={selectedPartyId || (parties.length > 0 ? parties[0].id : 'default-party')}
+        partyName={
+          parties.find((p) => p.id === selectedPartyId)?.name ||
+          (parties.length > 0 ? parties[0].name : t('simulation.partyTitle', 'La Party'))
+        }
+        onClose={() => setIsPartyStashModalOpen(false)}
+      />
     </div>
   );
 };
