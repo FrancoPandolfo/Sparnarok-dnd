@@ -21,6 +21,9 @@ public class PartiesController : ControllerBase
     private readonly ICreatureRepository _creatureRepository;
     private readonly IValidator<CreatePartyRequestDto> _partyValidator;
     private readonly IValidator<CreateStashItemRequest> _stashItemValidator;
+    private readonly IValidator<UpdatePartyFundsRequest> _fundsValidator;
+    private readonly IValidator<QueueCraftingItemRequest> _craftingValidator;
+    private readonly IStashNotificationService _notificationService;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="PartiesController"/>.
@@ -29,12 +32,18 @@ public class PartiesController : ControllerBase
         IPartyRepository partyRepository,
         ICreatureRepository creatureRepository,
         IValidator<CreatePartyRequestDto> partyValidator,
-        IValidator<CreateStashItemRequest> stashItemValidator)
+        IValidator<CreateStashItemRequest> stashItemValidator,
+        IValidator<UpdatePartyFundsRequest> fundsValidator,
+        IValidator<QueueCraftingItemRequest> craftingValidator,
+        IStashNotificationService notificationService)
     {
         _partyRepository = partyRepository;
         _creatureRepository = creatureRepository;
         _partyValidator = partyValidator;
         _stashItemValidator = stashItemValidator;
+        _fundsValidator = fundsValidator;
+        _craftingValidator = craftingValidator;
+        _notificationService = notificationService;
     }
 
     /// <summary>
@@ -297,11 +306,11 @@ public class PartiesController : ControllerBase
     }
 
     /// <summary>
-    /// Consulta el inventario y peso total del alijo compartido (Collaborative Party Stash) de la Party.
+    /// Consulta el inventario, fondos monetarios y peso total del alijo compartido (Collaborative Party Stash) de la Party.
     /// </summary>
     /// <param name="id">Identificador único de la Party.</param>
     /// <param name="ct">Token de cancelación cooperativa.</param>
-    /// <response code="200">Retorna los ítems del alijo y el peso acumulado.</response>
+    /// <response code="200">Retorna los ítems del alijo, fondos y peso acumulado.</response>
     /// <response code="401">Si no está autenticado.</response>
     /// <response code="403">Si la Party pertenece a otro usuario.</response>
     /// <response code="404">Si la Party no existe.</response>
@@ -340,11 +349,16 @@ public class PartiesController : ControllerBase
         }
 
         var stashItemsDto = party.StashItems.Select(StashItemResponseDto.FromEntity).ToList();
-        return Ok(new PartyStashResponseDto(party.Id, party.Name, party.TotalStashWeight, stashItemsDto));
+        var fundsDto = PartyFundDto.FromEntity(party);
+        var craftingQueue = (await _partyRepository.GetCraftingQueueAsync(id, ct))
+            .Select(CraftingQueueItemDto.FromEntity)
+            .ToList();
+
+        return Ok(new PartyStashResponseDto(party.Id, party.Name, party.TotalStashWeight, stashItemsDto, fundsDto, craftingQueue));
     }
 
     /// <summary>
-    /// Añade un nuevo objeto al alijo compartido de la Party.
+    /// Añade un nuevo objeto al alijo compartido de la Party y emite un evento en tiempo real.
     /// </summary>
     /// <param name="id">Identificador único de la Party.</param>
     /// <param name="request">Datos del objeto a agregar (oficial SRD o Homebrew).</param>
@@ -413,14 +427,27 @@ public class PartiesController : ControllerBase
         );
 
         await _partyRepository.AddStashItemAsync(item, ct);
+
+        var log = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "Usuario",
+            "ItemAdded",
+            $"Añadido {item.Quantity}x {item.Name} al alijo compartido."
+        );
+        await _partyRepository.AddActivityLogAsync(log, ct);
         await _partyRepository.SaveChangesAsync(ct);
 
         var dto = StashItemResponseDto.FromEntity(item);
+        await _notificationService.NotifyItemAddedAsync(party.Id, dto, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(log), ct);
+
         return CreatedAtAction(nameof(GetStash), new { id = party.Id }, dto);
     }
 
     /// <summary>
-    /// Elimina un objeto del alijo compartido de la Party.
+    /// Elimina un objeto del alijo compartido de la Party y emite un evento en tiempo real.
     /// </summary>
     /// <param name="id">Identificador único de la Party.</param>
     /// <param name="itemId">Identificador del objeto a remover.</param>
@@ -475,8 +502,424 @@ public class PartiesController : ControllerBase
         }
 
         await _partyRepository.RemoveStashItemAsync(item, ct);
+
+        var log = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "Usuario",
+            "ItemDeleted",
+            $"Eliminado {item.Name} del alijo compartido."
+        );
+        await _partyRepository.AddActivityLogAsync(log, ct);
         await _partyRepository.SaveChangesAsync(ct);
 
+        await _notificationService.NotifyItemDeletedAsync(party.Id, itemId, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(log), ct);
+
         return NoContent();
+    }
+
+    /// <summary>
+    /// Consulta los fondos monetarios (Party Fund) de la Party.
+    /// </summary>
+    [HttpGet("{id:guid}/funds")]
+    [ProducesResponseType(typeof(PartyFundDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PartyFundDto>> GetFunds(Guid id, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para ver los fondos de esta Party."
+            });
+        }
+
+        return Ok(PartyFundDto.FromEntity(party));
+    }
+
+    /// <summary>
+    /// Actualiza las monedas del tesoro compartido (Party Fund) de la Party y emite un evento en tiempo real.
+    /// </summary>
+    [HttpPut("{id:guid}/funds")]
+    [ProducesResponseType(typeof(PartyFundDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PartyFundDto>> UpdateFunds(
+        Guid id,
+        [FromBody] UpdatePartyFundsRequest request,
+        CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var validationResult = await _fundsValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para modificar los fondos de esta Party."
+            });
+        }
+
+        party.UpdateFunds(request.CopperPieces, request.SilverPieces, request.ElectrumPieces, request.GoldPieces, request.PlatinumPieces);
+        await _partyRepository.UpdateAsync(party, ct);
+
+        var log = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "Usuario",
+            "FundsUpdated",
+            $"Fondos actualizados: {party.GoldPieces} PO, {party.SilverPieces} PP, {party.CopperPieces} PC. Total: {party.TotalGoldEquivalent:F1} PO."
+        );
+        await _partyRepository.AddActivityLogAsync(log, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        var dto = PartyFundDto.FromEntity(party);
+        await _notificationService.NotifyFundsUpdatedAsync(party.Id, dto, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(log), ct);
+
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Consulta la cola de fabricación (Downtime Crafting) de la Party.
+    /// </summary>
+    [HttpGet("{id:guid}/crafting")]
+    [ProducesResponseType(typeof(IReadOnlyList<CraftingQueueItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<CraftingQueueItemDto>>> GetCraftingQueue(Guid id, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para consultar la cola de fabricación de esta Party."
+            });
+        }
+
+        var queue = await _partyRepository.GetCraftingQueueAsync(id, ct);
+        return Ok(queue.Select(CraftingQueueItemDto.FromEntity).ToList());
+    }
+
+    /// <summary>
+    /// Encola un nuevo objeto para su fabricación en downtime, descontando automáticamente el oro del Party Fund.
+    /// </summary>
+    [HttpPost("{id:guid}/crafting")]
+    [ProducesResponseType(typeof(CraftingQueueItemDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CraftingQueueItemDto>> QueueCraftingItem(
+        Guid id,
+        [FromBody] QueueCraftingItemRequest request,
+        CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var validationResult = await _craftingValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para encolar fabricación en esta Party."
+            });
+        }
+
+        if (party.GoldPieces < request.GoldCost)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Fondos insuficientes",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = $"El alijo cuenta con {party.GoldPieces:F1} PO pero la fabricación requiere {request.GoldCost:F1} PO."
+            });
+        }
+
+        // Descontar oro del Party Fund
+        party.DeductGold(request.GoldCost);
+        await _partyRepository.UpdateAsync(party, ct);
+
+        var item = new CraftingQueueItem(
+            Guid.NewGuid(),
+            party.Id,
+            request.ItemName,
+            request.ItemType ?? "Adventuring Gear",
+            request.Rarity ?? "Common",
+            request.GoldCost,
+            request.DaysRequired,
+            request.Weight,
+            request.Description ?? string.Empty,
+            request.IsOfficialSrd,
+            request.ReferenceIndex,
+            request.CrafterName
+        );
+
+        await _partyRepository.AddCraftingItemAsync(item, ct);
+
+        var log = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "Usuario",
+            "CraftingStarted",
+            $"Iniciada fabricación de '{item.ItemName}' ({item.DaysRequired} días, -{item.GoldCost:F1} PO)."
+        );
+        await _partyRepository.AddActivityLogAsync(log, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        var itemDto = CraftingQueueItemDto.FromEntity(item);
+        var fundsDto = PartyFundDto.FromEntity(party);
+
+        var updatedQueue = (await _partyRepository.GetCraftingQueueAsync(id, ct)).Select(CraftingQueueItemDto.FromEntity).ToList();
+        await _notificationService.NotifyCraftingQueueUpdatedAsync(party.Id, updatedQueue, ct);
+        await _notificationService.NotifyFundsUpdatedAsync(party.Id, fundsDto, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(log), ct);
+
+        return CreatedAtAction(nameof(GetCraftingQueue), new { id = party.Id }, itemDto);
+    }
+
+    /// <summary>
+    /// Acción exclusiva del DM: Avanza 1 día de Downtime en todos los proyectos de fabricación activos.
+    /// Al alcanzar 0 días restantes, el objeto se transfiere automáticamente al alijo principal.
+    /// </summary>
+    [HttpPost("{id:guid}/crafting/advance-day")]
+    [ProducesResponseType(typeof(DowntimeAdvanceResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DowntimeAdvanceResultDto>> AdvanceDowntimeDay(Guid id, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para avanzar el Downtime de esta Party."
+            });
+        }
+
+        var queue = await _partyRepository.GetCraftingQueueAsync(id, ct);
+        var activeItems = queue.Where(i => i.Status == "InProgress").ToList();
+
+        var completedNames = new List<string>();
+
+        foreach (var activeItem in activeItems)
+        {
+            var completed = activeItem.AdvanceDay();
+            if (completed)
+            {
+                var stashItem = activeItem.ToStashItem();
+                await _partyRepository.AddStashItemAsync(stashItem, ct);
+                completedNames.Add(stashItem.Name);
+
+                var compLog = new StashActivityLog(
+                    Guid.NewGuid(),
+                    party.Id,
+                    userId.Value,
+                    User.GetDisplayName() ?? "DM",
+                    "CraftingCompleted",
+                    $"¡Fabricación completada! '{stashItem.Name}' ha sido agregado al alijo principal."
+                );
+                await _partyRepository.AddActivityLogAsync(compLog, ct);
+            }
+        }
+
+        var advanceLog = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "DM",
+            "DowntimeAdvanced",
+            $"Avanzado 1 día de Downtime. {completedNames.Count} objeto(s) completado(s)."
+        );
+        await _partyRepository.AddActivityLogAsync(advanceLog, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        var updatedQueueEntities = await _partyRepository.GetCraftingQueueAsync(id, ct);
+        var updatedQueueDto = updatedQueueEntities.Select(CraftingQueueItemDto.FromEntity).ToList();
+
+        var reloadedParty = await _partyRepository.GetByIdAsync(id, ct);
+        var updatedStashDto = (reloadedParty?.StashItems ?? party.StashItems).Select(StashItemResponseDto.FromEntity).ToList();
+
+        var result = new DowntimeAdvanceResultDto(
+            DaysAdvanced: 1,
+            CompletedItemsCount: completedNames.Count,
+            ActiveItemsCount: updatedQueueEntities.Count(i => i.Status == "InProgress"),
+            CompletedItemNames: completedNames,
+            UpdatedQueue: updatedQueueDto,
+            UpdatedStash: updatedStashDto
+        );
+
+        await _notificationService.NotifyDowntimeAdvancedAsync(party.Id, result, ct);
+        await _notificationService.NotifyCraftingQueueUpdatedAsync(party.Id, updatedQueueDto, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(advanceLog), ct);
+
+        if (completedNames.Count > 0)
+        {
+            var fullStashResponse = new PartyStashResponseDto(
+                party.Id,
+                party.Name,
+                reloadedParty?.TotalStashWeight ?? party.TotalStashWeight,
+                updatedStashDto,
+                PartyFundDto.FromEntity(reloadedParty ?? party),
+                updatedQueueDto
+            );
+            await _notificationService.NotifyStashUpdatedAsync(party.Id, fullStashResponse, ct);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Consulta el historial de actividad y transacciones (Audit Log) del alijo y tesoro de la Party.
+    /// </summary>
+    [HttpGet("{id:guid}/stash/logs")]
+    [ProducesResponseType(typeof(IReadOnlyList<StashActivityLogDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<StashActivityLogDto>>> GetActivityLogs(
+        Guid id,
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (party.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para consultar los registros de auditoría de esta Party."
+            });
+        }
+
+        var logs = await _partyRepository.GetActivityLogsAsync(id, Math.Clamp(limit, 1, 100), ct);
+        return Ok(logs.Select(StashActivityLogDto.FromEntity).ToList());
     }
 }

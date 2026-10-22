@@ -384,8 +384,26 @@ Gestión colaborativa del inventario de la Party (Party Stash) con cálculo reac
     - Soporte bilingüe en i18n (`es`/`en`).
 - **Entregables de Calidad & Directivas:**
   - Rama: `feat/collaborative-party-stash`.
-  - Documentación: [ADR-0015](file:///docs/adrs/0015-collaborative-party-stash-and-dnd5e-api-reference-proxy.md) y comentarios XML/TSDoc exhaustivos.
-  - Testing: 180 tests unitarios backend en `Sparnarok.UnitTests`, 32 tests de integración en `Sparnarok.IntegrationTests`, 36 tests de componentes frontend en Vitest (incluyendo suite para `PartyStashModal`) y 12 tests E2E en Playwright.
+  - Documentación: [ADR-0015](file:///docs/adrs/0015-collaborative-party-stash-and-dnd5e-api-reference-proxy.md) y [ADR-0016](file:///docs/adrs/0016-real-time-stash-signalr-crafting-and-audit-log.md).
+  - Testing: 193 tests unitarios backend en `Sparnarok.UnitTests`, 33 tests de integración en `Sparnarok.IntegrationTests` con Testcontainers PostgreSQL, 37 tests de componentes frontend en Vitest (7 suites completas).
+
+### 3.6.9 QoL: Reactividad en Tiempo Real (SignalR), Downtime Crafting y Audit Log [Completado]
+
+Optimización de la experiencia en vivo durante sesiones de juego mediante sincronización reactiva, automatización de tiempos de descanso y trazabilidad auditada de recursos:
+1. **Sincronización en Tiempo Real (SignalR):**
+   - Configuración de `StashHub` en `/hubs/stash` de ASP.NET Core (.NET 10).
+   - Suscripción por grupos aislados `$"party_{partyId}"` y autenticación WebSockets vía query token `access_token`.
+   - Servicio tipado `IStashNotificationService` que emite eventos reactivos (`ItemAdded`, `ItemDeleted`, `FundsUpdated`, `CraftingQueueUpdated`, `ActivityLogged`, `DowntimeAdvanced`, `StashUpdated`).
+   - Cliente React `@microsoft/signalr` en `stashHubService.ts` con reconexión automática y actualización de estado sin recarga del navegador.
+2. **Historial de Transacciones (Audit Log):**
+   - Entidad `StashActivityLog` con índices en `PartyId` y `TimestampUtc`.
+   - Registro automático inmutable de mutaciones de monedas, objetos agregados/eliminados y avances de downtime.
+   - Pestaña secundaria "Historial / Auditoría" en `PartyStashModal` con timeline cronológico e insignias de acción.
+3. **Módulo de Fabricación (Downtime Crafting) & Party Fund:**
+   - Modelado de las 5 monedas canónicas (PC, PP, PE, PO, PL) con cálculo dinámico de `TotalGoldEquivalent`.
+   - Pestaña secundaria "Cola de Fabricación" con tabla de seguimiento y barra de progreso.
+   - Encolado de objetos con deducción automática de oro del Party Fund y asignación de "Días Restantes".
+   - Acción exclusiva del DM: "👑 Avanzar 1 día de Downtime", reduciendo contadores de proyectos activos y transfiriendo automáticamente al alijo principal al llegar a 0 días restantes.
 
 ---
 

@@ -95,9 +95,26 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.FromMinutes(5)
     };
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
+
+// 5.2 Tiempo Real (SignalR) para Alijo Colaborativo y Sesiones en Vivo
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IStashNotificationService, Sparnarok.Api.Infrastructure.Hubs.StashNotificationService>();
 
 // 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
@@ -172,6 +189,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<Sparnarok.Api.Infrastructure.Hubs.StashHub>("/hubs/stash");
 
 app.Run();
 

@@ -299,4 +299,90 @@ public class PartyAndEncounterIntegrationTests : IClassFixture<CustomWebApplicat
         var deleteItemRespA = await _client.SendAsync(deleteItemReqA);
         deleteItemRespA.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
+
+    [Fact]
+    public async Task PartyFunds_CraftingQueue_AdvanceDowntimeDay_And_ActivityLogs_FullFlow_Succeeds()
+    {
+        // Arrange
+        var user = await AuthenticateUserAsync("crafting_hero");
+
+        // Crear Party
+        var partyCreateReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/parties");
+        partyCreateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        partyCreateReq.Content = JsonContent.Create(new CreatePartyRequestDto("Forjadores de Runas", new List<Guid>()));
+
+        var partyResp = await _client.SendAsync(partyCreateReq);
+        partyResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var party = await partyResp.Content.ReadFromJsonAsync<PartyResponseDto>(_jsonOptions);
+
+        // 1. Actualizar Fondos de la Party (100 GP)
+        var updateFundsReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/parties/{party!.Id}/funds");
+        updateFundsReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        updateFundsReq.Content = JsonContent.Create(new UpdatePartyFundsRequest(0, 0, 0, 100, 0));
+
+        var updateFundsResp = await _client.SendAsync(updateFundsReq);
+        updateFundsResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var fundsDto = await updateFundsResp.Content.ReadFromJsonAsync<PartyFundDto>(_jsonOptions);
+        fundsDto!.GoldPieces.Should().Be(100);
+
+        // 2. Encolar un objeto de fabricación (Coste: 30 GP, 1 día)
+        var queueReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/parties/{party.Id}/crafting");
+        queueReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        queueReq.Content = JsonContent.Create(new QueueCraftingItemRequest(
+            ItemName: "Poción de Curación Mayor",
+            ItemType: "Potion",
+            Rarity: "Uncommon",
+            GoldCost: 30,
+            DaysRequired: 1,
+            Weight: 0.5m,
+            Description: "Restaura 4d4+4 PG.",
+            IsOfficialSrd: true,
+            ReferenceIndex: "potion-of-greater-healing",
+            CrafterName: "Alquimista"
+        ));
+
+        var queueResp = await _client.SendAsync(queueReq);
+        queueResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var queuedItem = await queueResp.Content.ReadFromJsonAsync<CraftingQueueItemDto>(_jsonOptions);
+        queuedItem!.ItemName.Should().Be("Poción de Curación Mayor");
+        queuedItem.DaysRemaining.Should().Be(1);
+        queuedItem.Status.Should().Be("InProgress");
+
+        // Verificar que el oro fue descontado (100 - 30 = 70 GP)
+        var getFundsReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/parties/{party.Id}/funds");
+        getFundsReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        var getFundsResp = await _client.SendAsync(getFundsReq);
+        var remainingFunds = await getFundsResp.Content.ReadFromJsonAsync<PartyFundDto>(_jsonOptions);
+        remainingFunds!.GoldPieces.Should().Be(70);
+
+        // 3. Avanzar 1 día de Downtime (Acción del DM)
+        var advanceReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/parties/{party.Id}/crafting/advance-day");
+        advanceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+
+        var advanceResp = await _client.SendAsync(advanceReq);
+        advanceResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var advanceResult = await advanceResp.Content.ReadFromJsonAsync<DowntimeAdvanceResultDto>(_jsonOptions);
+        advanceResult!.DaysAdvanced.Should().Be(1);
+        advanceResult.CompletedItemsCount.Should().Be(1);
+        advanceResult.CompletedItemNames.Should().Contain("Poción de Curación Mayor");
+
+        // 4. Verificar que el objeto pasó automáticamente al alijo principal (Stash)
+        var getStashReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/parties/{party.Id}/stash");
+        getStashReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        var getStashResp = await _client.SendAsync(getStashReq);
+        var stash = await getStashResp.Content.ReadFromJsonAsync<PartyStashResponseDto>(_jsonOptions);
+        stash!.Items.Should().Contain(i => i.Name == "Poción de Curación Mayor");
+
+        // 5. Verificar historial de auditoría (Activity Logs)
+        var getLogsReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/parties/{party.Id}/stash/logs");
+        getLogsReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        var getLogsResp = await _client.SendAsync(getLogsReq);
+        getLogsResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var logs = await getLogsResp.Content.ReadFromJsonAsync<IReadOnlyList<StashActivityLogDto>>(_jsonOptions);
+        logs.Should().NotBeNull();
+        logs!.Should().Contain(l => l.ActionType == "FundsUpdated");
+        logs.Should().Contain(l => l.ActionType == "CraftingStarted");
+        logs.Should().Contain(l => l.ActionType == "CraftingCompleted");
+        logs.Should().Contain(l => l.ActionType == "DowntimeAdvanced");
+    }
 }

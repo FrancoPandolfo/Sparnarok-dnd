@@ -218,6 +218,77 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("Armors", (string)null);
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.CraftingQueueItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CrafterName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DaysRemaining")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DaysRequired")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("GoldCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsOfficialSrd")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Rarity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ReferenceIndex")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("Weight")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("PartyId", "Status");
+
+                    b.ToTable("CraftingQueueItems", (string)null);
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
                 {
                     b.Property<Guid>("Id")
@@ -319,8 +390,26 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("CopperPieces")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ElectrumPieces")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("GoldPieces")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -330,11 +419,62 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("PlatinumPieces")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("SilverPieces")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
 
                     b.ToTable("Parties", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashActivityLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("PartyId", "TimestampUtc");
+
+                    b.ToTable("StashActivityLogs", (string)null);
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashItem", b =>
@@ -603,6 +743,15 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("AssociatedMastery");
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.CraftingQueueItem", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
+                        .WithMany("CraftingQueue")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
                 {
                     b.HasOne("Sparnarok.Api.Domain.Entities.Armor", "EquippedArmor")
@@ -725,6 +874,15 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashActivityLog", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
+                        .WithMany("ActivityLogs")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashItem", b =>
                 {
                     b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
@@ -746,6 +904,10 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Party", b =>
                 {
+                    b.Navigation("ActivityLogs");
+
+                    b.Navigation("CraftingQueue");
+
                     b.Navigation("StashItems");
                 });
 #pragma warning restore 612, 618

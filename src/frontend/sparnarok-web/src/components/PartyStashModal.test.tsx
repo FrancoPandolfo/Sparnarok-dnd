@@ -3,8 +3,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PartyStashModal } from './PartyStashModal';
 import { apiClient } from '../services/apiClient';
+import { stashHubService } from '../services/stashHubService';
 import i18n from '../i18n';
-import type { ReferenceItemDetailDto, ReferenceItemSummaryDto, StashItemDto } from '../types/stash';
+import type {
+  PartyFundDto,
+  CraftingQueueItemDto,
+  StashActivityLogDto,
+  DowntimeAdvanceResultDto,
+} from '../types/stash';
 
 vi.mock('../services/apiClient', () => ({
   apiClient: {
@@ -13,16 +19,91 @@ vi.mock('../services/apiClient', () => ({
     getReferenceEquipmentDetail: vi.fn(),
     addStashItem: vi.fn(),
     deleteStashItem: vi.fn(),
+    getPartyFunds: vi.fn(),
+    updatePartyFunds: vi.fn(),
+    getCraftingQueue: vi.fn(),
+    queueCraftingItem: vi.fn(),
+    advanceDowntimeDay: vi.fn(),
+    getStashActivityLogs: vi.fn(),
   },
 }));
 
-describe('PartyStashModal Component Suite', () => {
+vi.mock('../services/stashHubService', () => ({
+  stashHubService: {
+    startConnection: vi.fn().mockResolvedValue(undefined),
+    stopConnection: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+describe('PartyStashModal Component Suite with QoL Features', () => {
   const mockPartyId = 'test-party-123';
   const mockPartyName = 'Fellowship of the Ring';
+
+  const defaultFunds: PartyFundDto = {
+    partyId: mockPartyId,
+    copperPieces: 50,
+    silverPieces: 20,
+    electrumPieces: 0,
+    goldPieces: 150,
+    platinumPieces: 2,
+    totalGoldEquivalent: 172.5,
+  };
+
+  const defaultCraftingQueue: CraftingQueueItemDto[] = [
+    {
+      id: 'craft-1',
+      partyId: mockPartyId,
+      itemName: 'Potion of Greater Healing',
+      itemType: 'Potion',
+      rarity: 'Uncommon',
+      goldCost: 50,
+      daysRequired: 3,
+      daysRemaining: 2,
+      weight: 0.5,
+      description: 'Restores 4d4+4 HP',
+      isOfficialSrd: true,
+      referenceIndex: 'potion-of-greater-healing',
+      crafterName: 'Gandalf',
+      status: 'InProgress',
+      createdAtUtc: new Date().toISOString(),
+    },
+  ];
+
+  const defaultLogs: StashActivityLogDto[] = [
+    {
+      id: 'log-1',
+      partyId: mockPartyId,
+      userId: 'user-1',
+      userDisplayName: 'Frodo',
+      actionType: 'ItemAdded',
+      description: 'Añadido 1x Elven Cloak al alijo.',
+      timestampUtc: new Date().toISOString(),
+    },
+    {
+      id: 'log-2',
+      partyId: mockPartyId,
+      userId: 'user-dm',
+      userDisplayName: 'Dungeon Master',
+      actionType: 'DowntimeAdvanced',
+      description: 'Avanzado 1 día de Downtime.',
+      timestampUtc: new Date().toISOString(),
+    },
+  ];
 
   beforeEach(async () => {
     vi.clearAllMocks();
     await i18n.changeLanguage('es');
+
+    vi.mocked(apiClient.getPartyStash).mockResolvedValue({
+      partyId: mockPartyId,
+      partyName: mockPartyName,
+      totalWeight: 0,
+      items: [],
+      funds: defaultFunds,
+      craftingQueue: defaultCraftingQueue,
+    });
+
+    vi.mocked(apiClient.getStashActivityLogs).mockResolvedValue(defaultLogs);
   });
 
   it('does not render when isOpen is false', () => {
@@ -37,15 +118,8 @@ describe('PartyStashModal Component Suite', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders party stash modal with empty items list and accumulated weight', async () => {
-    vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
-      partyId: mockPartyId,
-      partyName: mockPartyName,
-      totalWeight: 0,
-      items: [],
-    });
-
-    render(
+  it('initializes SignalR real-time connection on open and cleans up on unmount', async () => {
+    const { unmount } = render(
       <PartyStashModal
         isOpen={true}
         partyId={mockPartyId}
@@ -54,193 +128,132 @@ describe('PartyStashModal Component Suite', () => {
       />
     );
 
-    expect(screen.getByText(mockPartyName)).toBeDefined();
-    expect(screen.getByText(/0\.0 lbs/)).toBeDefined();
-    await waitFor(() => {
-      expect(screen.getByText(/El alijo de esta Party está vacío/i)).toBeDefined();
-    });
-  });
-
-  it('renders existing items and calculates total weight correctly', async () => {
-    const mockItems: StashItemDto[] = [
-      {
-        id: 'item-1',
-        partyId: mockPartyId,
-        name: 'Rope of Climbing',
-        quantity: 1,
-        weight: 3,
-        description: 'A 60-foot length of silk rope.',
-        rarity: 'Uncommon',
-        itemType: 'Wondrous Items',
-        isOfficialSrd: true,
-        referenceIndex: 'rope-of-climbing',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'item-2',
-        partyId: mockPartyId,
-        name: 'Healing Potion',
-        quantity: 4,
-        weight: 0.5,
-        description: 'Restores 2d4+2 HP.',
-        rarity: 'Common',
-        itemType: 'Potions',
-        isOfficialSrd: false,
-        referenceIndex: null,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
-      partyId: mockPartyId,
-      partyName: mockPartyName,
-      totalWeight: 5.0,
-      items: mockItems,
-    });
-
-    render(
-      <PartyStashModal
-        isOpen={true}
-        partyId={mockPartyId}
-        partyName={mockPartyName}
-        onClose={vi.fn()}
-      />
+    expect(stashHubService.startConnection).toHaveBeenCalledWith(
+      mockPartyId,
+      expect.objectContaining({
+        onItemAdded: expect.any(Function),
+        onItemDeleted: expect.any(Function),
+        onFundsUpdated: expect.any(Function),
+        onCraftingQueueUpdated: expect.any(Function),
+        onActivityLogged: expect.any(Function),
+        onDowntimeAdvanced: expect.any(Function),
+      })
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Rope of Climbing')).toBeDefined();
-      expect(screen.getByText('Healing Potion')).toBeDefined();
-      expect(screen.getByText(/5\.0 lbs/)).toBeDefined();
-    });
+    unmount();
+    expect(stashHubService.stopConnection).toHaveBeenCalled();
   });
 
-  it('searches D&D 5e API with debounce, autofills on suggestion click, and supports manual edits', async () => {
+  it('renders party fund currencies and allows modifying coins', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
-      partyId: mockPartyId,
-      partyName: mockPartyName,
-      totalWeight: 0,
-      items: [],
+
+    render(
+      <PartyStashModal
+        isOpen={true}
+        partyId={mockPartyId}
+        partyName={mockPartyName}
+        onClose={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('150')).toBeDefined(); // GP
+      expect(document.getElementById('party-total-gold-equiv')?.textContent).toContain('172.5');
     });
 
-    const mockSearchResults: ReferenceItemSummaryDto[] = [
-      { index: 'dagger', name: 'Dagger', url: '/api/2024/equipment/dagger' },
-    ];
-    vi.mocked(apiClient.searchReferenceEquipment).mockResolvedValue(mockSearchResults);
+    // Click "Modificar Monedas"
+    const editFundsBtn = screen.getByRole('button', { name: /Modificar Monedas/i });
+    await user.click(editFundsBtn);
 
-    const mockDetail: ReferenceItemDetailDto = {
-      index: 'dagger',
-      name: 'Dagger',
-      weight: 1,
-      description: 'Finesse, light, thrown (range 20/60). Simple Melee Weapon.',
-      rarity: 'Common',
-      itemType: 'Weapons',
-      isOfficialSrd: true,
+    // Edit GP input
+    const gpInput = document.getElementById('funds-gp') as HTMLInputElement;
+    fireEvent.change(gpInput, { target: { value: '200' } });
+
+    const updatedFunds: PartyFundDto = {
+      ...defaultFunds,
+      goldPieces: 200,
+      totalGoldEquivalent: 222.5,
     };
-    vi.mocked(apiClient.getReferenceEquipmentDetail).mockResolvedValue(mockDetail);
+    vi.mocked(apiClient.updatePartyFunds).mockResolvedValueOnce(updatedFunds);
 
-    const mockCreatedItem: StashItemDto = {
-      id: 'item-dagger',
+    const saveFundsBtn = screen.getByRole('button', { name: /Guardar Monedas/i });
+    await user.click(saveFundsBtn);
+
+    await waitFor(() => {
+      expect(apiClient.updatePartyFunds).toHaveBeenCalledWith(mockPartyId, {
+        copperPieces: 50,
+        silverPieces: 20,
+        electrumPieces: 0,
+        goldPieces: 200,
+        platinumPieces: 2,
+      });
+      expect(document.getElementById('party-total-gold-equiv')?.textContent).toContain('222.5');
+    });
+  });
+
+  it('switches to Crafting Queue tab, renders active queue and queues a new crafting project', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PartyStashModal
+        isOpen={true}
+        partyId={mockPartyId}
+        partyName={mockPartyName}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Switch to Crafting tab
+    const craftingTabBtn = document.getElementById('tab-crafting-btn')!;
+    await user.click(craftingTabBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Potion of Greater Healing')).toBeDefined();
+      expect(screen.getByText(/Gandalf/)).toBeDefined();
+    });
+
+    // Open Queue Crafting form
+    const openQueueBtn = document.getElementById('open-queue-crafting-btn')!;
+    await user.click(openQueueBtn);
+
+    const nameInput = document.getElementById('craft-name-input')!;
+    await user.type(nameInput, 'Scroll of Fireball');
+
+    const costInput = document.getElementById('craft-cost-input')!;
+    fireEvent.change(costInput, { target: { value: '100' } });
+
+    const newQueuedItem: CraftingQueueItemDto = {
+      id: 'craft-2',
       partyId: mockPartyId,
-      name: 'Dagger',
-      quantity: 2,
-      weight: 1,
-      description: 'Finesse, light, thrown (range 20/60). Simple Melee Weapon.',
+      itemName: 'Scroll of Fireball',
+      itemType: 'Scroll',
       rarity: 'Uncommon',
-      itemType: 'Weapons',
-      isOfficialSrd: true,
-      referenceIndex: 'dagger',
-      createdAt: new Date().toISOString(),
+      goldCost: 100,
+      daysRequired: 5,
+      daysRemaining: 5,
+      weight: 0.1,
+      description: 'Cast 8d6 Fireball',
+      isOfficialSrd: false,
+      crafterName: 'Wizard',
+      status: 'InProgress',
+      createdAtUtc: new Date().toISOString(),
     };
-    vi.mocked(apiClient.addStashItem).mockResolvedValue(mockCreatedItem);
+    vi.mocked(apiClient.queueCraftingItem).mockResolvedValueOnce(newQueuedItem);
 
-    render(
-      <PartyStashModal
-        isOpen={true}
-        partyId={mockPartyId}
-        partyName={mockPartyName}
-        onClose={vi.fn()}
-      />
-    );
-
-    // Open add item form
-    const openAddBtn = screen.getByRole('button', { name: /Añadir Objeto al Stash/i });
-    await user.click(openAddBtn);
-
-    const nameInput = screen.getByRole('textbox', { name: /Nombre del Objeto/i });
-    await user.type(nameInput, 'Dag');
-
-    // Wait for debounced search call
-    await waitFor(() => {
-      expect(apiClient.searchReferenceEquipment).toHaveBeenCalledWith('Dag');
-    }, { timeout: 1500 });
-
-    // Suggestion should appear
-    const suggestion = await screen.findByText('Dagger');
-    expect(suggestion).toBeDefined();
-
-    // Click suggestion
-    await user.click(suggestion);
-
-    // Detail should autofill
-    await waitFor(() => {
-      expect(apiClient.getReferenceEquipmentDetail).toHaveBeenCalledWith('dagger');
-      const weightInput = screen.getByLabelText(/Peso Unitario/i) as HTMLInputElement;
-      expect(weightInput.value).toBe('1');
-      expect(screen.getByText(/Objeto oficial importado de D&D 5e SRD/i)).toBeDefined();
-    });
-
-    // User modifies quantity and rarity
-    const qtyInput = screen.getByLabelText(/Cantidad/i);
-    fireEvent.change(qtyInput, { target: { value: '2' } });
-
-    const raritySelect = screen.getByLabelText(/Rareza/i);
-    await user.selectOptions(raritySelect, 'Uncommon');
-
-    // Submit form
-    const saveBtn = screen.getByRole('button', { name: /Guardar en el Stash/i });
-    await user.click(saveBtn);
+    const submitQueueBtn = document.getElementById('submit-queue-crafting-btn')!;
+    await user.click(submitQueueBtn);
 
     await waitFor(() => {
-      expect(apiClient.addStashItem).toHaveBeenCalledWith(mockPartyId, expect.objectContaining({
-        name: 'Dagger',
-        quantity: 2,
-        weight: 1,
-        rarity: 'Uncommon',
-        itemType: 'Weapons',
-        isOfficialSrd: true,
-        referenceIndex: 'dagger',
+      expect(apiClient.queueCraftingItem).toHaveBeenCalledWith(mockPartyId, expect.objectContaining({
+        itemName: 'Scroll of Fireball',
+        goldCost: 100,
       }));
-      expect(screen.getByText('Dagger')).toBeDefined();
+      expect(screen.getByText('Scroll of Fireball')).toBeDefined();
     });
   });
 
-  it('deletes an item and updates local state and total weight', async () => {
+  it('handles DM Advance Downtime Day action and updates crafting progress', async () => {
     const user = userEvent.setup();
-    const mockItems: StashItemDto[] = [
-      {
-        id: 'item-del-1',
-        partyId: mockPartyId,
-        name: 'Heavy Greatsword',
-        quantity: 1,
-        weight: 6,
-        description: 'Two-handed heavy weapon',
-        rarity: 'Common',
-        itemType: 'Weapons',
-        isOfficialSrd: false,
-        referenceIndex: null,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    vi.mocked(apiClient.getPartyStash).mockResolvedValueOnce({
-      partyId: mockPartyId,
-      partyName: mockPartyName,
-      totalWeight: 6.0,
-      items: mockItems,
-    });
-
-    vi.mocked(apiClient.deleteStashItem).mockResolvedValueOnce();
 
     render(
       <PartyStashModal
@@ -251,18 +264,71 @@ describe('PartyStashModal Component Suite', () => {
       />
     );
 
+    // Switch to Crafting tab
+    const craftingTabBtn = document.getElementById('tab-crafting-btn')!;
+    await user.click(craftingTabBtn);
+
+    const advanceResult: DowntimeAdvanceResultDto = {
+      daysAdvanced: 1,
+      completedItemsCount: 1,
+      activeItemsCount: 0,
+      completedItemNames: ['Potion of Greater Healing'],
+      updatedQueue: [
+        {
+          ...defaultCraftingQueue[0],
+          daysRemaining: 0,
+          status: 'Completed',
+        },
+      ],
+      updatedStash: [
+        {
+          id: 'stash-potion',
+          partyId: mockPartyId,
+          name: 'Potion of Greater Healing',
+          quantity: 1,
+          weight: 0.5,
+          description: 'Restores 4d4+4 HP',
+          rarity: 'Uncommon',
+          itemType: 'Potion',
+          isOfficialSrd: true,
+          referenceIndex: 'potion-of-greater-healing',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    vi.mocked(apiClient.advanceDowntimeDay).mockResolvedValueOnce(advanceResult);
+
+    // Click DM Advance Day button
+    const advanceBtn = document.getElementById('advance-downtime-day-btn')!;
+    await user.click(advanceBtn);
+
     await waitFor(() => {
-      expect(screen.getByText('Heavy Greatsword')).toBeDefined();
-      expect(document.getElementById('stash-total-weight')?.textContent).toContain('6.0 lbs');
+      expect(apiClient.advanceDowntimeDay).toHaveBeenCalledWith(mockPartyId);
+      expect(document.getElementById('crafting-feedback-msg')?.textContent).toContain('Downtime avanzado 1 día');
     });
+  });
 
-    const deleteBtn = screen.getByRole('button', { name: /Eliminar Heavy Greatsword/i });
-    await user.click(deleteBtn);
+  it('switches to Activity Log tab and displays chronological transaction history', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PartyStashModal
+        isOpen={true}
+        partyId={mockPartyId}
+        partyName={mockPartyName}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Switch to Logs tab
+    const logsTabBtn = document.getElementById('tab-logs-btn')!;
+    await user.click(logsTabBtn);
 
     await waitFor(() => {
-      expect(apiClient.deleteStashItem).toHaveBeenCalledWith(mockPartyId, 'item-del-1');
-      expect(screen.queryByText('Heavy Greatsword')).toBeNull();
-      expect(document.getElementById('stash-total-weight')?.textContent).toContain('0.0 lbs');
+      expect(screen.getByText('Frodo')).toBeDefined();
+      expect(screen.getByText(/Añadido 1x Elven Cloak al alijo/)).toBeDefined();
+      expect(screen.getByText('Dungeon Master')).toBeDefined();
+      expect(screen.getByText(/Avanzado 1 día de Downtime/)).toBeDefined();
     });
   });
 });

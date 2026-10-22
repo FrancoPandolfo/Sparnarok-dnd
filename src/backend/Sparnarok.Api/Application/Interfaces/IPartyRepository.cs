@@ -43,6 +43,31 @@ public interface IPartyRepository
     Task RemoveStashItemAsync(StashItem item, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Obtiene una party por su ID incluyendo miembros, alijo, cola de fabricación y registros de actividad.
+    /// </summary>
+    Task<Party?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Agrega un nuevo trabajo a la cola de fabricación de la Party.
+    /// </summary>
+    Task AddCraftingItemAsync(CraftingQueueItem item, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene los trabajos de fabricación de una Party ordenados por fecha de creación.
+    /// </summary>
+    Task<IReadOnlyList<CraftingQueueItem>> GetCraftingQueueAsync(Guid partyId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Registra un nuevo evento en el historial de auditoría de la Party.
+    /// </summary>
+    Task AddActivityLogAsync(StashActivityLog log, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene los registros de auditoría de una Party ordenados cronológicamente de forma descendente.
+    /// </summary>
+    Task<IReadOnlyList<StashActivityLog>> GetActivityLogsAsync(Guid partyId, int limit = 50, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Persiste los cambios pendientes en el almacenamiento.
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

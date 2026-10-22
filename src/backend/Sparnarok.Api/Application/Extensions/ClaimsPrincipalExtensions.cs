@@ -23,4 +23,18 @@ public static class ClaimsPrincipalExtensions
 
         return Guid.TryParse(claimValue, out var userId) ? userId : null;
     }
+
+    /// <summary>
+    /// Extrae el nombre o correo visible del usuario a partir de los claims del token.
+    /// </summary>
+    public static string GetDisplayName(this ClaimsPrincipal? principal)
+    {
+        if (principal == null)
+            return "Aventurero";
+
+        return principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? principal.FindFirst("name")?.Value
+            ?? principal.FindFirst(ClaimTypes.Email)?.Value
+            ?? "Aventurero";
+    }
 }

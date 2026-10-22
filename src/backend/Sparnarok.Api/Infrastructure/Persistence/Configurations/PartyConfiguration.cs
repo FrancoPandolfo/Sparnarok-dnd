@@ -28,6 +28,27 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
+        // Fondos de la Party (Party Fund)
+        builder.Property(p => p.CopperPieces)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.SilverPieces)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.ElectrumPieces)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.GoldPieces)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.PlatinumPieces)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0);
+
         // Relación Many-to-Many con Creature (PartyCreatures)
         builder.HasMany(p => p.Members)
             .WithMany()
@@ -47,6 +68,24 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Navigation(p => p.StashItems)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Relación One-to-Many con CraftingQueueItem
+        builder.HasMany(p => p.CraftingQueue)
+            .WithOne()
+            .HasForeignKey(c => c.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(p => p.CraftingQueue)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Relación One-to-Many con StashActivityLog
+        builder.HasMany(p => p.ActivityLogs)
+            .WithOne()
+            .HasForeignKey(a => a.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(p => p.ActivityLogs)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
