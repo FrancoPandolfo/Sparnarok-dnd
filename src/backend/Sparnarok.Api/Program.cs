@@ -28,6 +28,8 @@ builder.Services.AddDbContext<SparnarokDbContext>(options =>
 // 3. Repositorios de Dominio
 builder.Services.AddScoped<ICreatureRepository, CreatureRepository>();
 builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
+builder.Services.AddScoped<IPartyRepository, PartyRepository>();
+builder.Services.AddScoped<IEncounterRepository, EncounterRepository>();
 
 // 4. Servicios de Ingestión de Datos (CSV & Streaming)
 builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();

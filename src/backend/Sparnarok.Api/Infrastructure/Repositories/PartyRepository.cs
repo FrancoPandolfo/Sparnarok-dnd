@@ -1,0 +1,86 @@
+using Microsoft.EntityFrameworkCore;
+using Sparnarok.Api.Application.Interfaces;
+using Sparnarok.Api.Domain.Entities;
+using Sparnarok.Api.Infrastructure.Persistence;
+
+namespace Sparnarok.Api.Infrastructure.Repositories;
+
+/// <summary>
+/// Implementación de repositorio para <see cref="Party"/> basada en Entity Framework Core.
+/// </summary>
+public class PartyRepository : IPartyRepository
+{
+    private readonly SparnarokDbContext _context;
+
+    /// <summary>
+    /// Inicializa una nueva instancia de <see cref="PartyRepository"/>.
+    /// </summary>
+    public PartyRepository(SparnarokDbContext context)
+    {
+        _context = context;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Party>> GetAllByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Parties
+            .Include(p => p.Members)
+                .ThenInclude(m => m.Actions)
+                    .ThenInclude(a => a.AssociatedMastery)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.KnownMasteries)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.EquippedArmor)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.EquippedShield)
+            .Where(p => p.OwnerUserId == userId)
+            .OrderByDescending(p => p.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Party?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Parties
+            .Include(p => p.Members)
+                .ThenInclude(m => m.Actions)
+                    .ThenInclude(a => a.AssociatedMastery)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.KnownMasteries)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.EquippedArmor)
+            .Include(p => p.Members)
+                .ThenInclude(m => m.EquippedShield)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task AddAsync(Party party, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        await _context.Parties.AddAsync(party, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task UpdateAsync(Party party, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        _context.Parties.Update(party);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task DeleteAsync(Party party, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        _context.Parties.Remove(party);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.SaveChangesAsync(cancellationToken);
+    }
+}

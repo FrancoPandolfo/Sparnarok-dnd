@@ -706,6 +706,201 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     await page.locator('#cancel-custom-hero-btn').click();
     await expect(heroModal).not.toBeVisible();
   });
+
+  test('Party Persistence Manager: Logged-in user creates a Party with 3 Custom Heroes, saves it, clears screen, and loads it from dropdown', async ({ page }) => {
+    // 1. Simular sesión autenticada en localStorage
+    await page.addInitScript(() => {
+      window.localStorage.setItem('sparnarok_auth', JSON.stringify({
+        id: 'e2e-user-1234',
+        email: 'dungeonmaster@sparnarok.dnd',
+        displayName: 'Dungeon Master',
+        avatarUrl: null,
+        token: 'mock-jwt-e2e-party-token',
+      }));
+    });
+
+    // Estado simulado en memoria para las peticiones de red
+    const customHeroes: any[] = [];
+    const savedParties: any[] = [];
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          userId: 'e2e-user-1234',
+          email: 'dungeonmaster@sparnarok.dnd',
+          displayName: 'Dungeon Master',
+          avatarUrl: null,
+          token: 'mock-jwt-e2e-party-token',
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/creatures/custom', async (route) => {
+      if (route.request().method() === 'POST') {
+        const body = JSON.parse(route.request().postData() || '{}');
+        const hero = {
+          id: `hero-custom-${customHeroes.length + 1}`,
+          name: body.name,
+          size: 'Medium',
+          type: 'Humanoid',
+          alignment: 'Heroic',
+          challengeRating: 1,
+          speedFeet: 30,
+          proficiencyBonus: 2,
+          effectiveArmorClass: body.armorClass || 16,
+          isPlayerCharacter: true,
+          level: body.level || 5,
+          archetype: body.archetype || 'Fighter 2H',
+          expectedDpr: body.expectedDpr || 19.4,
+          abilityScores: {
+            strength: body.strength || 16,
+            strengthModifier: 3,
+            dexterity: body.dexterity || 14,
+            dexterityModifier: 2,
+            constitution: body.constitution || 14,
+            constitutionModifier: 2,
+            intelligence: 10,
+            intelligenceModifier: 0,
+            wisdom: 12,
+            wisdomModifier: 1,
+            charisma: 8,
+            charismaModifier: -1,
+          },
+          hitPoints: { max: body.maxHitPoints || 45, current: body.maxHitPoints || 45, temporary: 0 },
+          armorClass: { base: body.armorClass || 16, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+          actions: [],
+          knownMasteries: [],
+        };
+        customHeroes.push(hero);
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(hero),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.route('**/api/v1/parties**', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedParties),
+        });
+      } else if (route.request().method() === 'POST') {
+        const body = JSON.parse(route.request().postData() || '{}');
+        const members = body.memberCreatureIds.map((id: string) => customHeroes.find((h) => h.id === id) || {
+          id,
+          name: 'Hero ' + id,
+          isPlayerCharacter: true,
+          effectiveArmorClass: 16,
+          hitPoints: { max: 40, current: 40, temporary: 0 },
+          abilityScores: { strength: 16, strengthModifier: 3, dexterity: 14, dexterityModifier: 2, constitution: 14, constitutionModifier: 2, intelligence: 10, intelligenceModifier: 0, wisdom: 10, wisdomModifier: 0, charisma: 10, charismaModifier: 0 },
+          actions: [],
+          knownMasteries: [],
+        });
+        const party = {
+          id: `party-e2e-${savedParties.length + 1}`,
+          name: body.name,
+          ownerUserId: 'e2e-user-1234',
+          createdAt: new Date().toISOString(),
+          members,
+        };
+        savedParties.push(party);
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(party),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/');
+
+    // 2. Ir a la pestaña de Simulación de Combate
+    await page.locator('#tab-simulation-btn').click();
+
+    // 3. Crear 3 Héroes Custom consecutivamente
+    // Héroe 1: Sir Roland el Paladín
+    await page.locator('#open-custom-hero-btn').click();
+    await page.locator('#hero-name-input').fill('Sir Roland el Paladín');
+    await page.locator('#hero-ac-input').fill('18');
+    await page.locator('#hero-hp-input').fill('50');
+    await page.locator('#hero-archetype-select').selectOption('Paladin 2H');
+    await page.locator('#hero-level-select').selectOption('5');
+    await page.locator('#save-custom-hero-btn').click();
+
+    // Héroe 2: Lyra la Cazadora
+    await page.locator('#open-custom-hero-btn').click();
+    await page.locator('#hero-name-input').fill('Lyra la Cazadora');
+    await page.locator('#hero-ac-input').fill('16');
+    await page.locator('#hero-hp-input').fill('42');
+    await page.locator('#hero-archetype-select').selectOption('Ranger Ranged');
+    await page.locator('#hero-level-select').selectOption('5');
+    await page.locator('#save-custom-hero-btn').click();
+
+    // Héroe 3: Ignis el Brujo
+    await page.locator('#open-custom-hero-btn').click();
+    await page.locator('#hero-name-input').fill('Ignis el Brujo');
+    await page.locator('#hero-ac-input').fill('15');
+    await page.locator('#hero-hp-input').fill('38');
+    await page.locator('#hero-archetype-select').selectOption('Warlock Eldritch Blast');
+    await page.locator('#hero-level-select').selectOption('5');
+    await page.locator('#save-custom-hero-btn').click();
+
+    // Verificar que el Team A ahora cuenta con 3 integrantes
+    await expect(page.locator('.initiator-card .team-count-pill')).toContainText('3');
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Sir Roland el Paladín' })).toBeVisible();
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Lyra la Cazadora' })).toBeVisible();
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Ignis el Brujo' })).toBeVisible();
+
+    // 4. Guardar Team A como nueva Party
+    const savePartyBtn = page.locator('#save-party-btn');
+    await expect(savePartyBtn).toBeEnabled();
+    await savePartyBtn.click();
+
+    // El modal de guardado debe aparecer
+    const savePartyModal = page.locator('#save-party-modal');
+    await expect(savePartyModal).toBeVisible();
+
+    // Ingresar nombre de la party y confirmar
+    await page.locator('#party-name-input').fill('La Guardia de Invierno');
+    await page.locator('#confirm-save-party-btn').click();
+
+    // El modal debe cerrarse y el banner de feedback exitoso debe mostrarse
+    await expect(savePartyModal).not.toBeVisible();
+    await expect(page.locator('#status-feedback-banner')).toBeVisible();
+    await expect(page.locator('#status-feedback-banner')).toContainText('Party guardada');
+
+    // 5. Limpiar la pantalla ("limpiando la pantalla")
+    const clearTeamBtn = page.locator('#clear-team-a-btn');
+    await expect(clearTeamBtn).toBeEnabled();
+    await clearTeamBtn.click();
+
+    // Team A debe estar completamente vacío con el placeholder visible
+    await expect(page.locator('#empty-team-a-placeholder')).toBeVisible();
+    await expect(page.locator('.initiator-card .team-count-pill')).toContainText('0');
+    await expect(page.locator('.initiator-card .member-item-title')).toHaveCount(0);
+
+    // 6. Volver a cargar la Party exitosamente desde el dropdown
+    const partyDropdown = page.locator('#saved-party-select');
+    await expect(partyDropdown).toBeVisible();
+    const savedPartyOption = partyDropdown.locator('option', { hasText: 'La Guardia de Invierno' });
+    const partyId = await savedPartyOption.getAttribute('value');
+    await partyDropdown.selectOption(partyId!);
+
+    // 7. Verificar que el Team A se pobló nuevamente con los 3 Héroes Custom
+    await expect(page.locator('.initiator-card .team-count-pill')).toContainText('3');
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Sir Roland el Paladín' })).toBeVisible();
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Lyra la Cazadora' })).toBeVisible();
+    await expect(page.locator('.initiator-card .member-item-title', { hasText: 'Ignis el Brujo' })).toBeVisible();
+  });
 });
 
 

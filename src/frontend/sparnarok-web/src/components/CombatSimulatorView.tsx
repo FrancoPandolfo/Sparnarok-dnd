@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   CreatureResponseDto,
@@ -7,6 +7,7 @@ import type {
   MontecarloResultDto,
   TargetingStrategy,
 } from '../types/dnd';
+import type { PartyResponseDto, EncounterResponseDto } from '../types/partyEncounter';
 import { CustomHeroModal } from './CustomHeroModal';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -62,11 +63,69 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     },
   ]);
 
+  // Estado para persistencia y carga de grupos (Partys y Encuentros)
+  const [parties, setParties] = useState<PartyResponseDto[]>([]);
+  const [selectedPartyId, setSelectedPartyId] = useState<string>('');
+  const [encounters, setEncounters] = useState<EncounterResponseDto[]>([]);
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string>('');
+
+  // Modales de guardado
+  const [isSavePartyModalOpen, setIsSavePartyModalOpen] = useState(false);
+  const [partyNameInput, setPartyNameInput] = useState('');
+  const [isSavingParty, setIsSavingParty] = useState(false);
+
+  const [isSaveEncounterModalOpen, setIsSaveEncounterModalOpen] = useState(false);
+  const [encounterNameInput, setEncounterNameInput] = useState('');
+  const [encounterNotesInput, setEncounterNotesInput] = useState('');
+  const [isSavingEncounter, setIsSavingEncounter] = useState(false);
+
+  const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
+
   const [targetingStrategy, setTargetingStrategy] = useState<TargetingStrategy>('LowestHp');
   const [iterations, setIterations] = useState<number>(10000);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<MontecarloResultDto | null>(null);
+
+  // Carga inicial y reactiva de Partys y Encuentros persistidos
+  useEffect(() => {
+    let isMounted = true;
+    const fetchGroups = async () => {
+      try {
+        const [loadedParties, loadedEncounters] = await Promise.all([
+          apiClient.getParties(),
+          apiClient.getEncounters(),
+        ]);
+        if (isMounted) {
+          setParties(loadedParties);
+          setEncounters(loadedEncounters);
+        }
+      } catch {
+        // Fallback local silencioso
+      }
+    };
+    fetchGroups();
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthed]);
+
+  // Catálogo unificado que incluye criaturas del bestiario y miembros cargados de partys/encuentros
+  const allCreatures = React.useMemo(() => {
+    const map = new Map<string, CreatureResponseDto>();
+    creatures.forEach((c) => map.set(c.id, c));
+    parties.forEach((p) => {
+      p.members?.forEach((m) => {
+        if (!map.has(m.id)) map.set(m.id, m);
+      });
+    });
+    encounters.forEach((e) => {
+      e.creatures?.forEach((c) => {
+        if (!map.has(c.id)) map.set(c.id, c);
+      });
+    });
+    return Array.from(map.values());
+  }, [creatures, parties, encounters]);
 
   // Sincronizar selección inicial cuando las criaturas o armas cargan asíncronamente
   React.useEffect(() => {
@@ -177,11 +236,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     }
 
     const invalidMemberA = teamA.find((m) => {
-      const c = creatures.find((x) => x.id === m.creatureId);
+      const c = allCreatures.find((x) => x.id === m.creatureId);
       return !c || (!c.expectedDpr && !m.weaponId);
     });
     const invalidMemberB = teamB.find((m) => {
-      const c = creatures.find((x) => x.id === m.creatureId);
+      const c = allCreatures.find((x) => x.id === m.creatureId);
       return !c || (!c.expectedDpr && !m.weaponId);
     });
 
@@ -192,19 +251,19 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     setIsSimulating(true);
     setErrorMessage(null);
 
-    const firstCreatureA = creatures.find((x) => x.id === teamA[0]?.creatureId);
-    const firstCreatureB = creatures.find((x) => x.id === teamB[0]?.creatureId);
+    const firstCreatureA = allCreatures.find((x) => x.id === teamA[0]?.creatureId);
+    const firstCreatureB = allCreatures.find((x) => x.id === teamB[0]?.creatureId);
 
     const payload: MontecarloRequestDto = {
       teamA: teamA.map((m) => {
-        const c = creatures.find((x) => x.id === m.creatureId);
+        const c = allCreatures.find((x) => x.id === m.creatureId);
         return {
           creatureId: m.creatureId,
           weaponId: c?.expectedDpr ? undefined : m.weaponId,
         };
       }),
       teamB: teamB.map((m) => {
-        const c = creatures.find((x) => x.id === m.creatureId);
+        const c = allCreatures.find((x) => x.id === m.creatureId);
         return {
           creatureId: m.creatureId,
           weaponId: c?.expectedDpr ? undefined : m.weaponId,
@@ -229,15 +288,135 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     }
   };
 
+  const handleSelectParty = (partyId: string) => {
+    setSelectedPartyId(partyId);
+    if (!partyId) return;
+
+    const party = parties.find((p) => p.id === partyId);
+    if (!party || !party.members || party.members.length === 0) return;
+
+    party.members.forEach((m) => {
+      if (!creatures.some((c) => c.id === m.id)) {
+        onHeroCreated?.(m);
+      }
+    });
+
+    const newTeamA: TeamMemberConfig[] = party.members.map((m, idx) => ({
+      id: `member-a-${Date.now()}-${idx}`,
+      creatureId: m.id,
+      weaponId: m.expectedDpr ? undefined : (weapons[0]?.id || ''),
+    }));
+
+    setTeamA(newTeamA);
+  };
+
+  const handleSelectEncounter = (encounterId: string) => {
+    setSelectedEncounterId(encounterId);
+    if (!encounterId) return;
+
+    const encounter = encounters.find((e) => e.id === encounterId);
+    if (!encounter || !encounter.creatures || encounter.creatures.length === 0) return;
+
+    encounter.creatures.forEach((c) => {
+      if (!creatures.some((x) => x.id === c.id)) {
+        onHeroCreated?.(c);
+      }
+    });
+
+    const newTeamB: TeamMemberConfig[] = encounter.creatures.map((c, idx) => ({
+      id: `member-b-${Date.now()}-${idx}`,
+      creatureId: c.id,
+      weaponId: c.expectedDpr ? undefined : (weapons.length > 1 ? weapons[1].id : weapons[0]?.id || ''),
+    }));
+
+    setTeamB(newTeamB);
+  };
+
+  const handleClearTeamA = () => {
+    setTeamA([]);
+    setSelectedPartyId('');
+  };
+
+  const handleClearTeamB = () => {
+    setTeamB([]);
+    setSelectedEncounterId('');
+  };
+
+  const handleConfirmSaveParty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partyNameInput.trim()) return;
+
+    const memberCreatureIds = teamA.map((m) => m.creatureId).filter(Boolean);
+    if (memberCreatureIds.length === 0) {
+      setErrorMessage(t('simulation.emptyTeamA'));
+      return;
+    }
+
+    setIsSavingParty(true);
+    setErrorMessage(null);
+    try {
+      const created = await apiClient.createParty({
+        name: partyNameInput.trim(),
+        memberCreatureIds,
+      });
+
+      setParties((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+      setSelectedPartyId(created.id);
+      setIsSavePartyModalOpen(false);
+      setPartyNameInput('');
+      setStatusFeedback(t('simulation.saveSuccessParty'));
+      setTimeout(() => setStatusFeedback(null), 4000);
+    } catch {
+      setErrorMessage('Error al guardar la Party.');
+    } finally {
+      setIsSavingParty(false);
+    }
+  };
+
+  const handleConfirmSaveEncounter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!encounterNameInput.trim()) return;
+
+    const creatureIds = teamB.map((m) => m.creatureId).filter(Boolean);
+    if (creatureIds.length === 0) {
+      setErrorMessage(t('simulation.emptyTeamB'));
+      return;
+    }
+
+    setIsSavingEncounter(true);
+    setErrorMessage(null);
+    try {
+      const created = await apiClient.createEncounter({
+        name: encounterNameInput.trim(),
+        difficultyNotes: encounterNotesInput.trim() || undefined,
+        creatureIds,
+      });
+
+      setEncounters((prev) => [created, ...prev.filter((e) => e.id !== created.id)]);
+      setSelectedEncounterId(created.id);
+      setIsSaveEncounterModalOpen(false);
+      setEncounterNameInput('');
+      setEncounterNotesInput('');
+      setStatusFeedback(t('simulation.saveSuccessEncounter'));
+      setTimeout(() => setStatusFeedback(null), 4000);
+    } catch {
+      setErrorMessage('Error al guardar el Encuentro.');
+    } finally {
+      setIsSavingEncounter(false);
+    }
+  };
+
   const handleHeroSaved = (hero: CreatureResponseDto) => {
     onHeroCreated?.(hero);
     setTeamA((prev) => {
       if (prev.length === 0) {
         return [{ id: `member-a-${Date.now()}`, creatureId: hero.id, weaponId: undefined }];
       }
-      const updated = [...prev];
-      updated[0] = { ...updated[0], creatureId: hero.id, weaponId: undefined };
-      return updated;
+      const firstCreature = creatures.find((c) => c.id === prev[0].creatureId);
+      if (prev.length === 1 && (!firstCreature || !firstCreature.isPlayerCharacter)) {
+        return [{ id: `member-a-${Date.now()}`, creatureId: hero.id, weaponId: undefined }];
+      }
+      return [...prev, { id: `member-a-${Date.now()}-${prev.length}`, creatureId: hero.id, weaponId: undefined }];
     });
   };
 
@@ -277,6 +456,13 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         </div>
       </header>
 
+      {/* Feedback de Estado de Guardado */}
+      {statusFeedback && (
+        <div id="status-feedback-banner" className="status-feedback-banner fade-in" role="status">
+          ✨ {statusFeedback}
+        </div>
+      )}
+
       {/* Panel de Configuración de Equipos Dinámicos */}
       <div className="sim-setup-grid">
         {/* Equipo A (La Party / Héroes) */}
@@ -297,95 +483,146 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             </button>
           </div>
 
+          {/* Selector de Party Guardada y Botones de Persistencia */}
+          <div className="team-persistence-bar">
+            <div className="persistence-select-wrapper">
+              <label htmlFor="saved-party-select" className="sr-only">
+                {t('simulation.loadSavedParty')}
+              </label>
+              <select
+                id="saved-party-select"
+                className="sim-select party-encounter-dropdown"
+                value={selectedPartyId}
+                onChange={(e) => handleSelectParty(e.target.value)}
+                disabled={isSimulating}
+              >
+                <option value="">{t('simulation.loadSavedParty')}</option>
+                {parties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    🛡️ {p.name} ({p.members.length} {t('simulation.members')})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="team-persistence-actions">
+              <button
+                type="button"
+                id="save-party-btn"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setIsSavePartyModalOpen(true)}
+                disabled={isSimulating || teamA.length === 0}
+                title={t('simulation.saveTeamAAsParty')}
+              >
+                💾 {t('simulation.saveTeamAAsParty')}
+              </button>
+              <button
+                type="button"
+                id="clear-team-a-btn"
+                className="btn btn-outline btn-sm"
+                onClick={handleClearTeamA}
+                disabled={isSimulating || teamA.length === 0}
+                title={t('simulation.clearTeam')}
+              >
+                🗑️ {t('simulation.clearTeam')}
+              </button>
+            </div>
+          </div>
+
           <div className="team-members-list">
-            {teamA.map((member, idx) => {
-              const creature = creatures.find((c) => c.id === member.creatureId);
-              return (
-                <div key={member.id} className="team-member-item">
-                  <div className="member-item-header">
-                    <span className="member-item-title">
-                      #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
-                    </span>
-                    {teamA.length > 1 && (
-                      <button
-                        type="button"
-                        id={`remove-member-a-btn-${idx}`}
-                        className="remove-member-btn"
-                        onClick={() => handleRemoveMemberA(idx)}
-                        disabled={isSimulating}
-                        title={t('simulation.removeMember')}
-                        aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
-                      >
-                        ✕ {t('simulation.removeMember')}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="field-group">
-                    <label htmlFor={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`} className="field-label">
-                      {t('simulation.creatureSelect')}
-                    </label>
-                    <select
-                      id={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`}
-                      className="sim-select"
-                      value={member.creatureId}
-                      onChange={(e) => handleUpdateMemberA(idx, e.target.value)}
-                      disabled={isSimulating}
-                    >
-                      {creatures.map((c) => (
-                        <option key={`a-${idx}-${c.id}`} value={c.id}>
-                          {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
-                          {c.name}
-                          {c.expectedDpr
-                            ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
-                            : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="field-group">
-                    <label htmlFor={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`} className="field-label">
-                      {t('simulation.weaponSelect')}
-                    </label>
-                    <select
-                      id={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`}
-                      className="sim-select"
-                      value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
-                      onChange={(e) => handleUpdateMemberA(idx, member.creatureId, e.target.value)}
-                      disabled={isSimulating || Boolean(creature?.expectedDpr)}
-                    >
-                      {creature?.expectedDpr ? (
-                        <option value="">
-                          {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
-                        </option>
-                      ) : (
-                        weapons.map((w) => (
-                          <option key={`w-a-${idx}-${w.id}`} value={w.id}>
-                            {w.name} ({w.damage} {w.damageType})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  {creature && (
-                    <div className="creature-preview-strip">
-                      <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
-                      <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
-                      {creature.expectedDpr ? (
-                        <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
-                      ) : (
-                        <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
-                      )}
-                      {creature.archetype && (
-                        <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+            {teamA.length === 0 ? (
+              <div className="empty-team-placeholder" id="empty-team-a-placeholder">
+                <p>{t('simulation.noMembersInTeam')}</p>
+              </div>
+            ) : (
+              teamA.map((member, idx) => {
+                const creature = allCreatures.find((c) => c.id === member.creatureId);
+                return (
+                  <div key={member.id} className="team-member-item">
+                    <div className="member-item-header">
+                      <span className="member-item-title">
+                        #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
+                      </span>
+                      {teamA.length > 1 && (
+                        <button
+                          type="button"
+                          id={`remove-member-a-btn-${idx}`}
+                          className="remove-member-btn"
+                          onClick={() => handleRemoveMemberA(idx)}
+                          disabled={isSimulating}
+                          title={t('simulation.removeMember')}
+                          aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
+                        >
+                          ✕ {t('simulation.removeMember')}
+                        </button>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    <div className="field-group">
+                      <label htmlFor={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`} className="field-label">
+                        {t('simulation.creatureSelect')}
+                      </label>
+                      <select
+                        id={idx === 0 ? 'combatant-a-select' : `combatant-a-select-${idx}`}
+                        className="sim-select"
+                        value={member.creatureId}
+                        onChange={(e) => handleUpdateMemberA(idx, e.target.value)}
+                        disabled={isSimulating}
+                      >
+                        {allCreatures.map((c) => (
+                          <option key={`a-${idx}-${c.id}`} value={c.id}>
+                            {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                            {c.name}
+                            {c.expectedDpr
+                              ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                              : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="field-group">
+                      <label htmlFor={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`} className="field-label">
+                        {t('simulation.weaponSelect')}
+                      </label>
+                      <select
+                        id={idx === 0 ? 'weapon-a-select' : `weapon-a-select-${idx}`}
+                        className="sim-select"
+                        value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
+                        onChange={(e) => handleUpdateMemberA(idx, member.creatureId, e.target.value)}
+                        disabled={isSimulating || Boolean(creature?.expectedDpr)}
+                      >
+                        {creature?.expectedDpr ? (
+                          <option value="">
+                            {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
+                          </option>
+                        ) : (
+                          weapons.map((w) => (
+                            <option key={`w-a-${idx}-${w.id}`} value={w.id}>
+                              {w.name} ({w.damage} {w.damageType})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {creature && (
+                      <div className="creature-preview-strip">
+                        <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
+                        <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
+                        {creature.expectedDpr ? (
+                          <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
+                        ) : (
+                          <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
+                        )}
+                        {creature.archetype && (
+                          <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -413,95 +650,146 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             </button>
           </div>
 
+          {/* Selector de Encuentro Guardado y Botones de Persistencia */}
+          <div className="team-persistence-bar">
+            <div className="persistence-select-wrapper">
+              <label htmlFor="saved-encounter-select" className="sr-only">
+                {t('simulation.loadSavedEncounter')}
+              </label>
+              <select
+                id="saved-encounter-select"
+                className="sim-select party-encounter-dropdown"
+                value={selectedEncounterId}
+                onChange={(e) => handleSelectEncounter(e.target.value)}
+                disabled={isSimulating}
+              >
+                <option value="">{t('simulation.loadSavedEncounter')}</option>
+                {encounters.map((enc) => (
+                  <option key={enc.id} value={enc.id}>
+                    ⚔️ {enc.name} ({enc.creatures.length} {t('simulation.monsters')})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="team-persistence-actions">
+              <button
+                type="button"
+                id="save-encounter-btn"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setIsSaveEncounterModalOpen(true)}
+                disabled={isSimulating || teamB.length === 0}
+                title={t('simulation.saveTeamBAsEncounter')}
+              >
+                💾 {t('simulation.saveTeamBAsEncounter')}
+              </button>
+              <button
+                type="button"
+                id="clear-team-b-btn"
+                className="btn btn-outline btn-sm"
+                onClick={handleClearTeamB}
+                disabled={isSimulating || teamB.length === 0}
+                title={t('simulation.clearTeam')}
+              >
+                🗑️ {t('simulation.clearTeam')}
+              </button>
+            </div>
+          </div>
+
           <div className="team-members-list">
-            {teamB.map((member, idx) => {
-              const creature = creatures.find((c) => c.id === member.creatureId);
-              return (
-                <div key={member.id} className="team-member-item">
-                  <div className="member-item-header">
-                    <span className="member-item-title">
-                      #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
-                    </span>
-                    {teamB.length > 1 && (
-                      <button
-                        type="button"
-                        id={`remove-member-b-btn-${idx}`}
-                        className="remove-member-btn"
-                        onClick={() => handleRemoveMemberB(idx)}
-                        disabled={isSimulating}
-                        title={t('simulation.removeMember')}
-                        aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
-                      >
-                        ✕ {t('simulation.removeMember')}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="field-group">
-                    <label htmlFor={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`} className="field-label">
-                      {t('simulation.creatureSelect')}
-                    </label>
-                    <select
-                      id={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`}
-                      className="sim-select"
-                      value={member.creatureId}
-                      onChange={(e) => handleUpdateMemberB(idx, e.target.value)}
-                      disabled={isSimulating}
-                    >
-                      {creatures.map((c) => (
-                        <option key={`b-${idx}-${c.id}`} value={c.id}>
-                          {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
-                          {c.name}
-                          {c.expectedDpr
-                            ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
-                            : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="field-group">
-                    <label htmlFor={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`} className="field-label">
-                      {t('simulation.weaponSelect')}
-                    </label>
-                    <select
-                      id={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`}
-                      className="sim-select"
-                      value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
-                      onChange={(e) => handleUpdateMemberB(idx, member.creatureId, e.target.value)}
-                      disabled={isSimulating || Boolean(creature?.expectedDpr)}
-                    >
-                      {creature?.expectedDpr ? (
-                        <option value="">
-                          {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
-                        </option>
-                      ) : (
-                        weapons.map((w) => (
-                          <option key={`w-b-${idx}-${w.id}`} value={w.id}>
-                            {w.name} ({w.damage} {w.damageType})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  {creature && (
-                    <div className="creature-preview-strip">
-                      <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
-                      <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
-                      {creature.expectedDpr ? (
-                        <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
-                      ) : (
-                        <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
-                      )}
-                      {creature.archetype && (
-                        <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+            {teamB.length === 0 ? (
+              <div className="empty-team-placeholder" id="empty-team-b-placeholder">
+                <p>{t('simulation.noMembersInTeam')}</p>
+              </div>
+            ) : (
+              teamB.map((member, idx) => {
+                const creature = allCreatures.find((c) => c.id === member.creatureId);
+                return (
+                  <div key={member.id} className="team-member-item">
+                    <div className="member-item-header">
+                      <span className="member-item-title">
+                        #{idx + 1} {creature ? creature.name : t('simulation.creatureSelect')}
+                      </span>
+                      {teamB.length > 1 && (
+                        <button
+                          type="button"
+                          id={`remove-member-b-btn-${idx}`}
+                          className="remove-member-btn"
+                          onClick={() => handleRemoveMemberB(idx)}
+                          disabled={isSimulating}
+                          title={t('simulation.removeMember')}
+                          aria-label={`${t('simulation.removeMember')} #${idx + 1}`}
+                        >
+                          ✕ {t('simulation.removeMember')}
+                        </button>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    <div className="field-group">
+                      <label htmlFor={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`} className="field-label">
+                        {t('simulation.creatureSelect')}
+                      </label>
+                      <select
+                        id={idx === 0 ? 'combatant-b-select' : `combatant-b-select-${idx}`}
+                        className="sim-select"
+                        value={member.creatureId}
+                        onChange={(e) => handleUpdateMemberB(idx, e.target.value)}
+                        disabled={isSimulating}
+                      >
+                        {allCreatures.map((c) => (
+                          <option key={`b-${idx}-${c.id}`} value={c.id}>
+                            {c.isPlayerCharacter ? '🛡️ [Héroe] ' : ''}
+                            {c.name}
+                            {c.expectedDpr
+                              ? ` (Nv ${c.level ?? 1} ${c.archetype ?? 'PC'} | ${c.expectedDpr} DPR | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`
+                              : ` (CR ${c.challengeRating} | CA ${c.effectiveArmorClass} | ${c.hitPoints.max} HP)`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="field-group">
+                      <label htmlFor={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`} className="field-label">
+                        {t('simulation.weaponSelect')}
+                      </label>
+                      <select
+                        id={idx === 0 ? 'weapon-b-select' : `weapon-b-select-${idx}`}
+                        className="sim-select"
+                        value={creature?.expectedDpr ? '' : (member.weaponId ?? '')}
+                        onChange={(e) => handleUpdateMemberB(idx, member.creatureId, e.target.value)}
+                        disabled={isSimulating || Boolean(creature?.expectedDpr)}
+                      >
+                        {creature?.expectedDpr ? (
+                          <option value="">
+                            {t('simulation.noWeaponRequiredDpr', { dpr: creature.expectedDpr })}
+                          </option>
+                        ) : (
+                          weapons.map((w) => (
+                            <option key={`w-b-${idx}-${w.id}`} value={w.id}>
+                              {w.name} ({w.damage} {w.damageType})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {creature && (
+                      <div className="creature-preview-strip">
+                        <span>🛡️ CA: <strong>{creature.effectiveArmorClass}</strong></span>
+                        <span>❤️ HP: <strong>{creature.hitPoints.max}</strong></span>
+                        {creature.expectedDpr ? (
+                          <span className="dpr-preview-badge">⚡ DPR: <strong>{creature.expectedDpr}</strong></span>
+                        ) : (
+                          <span>⚡ PB: <strong>+{creature.proficiencyBonus}</strong></span>
+                        )}
+                        {creature.archetype && (
+                          <span className="archetype-preview-badge">🏹 {creature.archetype} (Nv {creature.level ?? 1})</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -740,6 +1028,135 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         onSaveHero={apiClient.createCustomHero}
         onHeroSaved={handleHeroSaved}
       />
+
+      {/* Modal para Guardar Team A como Party */}
+      {isSavePartyModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" id="save-party-modal">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h3 className="modal-title">🛡️ {t('simulation.savePartyModalTitle')}</h3>
+              <button
+                type="button"
+                id="close-save-party-modal"
+                className="modal-close-btn"
+                onClick={() => setIsSavePartyModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleConfirmSaveParty} className="modal-form">
+              <div className="field-group">
+                <label htmlFor="party-name-input" className="field-label">
+                  {t('simulation.partyNameLabel')}
+                </label>
+                <input
+                  id="party-name-input"
+                  type="text"
+                  className="input-text"
+                  value={partyNameInput}
+                  onChange={(e) => setPartyNameInput(e.target.value)}
+                  placeholder={t('simulation.partyNamePlaceholder')}
+                  required
+                  autoFocus
+                />
+              </div>
+              <p className="modal-info-text">
+                Se guardarán los {teamA.length} combatientes de la party.
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  id="cancel-save-party-btn"
+                  className="btn btn-secondary"
+                  onClick={() => setIsSavePartyModalOpen(false)}
+                  disabled={isSavingParty}
+                >
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+                <button
+                  type="submit"
+                  id="confirm-save-party-btn"
+                  className="btn btn-primary"
+                  disabled={isSavingParty || !partyNameInput.trim()}
+                >
+                  {isSavingParty ? t('common.saving', 'Guardando...') : t('common.save', 'Guardar Party')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Guardar Team B como Encuentro */}
+      {isSaveEncounterModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" id="save-encounter-modal">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h3 className="modal-title">⚔️ {t('simulation.saveEncounterModalTitle')}</h3>
+              <button
+                type="button"
+                id="close-save-encounter-modal"
+                className="modal-close-btn"
+                onClick={() => setIsSaveEncounterModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleConfirmSaveEncounter} className="modal-form">
+              <div className="field-group">
+                <label htmlFor="encounter-name-input" className="field-label">
+                  {t('simulation.encounterNameLabel')}
+                </label>
+                <input
+                  id="encounter-name-input"
+                  type="text"
+                  className="input-text"
+                  value={encounterNameInput}
+                  onChange={(e) => setEncounterNameInput(e.target.value)}
+                  placeholder={t('simulation.encounterNamePlaceholder')}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="field-group">
+                <label htmlFor="encounter-notes-input" className="field-label">
+                  {t('simulation.encounterNotesLabel')}
+                </label>
+                <textarea
+                  id="encounter-notes-input"
+                  className="input-text input-textarea"
+                  rows={3}
+                  value={encounterNotesInput}
+                  onChange={(e) => setEncounterNotesInput(e.target.value)}
+                  placeholder={t('simulation.encounterNotesPlaceholder')}
+                />
+              </div>
+              <p className="modal-info-text">
+                Se guardarán los {teamB.length} monstruos del encuentro.
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  id="cancel-save-encounter-btn"
+                  className="btn btn-secondary"
+                  onClick={() => setIsSaveEncounterModalOpen(false)}
+                  disabled={isSavingEncounter}
+                >
+                  {t('common.cancel', 'Cancelar')}
+                </button>
+                <button
+                  type="submit"
+                  id="confirm-save-encounter-btn"
+                  className="btn btn-primary"
+                  disabled={isSavingEncounter || !encounterNameInput.trim()}
+                >
+                  {isSavingEncounter ? t('common.saving', 'Guardando...') : t('common.save', 'Guardar Encuentro')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

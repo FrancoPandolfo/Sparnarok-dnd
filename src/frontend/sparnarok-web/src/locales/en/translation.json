@@ -180,6 +180,24 @@
       "submit": "Add to Simulator",
       "saving": "Saving Hero..."
     },
-    "noWeaponRequiredDpr": "⚡ Archetype DPR ({{dpr}} DPR) [No weapon required]"
+    "noWeaponRequiredDpr": "⚡ Archetype DPR ({{dpr}} DPR) [No weapon required]",
+    "loadSavedParty": "Load Saved Party",
+    "loadSavedEncounter": "Load Saved Encounter",
+    "saveTeamAAsParty": "Save Team A as new Party",
+    "saveTeamBAsEncounter": "Save Team B as new Encounter",
+    "clearTeam": "Clear Team",
+    "noMembersInTeam": "No combatants in this team. Add members or load a saved preset.",
+    "savePartyModalTitle": "Save Team A as new Party",
+    "saveEncounterModalTitle": "Save Team B as new Encounter",
+    "partyNameLabel": "Party Name",
+    "partyNamePlaceholder": "E.g. The Silver Blade Fellowship",
+    "encounterNameLabel": "Encounter Name",
+    "encounterNamePlaceholder": "E.g. Hobgoblin Ambush at the Pass",
+    "encounterNotesLabel": "Tactical Notes / Difficulty (Optional)",
+    "encounterNotesPlaceholder": "E.g. Surprise ambush with initiative advantage...",
+    "saveSuccessParty": "Party saved successfully!",
+    "saveSuccessEncounter": "Encounter saved successfully!",
+    "members": "members",
+    "monsters": "monsters"
   }
 }

@@ -40,6 +40,17 @@ public class SparnarokDbContext : DbContext
     public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
 
     /// <summary>
+    /// Conjunto de datos para los grupos estructurados de héroes (Parties) guardados por los usuarios.
+    /// </summary>
+    public DbSet<Party> Parties => Set<Party>();
+
+    /// <summary>
+    /// Conjunto de datos para los encuentros tácticos de monstruos guardados por los usuarios.
+    /// </summary>
+    public DbSet<Encounter> Encounters => Set<Encounter>();
+
+
+    /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.
     /// </summary>
     /// <param name="options">Opciones de configuración del contexto.</param>

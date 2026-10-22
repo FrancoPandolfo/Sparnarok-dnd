@@ -180,6 +180,24 @@
       "submit": "Añadir al Simulador",
       "saving": "Guardando Héroe..."
     },
-    "noWeaponRequiredDpr": "⚡ DPR de Arquetipo ({{dpr}} DPR) [Sin arma requerida]"
+    "noWeaponRequiredDpr": "⚡ DPR de Arquetipo ({{dpr}} DPR) [Sin arma requerida]",
+    "loadSavedParty": "Cargar Party Guardada",
+    "loadSavedEncounter": "Cargar Encuentro Guardado",
+    "saveTeamAAsParty": "Guardar Team A como nueva Party",
+    "saveTeamBAsEncounter": "Guardar Team B como nuevo Encuentro",
+    "clearTeam": "Limpiar Equipo",
+    "noMembersInTeam": "No hay combatientes en este equipo. Añade combatientes o carga una plantilla guardada.",
+    "savePartyModalTitle": "Guardar Team A como nueva Party",
+    "saveEncounterModalTitle": "Guardar Team B como nuevo Encuentro",
+    "partyNameLabel": "Nombre de la Party",
+    "partyNamePlaceholder": "Ej. La Compañía de la Espada de Plata",
+    "encounterNameLabel": "Nombre del Encuentro",
+    "encounterNamePlaceholder": "Ej. Emboscada de Hobgoblins en el Paso",
+    "encounterNotesLabel": "Notas Tácticas / Dificultad (Opcional)",
+    "encounterNotesPlaceholder": "Ej. Emboscada sorpresa con ventaja en iniciativa...",
+    "saveSuccessParty": "¡Party guardada exitosamente!",
+    "saveSuccessEncounter": "¡Encuentro guardado exitosamente!",
+    "members": "miembros",
+    "monsters": "monstruos"
   }
 }

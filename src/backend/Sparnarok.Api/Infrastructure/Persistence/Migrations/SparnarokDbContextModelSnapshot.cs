@@ -37,6 +37,36 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("CreatureWeaponMasteries");
                 });
 
+            modelBuilder.Entity("EncounterCreatures", b =>
+                {
+                    b.Property<Guid>("CreatureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EncounterId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("CreatureId", "EncounterId");
+
+                    b.HasIndex("EncounterId");
+
+                    b.ToTable("EncounterCreatures");
+                });
+
+            modelBuilder.Entity("PartyCreatures", b =>
+                {
+                    b.Property<Guid>("CreatureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("CreatureId", "PartyId");
+
+                    b.HasIndex("PartyId");
+
+                    b.ToTable("PartyCreatures");
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Action", b =>
                 {
                     b.Property<Guid>("Id")
@@ -90,6 +120,47 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatureId");
 
                     b.ToTable("Actions", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.ApplicationUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("GoogleSubjectId")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("LastLoginAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("GoogleSubjectId")
+                        .IsUnique();
+
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Armor", b =>
@@ -187,6 +258,9 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Size")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -206,7 +280,61 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EquippedShieldId");
 
+                    b.HasIndex("OwnerUserId");
+
                     b.ToTable("Creatures", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Encounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DifficultyNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("Encounters", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Party", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("Parties", (string)null);
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Weapon", b =>
@@ -363,6 +491,36 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EncounterCreatures", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Creature", null)
+                        .WithMany()
+                        .HasForeignKey("CreatureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Encounter", null)
+                        .WithMany()
+                        .HasForeignKey("EncounterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PartyCreatures", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Creature", null)
+                        .WithMany()
+                        .HasForeignKey("CreatureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Action", b =>
                 {
                     b.HasOne("Sparnarok.Api.Domain.Entities.WeaponMastery", "AssociatedMastery")
@@ -390,6 +548,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("EquippedShieldId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sparnarok.Api.Domain.Entities.ApplicationUser", null)
+                        .WithMany("CustomHeroes")
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.OwnsOne("Sparnarok.Api.Domain.ValueObjects.AbilityScores", "AbilityScores", b1 =>
                         {
@@ -494,6 +657,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.Navigation("HitPoints")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.ApplicationUser", b =>
+                {
+                    b.Navigation("CustomHeroes");
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Creature", b =>
