@@ -48,7 +48,8 @@ import type {
   UpdateSessionNoteRequest,
 } from '../types/liveCombat';
 
-const API_BASE_URL = '/api/v1';
+export const BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
+export const API_BASE_URL = `${BASE_URL}/api/v1`;
 
 let currentAuthToken: string | null = null;
 let inMemorySessionNotes: SessionNoteResponseDto[] = [];
@@ -848,7 +849,7 @@ export const apiClient = {
    */
   async loginWithGoogle(idToken: string): Promise<AuthResponseDto> {
     try {
-      const response = await fetch('/api/auth/google', {
+      const response = await fetch(`${BASE_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
@@ -884,7 +885,7 @@ export const apiClient = {
    */
   async registerConventional(data: RegisterRequestDto): Promise<AuthResponseDto> {
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(`${BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -921,7 +922,7 @@ export const apiClient = {
    */
   async loginConventional(data: LoginRequestDto): Promise<AuthResponseDto> {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -957,7 +958,7 @@ export const apiClient = {
    * Configura o actualiza la contraseña para el usuario autenticado.
    */
   async setPassword(data: SetPasswordRequestDto): Promise<AuthResponseDto> {
-    const response = await fetch('/api/auth/set-password', {
+    const response = await fetch(`${BASE_URL}/api/auth/set-password`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data),
@@ -976,7 +977,7 @@ export const apiClient = {
    * Vincula una cuenta de Google al usuario autenticado.
    */
   async linkGoogle(idToken: string): Promise<AuthResponseDto> {
-    const response = await fetch('/api/auth/link-google', {
+    const response = await fetch(`${BASE_URL}/api/auth/link-google`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ idToken }),
@@ -997,7 +998,7 @@ export const apiClient = {
   async getCurrentUser(signal?: AbortSignal): Promise<AuthResponseDto | null> {
     if (!currentAuthToken) return null;
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(`${BASE_URL}/api/auth/me`, {
         headers: getAuthHeaders(),
         signal,
       });
@@ -1245,7 +1246,7 @@ export const apiClient = {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/ingestion/weapons', {
+      const response = await fetch(`${BASE_URL}/api/ingestion/weapons`, {
         method: 'POST',
         body: formData,
       });
@@ -1272,7 +1273,7 @@ export const apiClient = {
 
   async getWeapons(signal?: AbortSignal): Promise<WeaponDto[]> {
     try {
-      const response = await fetch('/api/ingestion/weapons', { signal });
+      const response = await fetch(`${BASE_URL}/api/ingestion/weapons`, { signal });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -1293,7 +1294,7 @@ export const apiClient = {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/ingestion/armors', {
+      const response = await fetch(`${BASE_URL}/api/ingestion/armors`, {
         method: 'POST',
         body: formData,
       });
@@ -1322,7 +1323,7 @@ export const apiClient = {
    */
   async getArmors(signal?: AbortSignal): Promise<ArmorDto[]> {
     try {
-      const response = await fetch('/api/ingestion/armors', { signal });
+      const response = await fetch(`${BASE_URL}/api/ingestion/armors`, { signal });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -1340,7 +1341,7 @@ export const apiClient = {
    */
   async equipCreature(creatureId: string, request: EquipItemsRequestDto): Promise<CreatureResponseDto | null> {
     try {
-      const response = await fetch(`/api/v1/creatures/${creatureId}/equip`, {
+      const response = await fetch(`${API_BASE_URL}/creatures/${creatureId}/equip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -1374,7 +1375,7 @@ export const apiClient = {
    */
   async getDprBaselines(signal?: AbortSignal): Promise<DprBaselineDto[]> {
     try {
-      const response = await fetch('/api/v1/dpr-baselines', { signal });
+      const response = await fetch(`${API_BASE_URL}/dpr-baselines`, { signal });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -1392,7 +1393,7 @@ export const apiClient = {
    */
   async getDprArchetypes(signal?: AbortSignal): Promise<string[]> {
     try {
-      const response = await fetch('/api/v1/dpr-baselines/archetypes', { signal });
+      const response = await fetch(`${API_BASE_URL}/dpr-baselines/archetypes`, { signal });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -1411,7 +1412,7 @@ export const apiClient = {
   async calculateDpr(archetype: string, level: number): Promise<number> {
     try {
       const response = await fetch(
-        `/api/v1/dpr-baselines/calculate?archetype=${encodeURIComponent(archetype)}&level=${level}`
+        `${API_BASE_URL}/dpr-baselines/calculate?archetype=${encodeURIComponent(archetype)}&level=${level}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -1430,7 +1431,7 @@ export const apiClient = {
    */
   async createCustomHero(request: CreateCustomHeroRequestDto): Promise<CreatureResponseDto> {
     try {
-      const response = await fetch('/api/v1/creatures/custom', {
+      const response = await fetch(`${API_BASE_URL}/creatures/custom`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(request),
@@ -1526,7 +1527,7 @@ export const apiClient = {
    */
   async syncOpen5eMonsters(limit = 50): Promise<IngestionResultDto> {
     try {
-      const response = await fetch(`/api/ingestion/open5e/monsters/sync?limit=${limit}`, {
+      const response = await fetch(`${BASE_URL}/api/ingestion/open5e/monsters/sync?limit=${limit}`, {
         method: 'POST',
       });
       if (response.ok) {
@@ -1549,7 +1550,7 @@ export const apiClient = {
    */
   async runMontecarlo(request: MontecarloRequestDto): Promise<MontecarloResultDto> {
     try {
-      const response = await fetch('/api/simulation/montecarlo', {
+      const response = await fetch(`${BASE_URL}/api/simulation/montecarlo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -1630,7 +1631,7 @@ export const apiClient = {
             inMemoryParties = parsed;
             return parsed;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1678,7 +1679,7 @@ export const apiClient = {
     if (authStr) {
       try {
         currentUserId = JSON.parse(authStr).id || currentUserId;
-      } catch {}
+      } catch { }
     }
 
     const members = request.memberCreatureIds
@@ -1959,7 +1960,7 @@ export const apiClient = {
             items = parsed;
           }
         }
-      } catch {}
+      } catch { }
     }
     const totalWeight = items.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0);
 
@@ -1970,7 +1971,7 @@ export const apiClient = {
         if (storedFunds) {
           funds = JSON.parse(storedFunds);
         }
-      } catch {}
+      } catch { }
     }
     if (!funds) {
       funds = {
@@ -2040,7 +2041,7 @@ export const apiClient = {
             detail: { partyId, type: 'ItemAdded', payload: newItem },
           })
         );
-      } catch {}
+      } catch { }
     }
 
     inMemoryActivityLogs = [
@@ -2122,7 +2123,7 @@ export const apiClient = {
               detail: { partyId, type: 'ItemUpdated', payload: updated },
             })
           );
-        } catch {}
+        } catch { }
       }
       return updated;
     }
@@ -2204,7 +2205,7 @@ export const apiClient = {
             detail: { partyId, type: 'FundsUpdated', payload: funds },
           })
         );
-      } catch {}
+      } catch { }
     }
     inMemoryActivityLogs = [
       {
@@ -2430,7 +2431,7 @@ export const apiClient = {
           const storedNotes: SessionNoteResponseDto[] = JSON.parse(raw);
           return storedNotes;
         }
-      } catch {}
+      } catch { }
     }
 
     const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
@@ -2438,7 +2439,7 @@ export const apiClient = {
     if (authStr) {
       try {
         currentUserId = JSON.parse(authStr).id;
-      } catch {}
+      } catch { }
     }
 
     return inMemorySessionNotes.filter(
@@ -2475,7 +2476,7 @@ export const apiClient = {
     if (authStr) {
       try {
         currentUserId = JSON.parse(authStr).id || currentUserId;
-      } catch {}
+      } catch { }
     }
 
     const newNote: SessionNoteResponseDto = {
@@ -2493,7 +2494,7 @@ export const apiClient = {
         const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
         const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
         window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify([newNote, ...stored]));
-      } catch {}
+      } catch { }
     }
     return newNote;
   },
@@ -2550,7 +2551,7 @@ export const apiClient = {
         const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
         const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
         window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.map(n => n.id === noteId ? fallbackNote : n)));
-      } catch {}
+      } catch { }
     }
 
     return fallbackNote;
@@ -2583,7 +2584,7 @@ export const apiClient = {
         const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
         const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
         window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.filter(n => n.id !== noteId)));
-      } catch {}
+      } catch { }
     }
   },
 
@@ -2592,7 +2593,7 @@ export const apiClient = {
    */
   async updateProfile(data: UpdateUserProfileRequestDto): Promise<UserProfileResponseDto> {
     try {
-      const response = await fetch('/api/users/profile', {
+      const response = await fetch(`${BASE_URL}/api/users/profile`, {
         method: 'PUT',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
@@ -2619,7 +2620,7 @@ export const apiClient = {
    */
   async getPartyInviteDetails(token: string): Promise<PartyInviteDetailsDto> {
     try {
-      const response = await fetch(`/api/parties/join/${token}`, {
+      const response = await fetch(`${BASE_URL}/api/parties/join/${token}`, {
         headers: getAuthHeaders(),
       });
       if (response.ok) {
@@ -2636,7 +2637,7 @@ export const apiClient = {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) partiesList = parsed;
-        } catch {}
+        } catch { }
       }
     }
 
@@ -2654,7 +2655,7 @@ export const apiClient = {
    */
   async joinPartyByToken(token: string, request: JoinPartyRequestDto): Promise<PartyResponseDto> {
     try {
-      const response = await fetch(`/api/parties/join/${token}`, {
+      const response = await fetch(`${BASE_URL}/api/parties/join/${token}`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(request),
@@ -2673,7 +2674,7 @@ export const apiClient = {
     if (authStr) {
       try {
         currentUserId = JSON.parse(authStr).id || currentUserId;
-      } catch {}
+      } catch { }
     }
 
     let partiesList = inMemoryParties;
@@ -2683,7 +2684,7 @@ export const apiClient = {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) partiesList = parsed;
-        } catch {}
+        } catch { }
       }
     }
 

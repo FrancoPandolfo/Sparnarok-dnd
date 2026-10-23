@@ -1,5 +1,5 @@
 import { HubConnection, HubConnectionBuilder, LogLevel, HubConnectionState } from '@microsoft/signalr';
-import { apiClient } from './apiClient';
+import { apiClient, BASE_URL } from './apiClient';
 import type {
   LiveCombatDmProjectionDto,
   LiveCombatPlayerProjectionDto,
@@ -131,7 +131,7 @@ class LiveCombatHubService {
     this.emitFallbackProjection();
 
     const connection = new HubConnectionBuilder()
-      .withUrl('/hubs/live-combat', {
+      .withUrl(`${BASE_URL}/hubs/live-combat`, {
         accessTokenFactory: () => apiClient.getAuthToken() ?? '',
       })
       .withAutomaticReconnect()

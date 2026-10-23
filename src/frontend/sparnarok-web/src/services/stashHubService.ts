@@ -1,5 +1,5 @@
 import { HubConnection, HubConnectionBuilder, LogLevel, HubConnectionState } from '@microsoft/signalr';
-import { apiClient } from './apiClient';
+import { apiClient, BASE_URL } from './apiClient';
 import type {
   StashItemDto,
   PartyFundDto,
@@ -92,7 +92,7 @@ class StashHubService {
     this.currentPartyId = partyId;
 
     const connection = new HubConnectionBuilder()
-      .withUrl('/hubs/stash', {
+      .withUrl(`${BASE_URL}/hubs/stash`, {
         accessTokenFactory: () => apiClient.getAuthToken() ?? '',
       })
       .withAutomaticReconnect()
