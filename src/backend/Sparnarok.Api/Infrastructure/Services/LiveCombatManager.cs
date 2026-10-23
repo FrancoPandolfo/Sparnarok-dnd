@@ -121,6 +121,37 @@ public class LiveCombatManager : ILiveCombatManager
         return combatant;
     }
 
+    public LiveCombatant ForceAddPartyMember(Guid partyId, Guid? assignedUserId, string name, int maxHp, int armorClass, int? currentHp = null)
+    {
+        var state = GetOrCreateState(partyId);
+        var existing = state.Combatants.FirstOrDefault(c =>
+            (assignedUserId.HasValue && c.AssignedPlayerUserId == assignedUserId.Value) ||
+            c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var combatant = new LiveCombatant(
+            Guid.NewGuid(),
+            name,
+            Math.Max(1, maxHp),
+            Math.Max(0, armorClass),
+            isPlayerCharacter: true,
+            isVisibleToPlayers: true,
+            assignedPlayerUserId: assignedUserId,
+            initiative: null
+        )
+        {
+            CurrentHp = Math.Clamp(currentHp ?? maxHp, 0, Math.Max(1, maxHp)),
+            SortOrder = state.Combatants.Count
+        };
+
+        state.Combatants.Add(combatant);
+        return combatant;
+    }
+
     public void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null)
     {
         if (!_states.TryGetValue(partyId, out var state))

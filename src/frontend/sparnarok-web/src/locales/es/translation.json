@@ -280,6 +280,7 @@
     "overrideInitiativeBtn": "Fijar",
     "overrideInitiativeTitle": "Sobreescribir iniciativa (DM/AFK)",
     "addQuickCombatantBtn": "Añadir Combatiente Rápido",
+    "forceAddMemberBtn": "+ Añadir al Combate",
     "quickCombatantModalTitle": "Añadir Combatiente Rápido",
     "quickCombatantName": "Nombre del Combatiente",
     "quickCombatantHp": "Puntos de Golpe (HP)",

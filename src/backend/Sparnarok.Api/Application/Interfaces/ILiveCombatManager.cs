@@ -40,6 +40,12 @@ public interface ILiveCombatManager
     LiveCombatant AddCombatant(Guid partyId, LiveCombatant combatant);
 
     /// <summary>
+    /// Incorpora directamente a un miembro de la Party al combate activo con iniciativa nula (null)
+    /// y asignándole el SortOrder al final de la lista posicional.
+    /// </summary>
+    LiveCombatant ForceAddPartyMember(Guid partyId, Guid? assignedUserId, string name, int maxHp, int armorClass, int? currentHp = null);
+
+    /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs que aún no tengan valor asignado.
     /// </summary>
     void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null);

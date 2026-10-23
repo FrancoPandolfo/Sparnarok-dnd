@@ -392,20 +392,24 @@ public class LiveCombatHubTests
     }
 
     [Fact]
-    public async Task InvitePlayerToEncounter_WhenInvited_SendsCombatInviteReceivedOnlyToTargetUserConnection()
+    public async Task ForceAddPartyMemberToCombat_WhenCalledByDm_AssignsNullInitiativeAndAppendsToEndOfSortOrder()
     {
         // Arrange
         var partyId = Guid.NewGuid();
-        var targetUserId = "user-player-target-456";
+        var playerUserId = Guid.NewGuid();
         var manager = new LiveCombatManager();
-        manager.InitializeCombat(partyId, "La Compañía del Dragón", new List<LiveCombatant>());
 
-        var targetUserProxy = Substitute.For<IClientProxy>();
-        var allProxy = Substitute.For<IClientProxy>();
+        var orc1 = new LiveCombatant(Guid.NewGuid(), "Orco 1", maxHp: 30, armorClass: 13, isPlayerCharacter: false, isVisibleToPlayers: true, initiative: 15) { SortOrder = 0 };
+        var orc2 = new LiveCombatant(Guid.NewGuid(), "Orco 2", maxHp: 30, armorClass: 13, isPlayerCharacter: false, isVisibleToPlayers: true, initiative: 12) { SortOrder = 1 };
+
+        manager.InitializeCombat(partyId, "La Compañía del Dragón", new List<LiveCombatant> { orc1, orc2 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
 
         var hubClients = Substitute.For<IHubCallerClients>();
-        hubClients.User(targetUserId).Returns(targetUserProxy);
-        hubClients.All.Returns(allProxy);
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
 
         var hub = new LiveCombatHub(manager)
         {
@@ -413,23 +417,22 @@ public class LiveCombatHubTests
         };
 
         // Act
-        await hub.InvitePlayerToEncounter(partyId.ToString(), targetUserId);
+        await hub.ForceAddPartyMemberToCombat(partyId.ToString(), playerUserId.ToString());
 
-        // Assert: Se envió el evento exclusivamente al usuario objetivo
-        await targetUserProxy.Received(1).SendCoreAsync(
-            "CombatInviteReceived",
-            Arg.Do<object?[]>(args =>
-            {
-                args.Should().ContainSingle();
-                var json = JsonSerializer.Serialize(args[0]);
-                json.Should().Contain(partyId.ToString());
-                json.Should().Contain(targetUserId);
-                json.Should().Contain("La Compañía del Dragón");
-            }),
-            default);
+        // Assert: El combatiente se agregó en memoria con iniciativa null y al final del SortOrder
+        var state = manager.GetState(partyId);
+        state.Should().NotBeNull();
+        state!.Combatants.Should().HaveCount(3);
 
-        // Assert: NO se envió a All (cero broadcast general indiscriminado)
-        await allProxy.DidNotReceive().SendCoreAsync(Arg.Any<string>(), Arg.Any<object?[]>(), default);
+        var addedPlayer = state.Combatants[2];
+        addedPlayer.AssignedPlayerUserId.Should().Be(playerUserId);
+        addedPlayer.IsPlayerCharacter.Should().BeTrue();
+        addedPlayer.Initiative.Should().BeNull("el jugador debe agregarse con iniciativa nula para que pueda ingresarla voluntariamente o el DM posicionarlo");
+        addedPlayer.SortOrder.Should().Be(2, "debe posicionarse al final de la lista existente");
+
+        // Assert: Se emitió el broadcast CombatStateUpdated a ambos grupos
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
     }
 
     [Fact]
