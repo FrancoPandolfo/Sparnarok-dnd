@@ -261,6 +261,60 @@ class LiveCombatHubService {
   }
 
   /**
+   * Actualiza la iniciativa de un combatiente específico.
+   * Si es llamado por un Jugador, solo puede actualizar la suya; si es el DM, cualquiera.
+   */
+  async updateCombatantInitiative(
+    partyId: string,
+    combatantId: string,
+    newInitiative: number | null
+  ): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      await this.connection.invoke('UpdateCombatantInitiative', partyId, combatantId, newInitiative);
+      return;
+    }
+
+    const state = this.getRawState(partyId);
+    if (!state) return;
+
+    const combatant = state.combatants.find((c) => c.id === combatantId);
+    if (combatant) {
+      combatant.initiative = newInitiative;
+      this.saveRawState(partyId, state);
+      this.broadcastFallbackUpdate(partyId);
+    }
+  }
+
+  /**
+   * Elimina un combatiente del encuentro activo y recalcula el orden posicional (exclusivo DM).
+   */
+  async removeCombatant(
+    partyId: string,
+    combatantId: string
+  ): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      await this.connection.invoke('RemoveCombatant', partyId, combatantId);
+      return;
+    }
+
+    const state = this.getRawState(partyId);
+    if (!state) return;
+
+    const initialLen = state.combatants.length;
+    state.combatants = state.combatants.filter((c) => c.id !== combatantId);
+    if (state.combatants.length !== initialLen) {
+      if (state.combatants.length === 0) {
+        state.currentTurnIndex = 0;
+        state.status = 'WaitingForInitiative';
+      } else {
+        state.currentTurnIndex = Math.min(state.currentTurnIndex, state.combatants.length - 1);
+      }
+      this.saveRawState(partyId, state);
+      this.broadcastFallbackUpdate(partyId);
+    }
+  }
+
+  /**
    * Tira la iniciativa automáticamente para todos los monstruos (DM).
    */
   async autoRollMonsters(partyId: string): Promise<void> {

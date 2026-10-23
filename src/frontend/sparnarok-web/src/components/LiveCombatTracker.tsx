@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { liveCombatHubService } from '../services/liveCombatHubService';
+import { apiClient } from '../services/apiClient';
 import type {
   LiveCombatDmProjectionDto,
   LiveCombatPlayerProjectionDto,
@@ -26,6 +27,7 @@ import type {
   PartyRole,
 } from '../types/liveCombat';
 import type { PartyResponseDto } from '../types/partyEncounter';
+import type { CreatureResponseDto } from '../types/dnd';
 
 export interface LiveCombatTrackerProps {
   partyId?: string | null;
@@ -40,6 +42,9 @@ interface SortableCombatantRowProps {
   index: number;
   isActive: boolean;
   isDm: boolean;
+  isOwnCharacter: boolean;
+  handleUpdateInitiative: (combatantId: string, val: number | string) => void;
+  handleRemoveCombatant: (combatantId: string, name: string) => void;
   overrideCombatantId: string | null;
   overrideValue: number | string;
   setOverrideCombatantId: (id: string | null) => void;
@@ -58,6 +63,9 @@ const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
   index,
   isActive,
   isDm,
+  isOwnCharacter,
+  handleUpdateInitiative,
+  handleRemoveCombatant,
   overrideCombatantId,
   overrideValue,
   setOverrideCombatantId,
@@ -67,6 +75,13 @@ const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
   handleToggleVisibility,
 }) => {
   const { t } = useTranslation();
+  const [localInitInput, setLocalInitInput] = useState<string | number>(
+    c.initiative !== null && c.initiative !== undefined ? c.initiative : ''
+  );
+
+  useEffect(() => {
+    setLocalInitInput(c.initiative !== null && c.initiative !== undefined ? c.initiative : '');
+  }, [c.initiative]);
   const {
     attributes,
     listeners,
@@ -139,30 +154,30 @@ const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
 
       {/* Iniciativa: Admite números o null/vacío sin romper la UI */}
       <td className="row-initiative">
-        {isDm && overrideCombatantId === c.id ? (
-          <div className="initiative-override-box">
-            <input
-              type="number"
-              className="input-xs"
-              value={overrideValue}
-              onChange={(e) =>
-                setOverrideValue(e.target.value === '' ? '' : Number(e.target.value))
-              }
-              placeholder="-"
-              aria-label={t('liveCombat.overrideInitiativeTitle', 'Modificar Iniciativa')}
-            />
-            <button
-              type="button"
-              className="btn btn-primary btn-xs"
-              onClick={() => handleDmOverrideInitiative(c.id)}
-            >
-              ✓
-            </button>
-          </div>
-        ) : (
-          <span className="initiative-score">
-            {c.initiative !== null && c.initiative !== undefined ? c.initiative : '-'}
-            {isDm && (
+        {isDm ? (
+          overrideCombatantId === c.id ? (
+            <div className="initiative-override-box">
+              <input
+                type="number"
+                className="input-xs"
+                value={overrideValue}
+                onChange={(e) =>
+                  setOverrideValue(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                placeholder="-"
+                aria-label={t('liveCombat.overrideInitiativeTitle', 'Modificar Iniciativa')}
+              />
+              <button
+                type="button"
+                className="btn btn-primary btn-xs"
+                onClick={() => handleDmOverrideInitiative(c.id)}
+              >
+                ✓
+              </button>
+            </div>
+          ) : (
+            <span className="initiative-score">
+              {c.initiative !== null && c.initiative !== undefined ? c.initiative : '-'}
               <button
                 type="button"
                 className="btn-link-icon"
@@ -174,8 +189,55 @@ const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
               >
                 ✏️
               </button>
-            )}
-          </span>
+            </span>
+          )
+        ) : (
+          <div className="player-initiative-input-container">
+            <input
+              type="number"
+              id={`combatant-initiative-input-${c.id}`}
+              data-testid={`combatant-initiative-input-${c.id}`}
+              className={`form-input initiative-row-input ${
+                isOwnCharacter ? 'initiative-row-input-active' : 'initiative-row-input-disabled'
+              }`}
+              disabled={!isOwnCharacter}
+              min={1}
+              max={40}
+              placeholder="-"
+              value={isOwnCharacter ? localInitInput : (c.initiative !== null && c.initiative !== undefined ? c.initiative : '')}
+              onChange={(e) => {
+                if (!isOwnCharacter) return;
+                setLocalInitInput(e.target.value === '' ? '' : Number(e.target.value));
+              }}
+              onBlur={() => {
+                if (!isOwnCharacter) return;
+                handleUpdateInitiative(c.id, localInitInput);
+              }}
+              onKeyDown={(e) => {
+                if (!isOwnCharacter) return;
+                if (e.key === 'Enter') {
+                  handleUpdateInitiative(c.id, localInitInput);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              aria-label={t('liveCombat.myInitiativeInputAria', 'Editar tu tirada de iniciativa')}
+              title={isOwnCharacter ? t('liveCombat.myInitiativeInputAria', 'Editar tu tirada de iniciativa') : undefined}
+              style={{
+                width: '60px',
+                padding: '2px 6px',
+                textAlign: 'center',
+                background: isOwnCharacter ? 'var(--color-surface, #1e2328)' : 'transparent',
+                borderColor: isOwnCharacter ? 'var(--color-gold, #c8aa6e)' : 'transparent',
+                color: 'var(--color-text-primary, #f0e6d2)',
+                fontWeight: isOwnCharacter ? 600 : 400,
+                cursor: isOwnCharacter ? 'text' : 'not-allowed',
+                opacity: isOwnCharacter ? 1 : 0.85,
+              }}
+            />
+            <span className="sr-only">
+              {c.initiative !== null && c.initiative !== undefined ? c.initiative : '-'}
+            </span>
+          </div>
         )}
       </td>
 
@@ -263,7 +325,18 @@ const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
       {/* Acciones del DM */}
       {isDm && (
         <td className="row-actions">
-          {/* Espacio para acciones rápidas o condiciones */}
+          <button
+            type="button"
+            id={`remove-combatant-btn-${c.id}`}
+            data-testid={`remove-combatant-btn-${c.id}`}
+            className="btn btn-xs btn-danger combatant-remove-btn"
+            title={t('liveCombat.removeCombatant', 'Eliminar combatiente')}
+            aria-label={t('liveCombat.removeCombatant', 'Eliminar combatiente')}
+            onClick={() => handleRemoveCombatant(c.id, c.name)}
+            style={{ padding: '2px 6px', fontSize: '0.8rem', minWidth: '28px' }}
+          >
+            🗑️
+          </button>
         </td>
       )}
     </tr>
@@ -327,6 +400,28 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   const [quickIsHero, setQuickIsHero] = useState(false);
   const [quickInitiative, setQuickInitiative] = useState<number | string>('');
   const [quickError, setQuickError] = useState<string | null>(null);
+
+  // Catálogo del bestiario y sugerencias para combobox rápido
+  const [availableCreatures, setAvailableCreatures] = useState<CreatureResponseDto[]>([]);
+  const [showCreatureSuggestions, setShowCreatureSuggestions] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCreatures = async () => {
+      try {
+        const data = await apiClient.getCreatures();
+        if (isMounted && data) {
+          setAvailableCreatures(data);
+        }
+      } catch (err) {
+        console.warn('[LiveCombatTracker] Error precargando criaturas del bestiario:', err);
+      }
+    };
+    fetchCreatures();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Estado para el panel de miembros de party (DM)
   const [isPartyMembersOpen, setIsPartyMembersOpen] = useState(false);
@@ -521,6 +616,43 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     await liveCombatHubService.toggleVisibility(effectivePartyId, combatantId, !currentVisibility);
   };
 
+  const isOwnCombatant = (c: LiveCombatantDmDto | LiveCombatantPlayerDto) => {
+    if (isDm) return false;
+    if (!c.isPlayerCharacter) return false;
+    const assignedUserId = (c as any).assignedPlayerUserId;
+    if (effectiveUserId && assignedUserId && assignedUserId === effectiveUserId) return true;
+    if (effectiveUserId && c.id === effectiveUserId) return true;
+    if (currentMember && c.name.toLowerCase() === currentMember.inGameName?.toLowerCase()) return true;
+    if (!party?.partyMembers || party.partyMembers.length === 0) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleUpdateInitiative = async (combatantId: string, val: number | string) => {
+    const numericInit = val === '' ? null : Number(val);
+    try {
+      await liveCombatHubService.updateCombatantInitiative(effectivePartyId, combatantId, numericInit);
+    } catch (err) {
+      console.error('[LiveCombatTracker] Error al actualizar iniciativa:', err);
+    }
+  };
+
+  const handleRemoveCombatant = async (combatantId: string, name: string) => {
+    const confirmMsg = t(
+      'liveCombat.confirmRemoveCombatant',
+      { name, defaultValue: `¿Estás seguro de que deseas eliminar a ${name} del combate?` }
+    );
+    const confirmed = typeof window !== 'undefined' ? window.confirm(confirmMsg) : true;
+    if (!confirmed) return;
+
+    try {
+      await liveCombatHubService.removeCombatant(effectivePartyId, combatantId);
+    } catch (err) {
+      console.error('[LiveCombatTracker] Error al eliminar combatiente:', err);
+    }
+  };
+
   const handleQuickCombatantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickName.trim()) {
@@ -553,6 +685,7 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
 
     setLocalCombatants((prev) => [...prev, newDto]);
     setIsQuickModalOpen(false);
+    setShowCreatureSuggestions(false);
     setQuickName('');
     setQuickHp(20);
     setQuickAc(12);
@@ -577,6 +710,20 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   const renderQuickCombatantModal = () => {
     if (!isQuickModalOpen) return null;
 
+    const filteredCreatures = quickName.trim()
+      ? availableCreatures
+          .filter((c) => c.name.toLowerCase().includes(quickName.trim().toLowerCase()))
+          .slice(0, 8)
+      : availableCreatures.slice(0, 8);
+
+    const handleSelectCreature = (creature: CreatureResponseDto) => {
+      setQuickName(creature.name);
+      setQuickHp(creature.hitPoints?.max ?? 20);
+      setQuickAc(creature.effectiveArmorClass || creature.armorClass?.base || 12);
+      setQuickIsHero(Boolean(creature.isPlayerCharacter));
+      setShowCreatureSuggestions(false);
+    };
+
     return (
       <div className="modal-backdrop" id="quick-combatant-modal-backdrop" style={{ zIndex: 1100 }}>
         <div
@@ -594,27 +741,95 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
               type="button"
               id="quick-combatant-close-btn"
               className="modal-close-btn"
-              onClick={() => setIsQuickModalOpen(false)}
+              onClick={() => {
+                setIsQuickModalOpen(false);
+                setShowCreatureSuggestions(false);
+              }}
             >
               ✕
             </button>
           </div>
           <form onSubmit={handleQuickCombatantSubmit} className="modal-body quick-combatant-form">
             {quickError && <div className="form-error-banner">⚠️ {quickError}</div>}
-            <div className="form-group" style={{ marginBottom: '12px' }}>
-              <label htmlFor="quick-combatant-name">
-                {t('liveCombat.quickCombatantName', 'Nombre')} *
-              </label>
+            <div className="form-group" style={{ marginBottom: '12px', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label htmlFor="quick-combatant-name">
+                  {t('liveCombat.quickCombatantName', 'Nombre')} *
+                </label>
+                {availableCreatures.length > 0 && (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-gold, #c8aa6e)' }}>
+                    📖 {t('liveCombat.bestiarySearch', 'Bestiario Open5e')}
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 id="quick-combatant-name"
+                data-testid="quick-combatant-name"
                 className="form-input"
                 value={quickName}
-                onChange={(e) => setQuickName(e.target.value)}
-                placeholder="ej. Goblin Arquero o Sir Tristan"
+                onChange={(e) => {
+                  setQuickName(e.target.value);
+                  setShowCreatureSuggestions(true);
+                }}
+                onFocus={() => setShowCreatureSuggestions(true)}
+                placeholder={t('liveCombat.quickCombatantSearchPlaceholder', 'Buscar en bestiario o escribir nombre custom...')}
                 required
                 autoFocus
+                autoComplete="off"
               />
+
+              {showCreatureSuggestions && filteredCreatures.length > 0 && (
+                <ul
+                  id="creature-suggestions-list"
+                  data-testid="creature-suggestions-list"
+                  className="creature-suggestions-dropdown"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    background: 'var(--color-surface-elevated, #2a2e35)',
+                    border: '1px solid var(--color-gold, #c8aa6e)',
+                    borderRadius: '4px',
+                    margin: '4px 0 0 0',
+                    padding: 0,
+                    listStyle: 'none',
+                    zIndex: 1200,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {filteredCreatures.map((creature) => (
+                    <li
+                      key={creature.id || creature.name}
+                      id={`creature-suggestion-${creature.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                      data-testid={`creature-suggestion-${creature.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                      className="creature-suggestion-item"
+                      onClick={() => handleSelectCreature(creature)}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid var(--color-border, #3c3c41)',
+                        fontSize: '0.85rem',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(200, 170, 110, 0.15)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <span style={{ fontWeight: 600, color: 'var(--color-text-primary, #f0e6d2)' }}>
+                        {creature.isPlayerCharacter ? '🛡️' : '👾'} {creature.name}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #a09b8c)' }}>
+                        HP: {creature.hitPoints?.max ?? 20} | CA: {creature.effectiveArmorClass || creature.armorClass?.base || 12}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div
@@ -691,7 +906,10 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
                 type="button"
                 id="quick-combatant-cancel-btn"
                 className="btn btn-secondary btn-sm"
-                onClick={() => setIsQuickModalOpen(false)}
+                onClick={() => {
+                  setIsQuickModalOpen(false);
+                  setShowCreatureSuggestions(false);
+                }}
               >
                 {t('liveCombat.quickCombatantCancel', 'Cancelar')}
               </button>
@@ -1227,6 +1445,9 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
                     index={index}
                     isActive={c.id === activeCombatantId}
                     isDm={isDm}
+                    isOwnCharacter={isOwnCombatant(c)}
+                    handleUpdateInitiative={handleUpdateInitiative}
+                    handleRemoveCombatant={handleRemoveCombatant}
                     overrideCombatantId={overrideCombatantId}
                     overrideValue={overrideValue}
                     setOverrideCombatantId={setOverrideCombatantId}

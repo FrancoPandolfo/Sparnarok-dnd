@@ -317,7 +317,13 @@
     "healthDown": "Inconsciente / Caído",
     "healthDead": "Muerto",
     "heroBadge": "Héroe",
-    "monsterBadge": "Monstruo"
+    "monsterBadge": "Monstruo",
+    "removeCombatant": "Eliminar combatiente",
+    "confirmRemoveCombatant": "¿Estás seguro de que deseas eliminar a {{name}} del combate?",
+    "quickCombatantSearchPlaceholder": "Buscar en bestiario o escribir nombre custom...",
+    "bestiarySearch": "Buscar en el bestiario (Open5e)",
+    "myInitiativeInputAria": "Editar tu tirada de iniciativa",
+    "bestiarySuggested": "Sugerencias del Bestiario"
   },
   "parties": {
     "myPartiesBtn": "Mis Partys",
