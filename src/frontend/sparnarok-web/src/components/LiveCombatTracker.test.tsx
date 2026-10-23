@@ -19,6 +19,7 @@ vi.mock('../services/liveCombatHubService', () => ({
     modifyHp: vi.fn(),
     toggleVisibility: vi.fn(),
     endCombat: vi.fn(),
+    addQuickCombatant: vi.fn(),
   },
 }));
 
@@ -226,6 +227,67 @@ describe('LiveCombatTracker Component Suite', () => {
     fireEvent.click(submitBtn);
 
     expect(liveCombatHubService.submitInitiative).toHaveBeenCalledWith('party-1', 'hero-1', null);
+  });
+
+  it('DM View: opens quick combatant modal and adds combatant on-the-fly without database persistence', async () => {
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    // Open quick combatant modal
+    const addBtn = screen.getByRole('button', { name: /\+ Añadir Combatiente Rápido/i });
+    fireEvent.click(addBtn);
+
+    // Modal is open
+    expect(screen.getByRole('dialog', { hidden: true })).toBeInTheDocument();
+
+    // Fill form
+    const nameInput = screen.getByLabelText(/Nombre/i);
+    fireEvent.change(nameInput, { target: { value: 'Bandido Rápido' } });
+
+    const hpInput = screen.getByLabelText(/Puntos de Golpe/i);
+    fireEvent.change(hpInput, { target: { value: '15' } });
+
+    const acInput = screen.getByLabelText(/Clase de Armadura/i);
+    fireEvent.change(acInput, { target: { value: '13' } });
+
+    // Submit
+    const submitBtn = screen.getByRole('button', { name: /^\+ Añadir$/i });
+    fireEvent.click(submitBtn);
+
+    expect(liveCombatHubService.addQuickCombatant).toHaveBeenCalledWith('party-1', {
+      name: 'Bandido Rápido',
+      maxHp: 15,
+      armorClass: 13,
+      isPlayerCharacter: false,
+      isVisibleToPlayers: true,
+      initiative: null,
+    });
+
+    // Optimistic addition is visible
+    expect(screen.getByText('Bandido Rápido')).toBeInTheDocument();
+  });
+
+  it('Empty State: unblocks DM by providing "+ Añadir Combatiente Rápido" button when combatState is null', () => {
+    render(
+      <LiveCombatTracker
+        partyId="quick-session"
+        role="DungeonMaster"
+        combatState={null}
+      />
+    );
+
+    // DM should see unblocked action buttons even without an active combat state
+    const quickButtons = screen.getAllByRole('button', { name: /\+ Añadir Combatiente Rápido/i });
+    expect(quickButtons.length).toBeGreaterThanOrEqual(1);
+
+    // Clicking it opens the quick combatant modal
+    fireEvent.click(quickButtons[0]);
+    expect(screen.getByLabelText(/Nombre/i)).toBeInTheDocument();
   });
 });
 

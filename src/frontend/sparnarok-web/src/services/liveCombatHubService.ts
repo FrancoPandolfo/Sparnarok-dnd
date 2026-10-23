@@ -8,6 +8,7 @@ import type {
   InitializeLiveCombatRequest,
   PartyRole,
   LiveCombatStatus,
+  AddQuickCombatantRequest,
 } from '../types/liveCombat';
 
 /**
@@ -294,6 +295,54 @@ class LiveCombatHubService {
     const [moved] = state.combatants.splice(oldIndex, 1);
     state.combatants.splice(clampedIndex, 0, moved);
 
+    this.saveRawState(partyId, state);
+    this.broadcastFallbackUpdate(partyId);
+  }
+
+  /**
+   * Añade un combatiente rápido en caliente directamente a la iniciativa activa (DM).
+   */
+  async addQuickCombatant(
+    partyId: string,
+    request: AddQuickCombatantRequest
+  ): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      try {
+        await this.connection.invoke('AddQuickCombatant', partyId, request);
+        return;
+      } catch (err) {
+        console.warn('[LiveCombatHub] Error al invocar AddQuickCombatant vía SignalR, usando fallback local:', err);
+      }
+    }
+
+    let state = this.getRawState(partyId);
+    if (!state) {
+      state = {
+        partyId,
+        partyName: partyId === 'quick-session' ? 'Partida Rápida' : 'Combate en Vivo',
+        status: 'WaitingForInitiative',
+        currentRound: 1,
+        currentTurnIndex: 0,
+        combatants: [],
+      };
+    }
+
+    const newCombatant: RawCombatant = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `quick-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: request.name.trim(),
+      initiative: request.initiative ?? null,
+      maxHp: Math.max(1, request.maxHp),
+      currentHp: Math.max(1, request.maxHp),
+      armorClass: Math.max(0, request.armorClass),
+      isPlayerCharacter: request.isPlayerCharacter ?? false,
+      isVisibleToPlayers: request.isVisibleToPlayers ?? true,
+      assignedPlayerUserId: null,
+      conditions: null,
+    };
+
+    state.combatants.push(newCombatant);
     this.saveRawState(partyId, state);
     this.broadcastFallbackUpdate(partyId);
   }

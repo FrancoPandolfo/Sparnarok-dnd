@@ -118,3 +118,16 @@ export interface UpdateSessionNoteRequest {
   title: string;
   content: string;
 }
+
+/**
+ * Solicitud para registrar un combatiente rápido en la iniciativa en caliente.
+ */
+export interface AddQuickCombatantRequest {
+  name: string;
+  maxHp: number;
+  armorClass: number;
+  isPlayerCharacter?: boolean;
+  isVisibleToPlayers?: boolean;
+  initiative?: number | null;
+}
+

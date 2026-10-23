@@ -24,7 +24,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task JoinCombat(string partyId, string role)
     {
-        if (!Guid.TryParse(partyId, out var id))
+        if (!TryResolvePartyId(partyId, out var id))
         {
             return;
         }
@@ -51,7 +51,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task LeaveCombat(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id))
+        if (!TryResolvePartyId(partyId, out var id))
         {
             return;
         }
@@ -65,7 +65,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task InitializeCombat(string partyId, InitializeLiveCombatRequest request)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         var combatants = request.Combatants.Select(c => new LiveCombatant(
             c.Id,
@@ -87,7 +87,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task SubmitInitiative(string partyId, Guid combatantId, decimal? initiative)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetInitiative(id, combatantId, initiative))
         {
@@ -100,7 +100,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task OverrideInitiative(string partyId, Guid combatantId, decimal? initiative)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetInitiative(id, combatantId, initiative))
         {
@@ -121,7 +121,7 @@ public class LiveCombatHub : Hub
             {
                 partyId = g;
             }
-            else if (val is string s && Guid.TryParse(s, out var parsed))
+            else if (val is string s && TryResolvePartyId(s, out var parsed))
             {
                 partyId = parsed;
             }
@@ -141,7 +141,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task ReorderCombatantInParty(string partyId, string combatantId, int newIndex)
     {
-        if (!Guid.TryParse(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
+        if (!TryResolvePartyId(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
         {
             return;
         }
@@ -153,11 +153,35 @@ public class LiveCombatHub : Hub
     }
 
     /// <summary>
+    /// Añade un nuevo combatiente rápido en caliente directamente al combate activo (Acción del DM).
+    /// No requiere persistencia previa en la base de datos ni pertenencia a una Party formal.
+    /// </summary>
+    public async Task AddQuickCombatant(string partyId, AddQuickCombatantRequest request)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+        if (request is null || string.IsNullOrWhiteSpace(request.Name)) return;
+
+        var combatant = new LiveCombatant(
+            Guid.NewGuid(),
+            request.Name.Trim(),
+            Math.Max(1, request.MaxHp),
+            Math.Max(0, request.ArmorClass),
+            request.IsPlayerCharacter,
+            request.IsVisibleToPlayers,
+            null,
+            request.Initiative
+        );
+
+        _combatManager.AddCombatant(id, combatant);
+        await BroadcastCombatStateAsync(id);
+    }
+
+    /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs del combate (Acción del DM).
     /// </summary>
     public async Task AutoRollMonsters(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         _combatManager.AutoRollMonsters(id);
         await BroadcastCombatStateAsync(id);
@@ -168,7 +192,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task StartCombat(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.StartCombat(id))
         {
@@ -181,7 +205,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task NextTurn(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.NextTurn(id))
         {
@@ -194,7 +218,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task PreviousTurn(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.PreviousTurn(id))
         {
@@ -207,7 +231,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task ModifyHp(string partyId, Guid combatantId, int deltaHp)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.ModifyCombatantHp(id, combatantId, deltaHp))
         {
@@ -220,7 +244,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task ToggleVisibility(string partyId, Guid combatantId, bool isVisible)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetCombatantVisibility(id, combatantId, isVisible))
         {
@@ -233,7 +257,7 @@ public class LiveCombatHub : Hub
     /// </summary>
     public async Task EndCombat(string partyId)
     {
-        if (!Guid.TryParse(partyId, out var id)) return;
+        if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.EndCombat(id))
         {
@@ -258,4 +282,31 @@ public class LiveCombatHub : Hub
 
     public static string GetDmGroupName(Guid partyId) => $"combat_{partyId}_dm";
     public static string GetPlayerGroupName(Guid partyId) => $"combat_{partyId}_player";
+
+    /// <summary>
+    /// Resuelve de forma determinística identificadores alfanuméricos ("quick-session") a un GUID válido para SignalR y el CombatManager.
+    /// </summary>
+    private static bool TryResolvePartyId(string? partyId, out Guid id)
+    {
+        if (string.IsNullOrWhiteSpace(partyId))
+        {
+            id = Guid.Empty;
+            return false;
+        }
+
+        if (Guid.TryParse(partyId, out id))
+        {
+            return true;
+        }
+
+        if (string.Equals(partyId.Trim(), "quick-session", StringComparison.OrdinalIgnoreCase))
+        {
+            id = Guid.Parse("00000000-0000-0000-0000-000000000099");
+            return true;
+        }
+
+        using var md5 = System.Security.Cryptography.MD5.Create();
+        id = new Guid(md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(partyId.Trim())));
+        return true;
+    }
 }
