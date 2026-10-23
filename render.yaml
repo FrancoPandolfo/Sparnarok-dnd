@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sparnarok-api
+    env: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/creatures
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ENABLE_SWAGGER
+        value: "true"

@@ -21,11 +21,13 @@ builder.Services.AddLocalization();
 // 1.1 Soporte de Memoria Caché para Endpoints de Referencia
 builder.Services.AddMemoryCache();
 
-// 2. Persistencia relacional en PostgreSQL con EF Core
+// 2. Persistencia relacional en PostgreSQL con EF Core (Soporte nativo y URI para Neon.tech y Render)
 builder.Services.AddDbContext<SparnarokDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? builder.Configuration["DATABASE_URL"]
         ?? "Host=localhost;Port=5432;Database=sparnarok_dev_db;Username=sparnarok;Password=sparnarok_secret";
+    var connectionString = PostgresConnectionHelper.NormalizeConnectionString(rawConnectionString);
     options.UseNpgsql(connectionString);
 });
 
@@ -179,24 +181,26 @@ var localizationOptions = new RequestLocalizationOptions()
 
 app.UseRequestLocalization(localizationOptions);
 
-// 4. Configuración del Entorno de Desarrollo y Swagger UI
-if (app.Environment.IsDevelopment())
+// 4. Migración de Base de Datos y Sembrado Inicial (Desarrollo y Producción / Render)
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    try
     {
-        try
-        {
-            var db = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
-            db.Database.Migrate();
-            Sparnarok.Api.Infrastructure.Persistence.DataSeeder.SeedInitialData(db);
-        }
-        catch (Exception ex)
-        {
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning(ex, "No se pudo migrar o sembrar la base de datos automáticamente en inicio de desarrollo.");
-        }
+        var db = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+        db.Database.Migrate();
+        Sparnarok.Api.Infrastructure.Persistence.DataSeeder.SeedInitialData(db);
     }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "No se pudo migrar o sembrar la base de datos automáticamente en el inicio de la aplicación.");
+    }
+}
 
+// 5. Configuración de Swagger UI (Disponible en Desarrollo o en Producción para verificación de despliegue)
+var enableSwagger = app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("ENABLE_SWAGGER", true);
+if (enableSwagger)
+{
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
