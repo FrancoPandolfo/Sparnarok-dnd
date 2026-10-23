@@ -701,5 +701,175 @@ public class LiveCombatHubTests
         await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
         await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
     }
+
+    [Fact]
+    public void AutoSortInitiative_KeepNullsInPlace_PreservesNullIndicesAndSortsNumericsDescending()
+    {
+        // Arrange: Array original [Null, 10, Null, 20]
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Pending A", 20, 10, true) { Initiative = null, SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Warrior", 30, 15, true) { Initiative = 10, SortOrder = 1 };
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Pending B", 20, 10, false) { Initiative = null, SortOrder = 2 };
+        var c3 = new LiveCombatant(Guid.NewGuid(), "Rogue", 25, 14, true) { Initiative = 20, SortOrder = 3 };
+
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1, c2, c3 });
+
+        // Act: KeepNullsInPlace
+        var success = manager.AutoSortInitiative(partyId, SortMode.KeepNullsInPlace);
+
+        // Assert: Resultado esperado [Null, 20, Null, 10]
+        success.Should().BeTrue();
+        var state = manager.GetState(partyId)!;
+        state.Combatants.Should().HaveCount(4);
+
+        // Índice 0: Era Null -> Sigue Pending A (Null)
+        state.Combatants[0].Name.Should().Be("Pending A");
+        state.Combatants[0].Initiative.Should().BeNull();
+        state.Combatants[0].SortOrder.Should().Be(0);
+
+        // Índice 1: Era numérico -> Ahora Rogue (20)
+        state.Combatants[1].Name.Should().Be("Rogue");
+        state.Combatants[1].Initiative.Should().Be(20);
+        state.Combatants[1].SortOrder.Should().Be(1);
+
+        // Índice 2: Era Null -> Sigue Pending B (Null)
+        state.Combatants[2].Name.Should().Be("Pending B");
+        state.Combatants[2].Initiative.Should().BeNull();
+        state.Combatants[2].SortOrder.Should().Be(2);
+
+        // Índice 3: Era numérico -> Ahora Warrior (10)
+        state.Combatants[3].Name.Should().Be("Warrior");
+        state.Combatants[3].Initiative.Should().Be(10);
+        state.Combatants[3].SortOrder.Should().Be(3);
+    }
+
+    [Fact]
+    public void AutoSortInitiative_PushNullsToBottom_SortsNumericsDescendingAndMovesNullsToEnd()
+    {
+        // Arrange: Array original [Null, 10, Null, 20]
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Pending A", 20, 10, true) { Initiative = null, SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Warrior", 30, 15, true) { Initiative = 10, SortOrder = 1 };
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Pending B", 20, 10, false) { Initiative = null, SortOrder = 2 };
+        var c3 = new LiveCombatant(Guid.NewGuid(), "Rogue", 25, 14, true) { Initiative = 20, SortOrder = 3 };
+
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1, c2, c3 });
+
+        // Act: PushNullsToBottom
+        var success = manager.AutoSortInitiative(partyId, SortMode.PushNullsToBottom);
+
+        // Assert: Resultado esperado [20, 10, Null, Null]
+        success.Should().BeTrue();
+        var state = manager.GetState(partyId)!;
+        state.Combatants.Should().HaveCount(4);
+
+        // Índice 0: Mayor iniciativa numérica (20)
+        state.Combatants[0].Name.Should().Be("Rogue");
+        state.Combatants[0].Initiative.Should().Be(20);
+        state.Combatants[0].SortOrder.Should().Be(0);
+
+        // Índice 1: Siguiente iniciativa numérica (10)
+        state.Combatants[1].Name.Should().Be("Warrior");
+        state.Combatants[1].Initiative.Should().Be(10);
+        state.Combatants[1].SortOrder.Should().Be(1);
+
+        // Índice 2: Primer combatiente nulo
+        state.Combatants[2].Name.Should().Be("Pending A");
+        state.Combatants[2].Initiative.Should().BeNull();
+        state.Combatants[2].SortOrder.Should().Be(2);
+
+        // Índice 3: Segundo combatiente nulo
+        state.Combatants[3].Name.Should().Be("Pending B");
+        state.Combatants[3].Initiative.Should().BeNull();
+        state.Combatants[3].SortOrder.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task AutoSortInitiative_WhenCalledByPlayer_DoesNotSortAndDoesNotBroadcast()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Pending A", 20, 10, true) { Initiative = null, SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Warrior", 30, 15, true) { Initiative = 10, SortOrder = 1 };
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Rogue", 25, 14, true) { Initiative = 20, SortOrder = 2 };
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1, c2 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "Player" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: Jugador intenta auto-ordenar
+        await hub.AutoSortInitiative(partyId.ToString(), SortMode.PushNullsToBottom);
+
+        // Assert: El orden no cambió
+        var state = manager.GetState(partyId)!;
+        state.Combatants[0].Id.Should().Be(c0.Id);
+        state.Combatants[1].Id.Should().Be(c1.Id);
+        state.Combatants[2].Id.Should().Be(c2.Id);
+
+        await dmGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task AutoSortInitiative_WhenCalledByDm_SortsCombatantsAndBroadcastsToBothGroups()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Pending A", 20, 10, true) { Initiative = null, SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Warrior", 30, 15, true) { Initiative = 10, SortOrder = 1 };
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Rogue", 25, 14, true) { Initiative = 20, SortOrder = 2 };
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1, c2 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "DungeonMaster" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: DM auto-ordena con PushNullsToBottom
+        await hub.AutoSortInitiative(partyId.ToString(), SortMode.PushNullsToBottom);
+
+        // Assert: Reordenado [Rogue(20), Warrior(10), Pending A(null)]
+        var state = manager.GetState(partyId)!;
+        state.Combatants[0].Id.Should().Be(c2.Id);
+        state.Combatants[0].SortOrder.Should().Be(0);
+        state.Combatants[1].Id.Should().Be(c1.Id);
+        state.Combatants[1].SortOrder.Should().Be(1);
+        state.Combatants[2].Id.Should().Be(c0.Id);
+        state.Combatants[2].SortOrder.Should().Be(2);
+
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
 }
+
 

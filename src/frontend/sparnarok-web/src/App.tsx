@@ -17,6 +17,7 @@ import { WeaponIngestionModal } from './components/WeaponIngestionModal';
 import { LiveSessionModal } from './components/LiveSessionModal';
 import { PartyOnboardingModal } from './components/PartyOnboardingModal';
 import { PartyManagerModal } from './components/PartyManagerModal';
+import { PartyStashModal } from './components/PartyStashModal';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -47,6 +48,7 @@ export function AppContent() {
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
   const [isLiveSessionOpen, setIsLiveSessionOpen] = useState<boolean>(false);
   const [isPartiesModalOpen, setIsPartiesModalOpen] = useState<boolean>(false);
+  const [isStashModalOpen, setIsStashModalOpen] = useState<boolean>(false);
   const [liveSessionPartyId, setLiveSessionPartyId] = useState<string | undefined>(undefined);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
@@ -152,6 +154,7 @@ export function AppContent() {
         onOpenIngestionModal={() => setIsIngestionModalOpen(true)}
         onOpenLiveSession={() => setIsLiveSessionOpen(true)}
         onOpenPartiesModal={() => setIsPartiesModalOpen(true)}
+        onOpenStashModal={() => setIsStashModalOpen(true)}
       />
 
       {/* Hero Section */}
@@ -296,6 +299,16 @@ export function AppContent() {
           setParties((prev) => [joinedParty, ...prev.filter((p) => p.id !== joinedParty.id)]);
           setIsLiveSessionOpen(true);
         }}
+      />
+
+      {/* Modal de Botín de Grupo (Stash, Fondos y Cola de Fabricación) */}
+      <PartyStashModal
+        isOpen={isStashModalOpen}
+        parties={parties}
+        partyId={liveSessionPartyId || (parties.length > 0 ? parties[0].id : '')}
+        partyName={parties.find((p) => p.id === liveSessionPartyId)?.name || (parties.length > 0 ? parties[0].name : 'Party')}
+        onPartySelect={(selectedId) => setLiveSessionPartyId(selectedId)}
+        onClose={() => setIsStashModalOpen(false)}
       />
     </div>
   );

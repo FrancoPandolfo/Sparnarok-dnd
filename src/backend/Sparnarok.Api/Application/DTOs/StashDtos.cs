@@ -17,7 +17,8 @@ public record StashItemResponseDto(
     bool IsOfficialSrd,
     string? ReferenceIndex,
     Guid? AssignedCreatureId,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    bool IsIdentified = true
 )
 {
     /// <summary>
@@ -36,7 +37,8 @@ public record StashItemResponseDto(
             item.IsOfficialSrd,
             item.ReferenceIndex,
             item.AssignedCreatureId,
-            item.CreatedAt
+            item.CreatedAt,
+            item.IsIdentified
         );
 }
 
@@ -64,7 +66,8 @@ public record CreateStashItemRequest(
     string? ItemType,
     bool IsOfficialSrd = false,
     string? ReferenceIndex = null,
-    Guid? AssignedCreatureId = null
+    Guid? AssignedCreatureId = null,
+    bool IsIdentified = true
 );
 
 /// <summary>

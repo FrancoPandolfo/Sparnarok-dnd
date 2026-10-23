@@ -51,6 +51,12 @@ public interface ILiveCombatManager
     bool RemoveCombatant(Guid partyId, Guid combatantId);
 
     /// <summary>
+    /// Auto-ordena los combatientes de acuerdo al modo especificado (PushNullsToBottom o KeepNullsInPlace)
+    /// y recalcula el SortOrder posicional.
+    /// </summary>
+    bool AutoSortInitiative(Guid partyId, SortMode mode);
+
+    /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs que aún no tengan valor asignado.
     /// </summary>
     void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null);

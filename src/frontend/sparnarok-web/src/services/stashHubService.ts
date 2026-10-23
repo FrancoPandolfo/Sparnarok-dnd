@@ -31,6 +31,31 @@ class StashHubService {
   private currentPartyId: string | null = null;
   private callbacks: StashHubCallbacks | null = null;
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sparnarok_stash_external_event', (e: Event) => {
+        const customEvent = e as CustomEvent;
+        const { partyId, type, payload } = customEvent.detail || {};
+        if (partyId && this.currentPartyId && partyId !== this.currentPartyId) return;
+        if (type === 'ItemAdded' || type === 'ItemUpdated') {
+          this.callbacks?.onItemAdded?.(payload);
+        } else if (type === 'ItemDeleted') {
+          this.callbacks?.onItemDeleted?.(payload);
+        } else if (type === 'FundsUpdated' || type === 'FundChanged') {
+          this.callbacks?.onFundsUpdated?.(payload);
+        } else if (type === 'CraftingQueueUpdated') {
+          this.callbacks?.onCraftingQueueUpdated?.(payload);
+        } else if (type === 'ActivityLogged') {
+          this.callbacks?.onActivityLogged?.(payload);
+        } else if (type === 'DowntimeAdvanced') {
+          this.callbacks?.onDowntimeAdvanced?.(payload);
+        } else if (type === 'StashUpdated') {
+          this.callbacks?.onStashUpdated?.(payload);
+        }
+      });
+    }
+  }
+
   /**
    * Inicia la conexión con el StashHub y se une al grupo de la Party seleccionada.
    */
@@ -84,6 +109,14 @@ class StashHubService {
 
     connection.on('FundsUpdated', (funds: PartyFundDto) => {
       this.callbacks?.onFundsUpdated?.(funds);
+    });
+
+    connection.on('FundChanged', (funds: PartyFundDto) => {
+      this.callbacks?.onFundsUpdated?.(funds);
+    });
+
+    connection.on('ItemUpdated', (item: StashItemDto) => {
+      this.callbacks?.onItemAdded?.(item);
     });
 
     connection.on('CraftingQueueUpdated', (queue: CraftingQueueItemDto[]) => {

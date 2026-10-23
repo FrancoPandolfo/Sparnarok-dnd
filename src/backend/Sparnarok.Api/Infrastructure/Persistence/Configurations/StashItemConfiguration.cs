@@ -57,6 +57,10 @@ public class StashItemConfiguration : IEntityTypeConfiguration<StashItem>
 
         builder.Property(s => s.AssignedCreatureId);
 
+        builder.Property(s => s.IsIdentified)
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(s => s.CreatedAt)
             .IsRequired();
     }

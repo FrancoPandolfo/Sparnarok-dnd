@@ -589,6 +589,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<bool>("IsIdentified")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsOfficialSrd")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

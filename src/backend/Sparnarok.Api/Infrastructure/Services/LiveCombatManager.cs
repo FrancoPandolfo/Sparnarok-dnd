@@ -191,6 +191,82 @@ public class LiveCombatManager : ILiveCombatManager
         return true;
     }
 
+    public bool AutoSortInitiative(Guid partyId, SortMode mode)
+    {
+        if (!_states.TryGetValue(partyId, out var state) || state.Combatants.Count == 0)
+        {
+            return false;
+        }
+
+        var activeCombatant = state.GetCurrentCombatant();
+
+        if (mode == SortMode.PushNullsToBottom)
+        {
+            // Extraer y ordenar numéricos descendente; los null van al final.
+            // Para orden estable entre iniciativas idénticas, se respeta el SortOrder previo.
+            var withInitiative = state.Combatants
+                .Where(c => c.Initiative.HasValue)
+                .OrderByDescending(c => c.Initiative!.Value)
+                .ThenBy(c => c.SortOrder)
+                .ToList();
+
+            var withoutInitiative = state.Combatants
+                .Where(c => !c.Initiative.HasValue)
+                .OrderBy(c => c.SortOrder)
+                .ToList();
+
+            state.Combatants = withInitiative.Concat(withoutInitiative).ToList();
+        }
+        else if (mode == SortMode.KeepNullsInPlace)
+        {
+            // 1. Identificar índices actuales de todos los combatientes con Initiative == null
+            // 2. Extraer todos los combatientes con iniciativa numérica y ordenarlos de forma descendente
+            var sortedNumerics = state.Combatants
+                .Where(c => c.Initiative.HasValue)
+                .OrderByDescending(c => c.Initiative!.Value)
+                .ThenBy(c => c.SortOrder)
+                .ToList();
+
+            var result = new List<LiveCombatant>(state.Combatants.Count);
+            int numericIdx = 0;
+
+            // 3. Volver a insertar: los que no tienen iniciativa vuelven exactamente al índice original;
+            // los espacios restantes se llenan con la lista ordenada del paso 2.
+            for (int i = 0; i < state.Combatants.Count; i++)
+            {
+                var current = state.Combatants[i];
+                if (!current.Initiative.HasValue)
+                {
+                    result.Add(current);
+                }
+                else
+                {
+                    result.Add(sortedNumerics[numericIdx++]);
+                }
+            }
+
+            state.Combatants = result;
+        }
+
+        // Recalcular SortOrder de 0 a N-1
+        for (int i = 0; i < state.Combatants.Count; i++)
+        {
+            state.Combatants[i].SortOrder = i;
+        }
+
+        // Preservar puntero de turno activo si aplica
+        if (activeCombatant != null)
+        {
+            var newActiveIndex = state.Combatants.IndexOf(activeCombatant);
+            if (newActiveIndex >= 0)
+            {
+                state.CurrentTurnIndex = newActiveIndex;
+            }
+        }
+
+        return true;
+    }
+
     public void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null)
     {
         if (!_states.TryGetValue(partyId, out var state))

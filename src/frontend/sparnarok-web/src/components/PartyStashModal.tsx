@@ -12,14 +12,18 @@ import type {
   DowntimeAdvanceResultDto,
   PartyStashDto,
 } from '../types/stash';
+import type { PartyResponseDto } from '../types/partyEncounter';
 import { apiClient } from '../services/apiClient';
 import { stashHubService } from '../services/stashHubService';
 
-interface PartyStashModalProps {
+export interface PartyStashModalProps {
   isOpen: boolean;
-  partyId: string;
-  partyName: string;
+  partyId?: string;
+  partyName?: string;
+  parties?: PartyResponseDto[];
+  onPartySelect?: (partyId: string) => void;
   onClose: () => void;
+  isEmbedded?: boolean;
 }
 
 type StashTab = 'stash' | 'crafting' | 'logs';
@@ -34,11 +38,30 @@ type StashTab = 'stash' | 'crafting' | 'logs';
  */
 export function PartyStashModal({
   isOpen,
-  partyId,
-  partyName,
+  partyId: propPartyId,
+  partyName: propPartyName,
+  parties = [],
+  onPartySelect,
   onClose,
+  isEmbedded = false,
 }: PartyStashModalProps) {
   const { t } = useTranslation();
+
+  const [selectedPartyId, setSelectedPartyId] = useState<string>(
+    propPartyId || (parties && parties.length > 0 ? parties[0].id : '')
+  );
+
+  useEffect(() => {
+    if (propPartyId) {
+      setSelectedPartyId(propPartyId);
+    } else if (parties && parties.length > 0 && !selectedPartyId) {
+      setSelectedPartyId(parties[0].id);
+    }
+  }, [propPartyId, parties]);
+
+  const activePartyId = selectedPartyId || propPartyId || '';
+  const currentPartyObj = parties.find((p) => p.id === activePartyId);
+  const activePartyName = currentPartyObj?.name || propPartyName || t('stash.defaultPartyName', 'Party');
 
   // Tab State
   const [activeTab, setActiveTab] = useState<StashTab>('stash');
@@ -51,7 +74,7 @@ export function PartyStashModal({
 
   // Funds State
   const [funds, setFunds] = useState<PartyFundDto>({
-    partyId,
+    partyId: activePartyId,
     copperPieces: 0,
     silverPieces: 0,
     electrumPieces: 0,
@@ -102,12 +125,12 @@ export function PartyStashModal({
 
   // Carga inicial y datos
   const loadInitialData = useCallback(async () => {
-    if (!partyId) return;
+    if (!activePartyId) return;
     setIsLoading(true);
     try {
       const [stashData, logsData] = await Promise.all([
-        apiClient.getPartyStash(partyId),
-        apiClient.getStashActivityLogs(partyId, 40),
+        apiClient.getPartyStash(activePartyId),
+        apiClient.getStashActivityLogs(activePartyId, 40),
       ]);
 
       setItems(stashData.items);
@@ -129,30 +152,31 @@ export function PartyStashModal({
     } finally {
       setIsLoading(false);
     }
-  }, [partyId]);
+  }, [activePartyId]);
 
   // Suscripción a eventos en tiempo real con SignalR
   useEffect(() => {
-    if (!isOpen || !partyId) return;
+    if (!isOpen || !activePartyId) return;
 
     loadInitialData();
 
     // Iniciar conexión SignalR
-    stashHubService.startConnection(partyId, {
+    stashHubService.startConnection(activePartyId, {
       onItemAdded: (newItem: StashItemDto) => {
         setItems((prev) => {
-          if (prev.some((i) => i.id === newItem.id)) return prev;
-          return [newItem, ...prev];
+          if (prev.some((i) => i.id === newItem.id)) {
+            return prev.map((i) => (i.id === newItem.id ? newItem : i));
+          }
+          const next = [newItem, ...prev];
+          setTotalWeight(next.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0));
+          return next;
         });
-        setTotalWeight((prev) => prev + newItem.weight * newItem.quantity);
       },
       onItemDeleted: (deletedItemId: string) => {
         setItems((prev) => {
-          const target = prev.find((i) => i.id === deletedItemId);
-          if (target) {
-            setTotalWeight((w) => Math.max(0, w - target.weight * target.quantity));
-          }
-          return prev.filter((i) => i.id !== deletedItemId);
+          const next = prev.filter((i) => i.id !== deletedItemId);
+          setTotalWeight(next.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0));
+          return next;
         });
       },
       onFundsUpdated: (updatedFunds: PartyFundDto) => {
@@ -196,7 +220,7 @@ export function PartyStashModal({
     return () => {
       stashHubService.stopConnection();
     };
-  }, [isOpen, partyId, loadInitialData]);
+  }, [isOpen, activePartyId, loadInitialData]);
 
   const resetForm = () => {
     setName('');
@@ -292,12 +316,13 @@ export function PartyStashModal({
     };
 
     try {
-      const created = await apiClient.addStashItem(partyId, requestData);
+      const created = await apiClient.addStashItem(activePartyId, requestData);
       setItems((prev) => {
         if (prev.some((i) => i.id === created.id)) return prev;
-        return [created, ...prev];
+        const next = [created, ...prev];
+        setTotalWeight(next.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0));
+        return next;
       });
-      setTotalWeight((prev) => prev + created.weight * created.quantity);
       setIsAddFormOpen(false);
       resetForm();
     } catch {
@@ -307,13 +332,23 @@ export function PartyStashModal({
 
   // Eliminar ítem del stash
   const handleDeleteItem = async (itemId: string) => {
-    const itemToDelete = items.find((i) => i.id === itemId);
     try {
-      await apiClient.deleteStashItem(partyId, itemId);
-      setItems((prev) => prev.filter((i) => i.id !== itemId));
-      if (itemToDelete) {
-        setTotalWeight((prev) => Math.max(0, prev - itemToDelete.weight * itemToDelete.quantity));
-      }
+      await apiClient.deleteStashItem(activePartyId, itemId);
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== itemId);
+        setTotalWeight(next.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0));
+        return next;
+      });
+    } catch {
+      // Fallback
+    }
+  };
+
+  // Identificar objeto mágico (Acción exclusiva del DM)
+  const handleIdentifyItem = async (itemId: string) => {
+    try {
+      const updated = await apiClient.identifyStashItem(activePartyId, itemId);
+      setItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
     } catch {
       // Fallback
     }
@@ -331,7 +366,7 @@ export function PartyStashModal({
     };
 
     try {
-      const updated = await apiClient.updatePartyFunds(partyId, req);
+      const updated = await apiClient.updatePartyFunds(activePartyId, req);
       setFunds(updated);
       setIsEditingFunds(false);
     } catch {
@@ -363,7 +398,7 @@ export function PartyStashModal({
     };
 
     try {
-      const queued = await apiClient.queueCraftingItem(partyId, req);
+      const queued = await apiClient.queueCraftingItem(activePartyId, req);
       setCraftingQueue((prev) => [queued, ...prev.filter((c) => c.id !== queued.id)]);
       setFunds((f) => ({
         ...f,
@@ -381,7 +416,7 @@ export function PartyStashModal({
   const handleAdvanceDay = async () => {
     try {
       setCraftingFeedback(null);
-      const result = await apiClient.advanceDowntimeDay(partyId);
+      const result = await apiClient.advanceDowntimeDay(activePartyId);
       setCraftingQueue(result.updatedQueue);
       if (result.updatedStash && result.updatedStash.length > 0) {
         setItems(result.updatedStash);
@@ -401,36 +436,57 @@ export function PartyStashModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="modal-backdrop" id="party-stash-modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-card stash-modal-card"
-        id="party-stash-modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="party-stash-modal-title"
-      >
-        {/* Cabecera del Stash con Live Sync Badge */}
-        <header className="modal-header stash-modal-header">
-          <div className="stash-header-info">
-            <h2 id="party-stash-modal-title" className="stash-modal-title">
-              🎒 {t('stash.title', 'Alijo de la Party (Party Stash)')}
-            </h2>
-            <span className="stash-party-pill">{partyName}</span>
-            <span className="live-sync-indicator" id="signalr-live-indicator" title="Conexión en vivo activa">
-              <span className="live-sync-dot"></span>
-              {t('stash.liveSyncBadge', '⚡ En Vivo')}
-            </span>
-          </div>
+  const modalBodyContent = (
+    <div
+      className={`stash-modal-card ${isEmbedded ? 'embedded-stash-card' : 'modal-card'}`}
+      id="party-stash-modal"
+      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="party-stash-modal-title"
+    >
+      {/* Cabecera del Stash con Live Sync Badge */}
+      <header className="modal-header stash-modal-header">
+        <div className="stash-header-info">
+          <h2 id="party-stash-modal-title" className="stash-modal-title">
+            🎒 {t('stash.title', 'Alijo de la Party (Party Stash)')}
+          </h2>
+          {parties && parties.length > 1 ? (
+            <div className="stash-party-picker">
+              <select
+                id="stash-party-select"
+                className="form-select form-select-sm"
+                value={activePartyId}
+                onChange={(e) => {
+                  setSelectedPartyId(e.target.value);
+                  onPartySelect?.(e.target.value);
+                }}
+                title={t('stash.selectPartyLabel', 'Seleccionar Party')}
+              >
+                {parties.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className="stash-party-pill">{activePartyName}</span>
+          )}
+          <span className="live-sync-indicator" id="signalr-live-indicator" title="Conexión en vivo activa">
+            <span className="live-sync-dot"></span>
+            {t('stash.liveSyncBadge', '⚡ En Vivo')}
+          </span>
+        </div>
 
-          <div className="stash-weight-badge-container">
-            <span className="stash-weight-label">{t('stash.totalWeightLabel', 'Peso Acumulado:')}</span>
-            <span className="stash-weight-pill" id="stash-total-weight">
-              ⚖️ {totalWeight.toFixed(1)} lbs
-            </span>
-          </div>
+        <div className="stash-weight-badge-container">
+          <span className="stash-weight-label">{t('stash.totalWeightLabel', 'Peso Acumulado:')}</span>
+          <span className="stash-weight-pill" id="stash-total-weight">
+            ⚖️ {totalWeight.toFixed(1)} lbs
+          </span>
+        </div>
 
+        {!isEmbedded && (
           <button
             type="button"
             className="modal-close-btn"
@@ -440,7 +496,8 @@ export function PartyStashModal({
           >
             &times;
           </button>
-        </header>
+        )}
+      </header>
 
         {/* Barra de Pestañas / Tabs */}
         <nav className="stash-nav-tabs" role="tablist">
@@ -800,6 +857,11 @@ export function PartyStashModal({
                               {item.isOfficialSrd && (
                                 <span className="badge-srd-tag" title="Objeto oficial SRD">SRD</span>
                               )}
+                              {item.isIdentified === false && (
+                                <span className="unidentified-badge" id={`unidentified-badge-${item.id}`} title="Objeto no identificado">
+                                  ❓ {t('stash.unidentified', 'No Identificado')}
+                                </span>
+                              )}
                               {item.description && (
                                 <p className="item-mini-desc">{item.description}</p>
                               )}
@@ -814,7 +876,18 @@ export function PartyStashModal({
                           <td><strong>x{item.quantity}</strong></td>
                           <td>{item.weight} lbs</td>
                           <td><strong>{(item.weight * item.quantity).toFixed(1)} lbs</strong></td>
-                          <td>
+                          <td className="actions-cell">
+                            {item.isIdentified === false && (
+                              <button
+                                type="button"
+                                className="btn-identify-icon"
+                                id={`identify-stash-item-${item.id}`}
+                                onClick={() => handleIdentifyItem(item.id)}
+                                title={t('stash.identifyTooltip', 'Identificar Objeto (DM)')}
+                              >
+                                🔍 {t('stash.identifyBtn', 'Identificar')}
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="btn-danger-icon"
@@ -1141,6 +1214,15 @@ export function PartyStashModal({
           </div>
         )}
       </div>
+  );
+
+  if (isEmbedded) {
+    return <div className="embedded-stash-wrapper">{modalBodyContent}</div>;
+  }
+
+  return (
+    <div className="modal-backdrop" id="party-stash-modal-backdrop" onClick={onClose}>
+      {modalBodyContent}
     </div>
   );
 }

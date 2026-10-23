@@ -462,13 +462,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para consultar el Stash de una Party que pertenece a otro usuario."
+                Detail = "No tiene autorización para consultar el Stash de una Party a la que no pertenece."
             });
         }
 
@@ -526,13 +526,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para modificar el Stash de una Party que pertenece a otro usuario."
+                Detail = "No tiene autorización para modificar el Stash de una Party a la que no pertenece."
             });
         }
 
@@ -547,7 +547,8 @@ public class PartiesController : ControllerBase
             request.ItemType ?? "Adventuring Gear",
             request.IsOfficialSrd,
             request.ReferenceIndex,
-            request.AssignedCreatureId
+            request.AssignedCreatureId,
+            request.IsIdentified
         );
 
         await _partyRepository.AddStashItemAsync(item, ct);
@@ -604,13 +605,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para modificar el Stash de una Party que pertenece a otro usuario."
+                Detail = "No tiene autorización para modificar el Stash de una Party a la que no pertenece."
             });
         }
 
@@ -645,6 +646,99 @@ public class PartiesController : ControllerBase
     }
 
     /// <summary>
+    /// Identifica un objeto del alijo revelando sus propiedades mágicas. Acción exclusiva del Dungeon Master.
+    /// </summary>
+    /// <param name="id">Identificador único de la Party.</param>
+    /// <param name="itemId">Identificador del objeto a identificar.</param>
+    /// <param name="ct">Token de cancelación cooperativa.</param>
+    /// <response code="200">Retorna el objeto con su estado identificado actualizado.</response>
+    /// <response code="401">Si no está autenticado.</response>
+    /// <response code="403">Si el usuario no pertenece a la Party o no tiene rol de Dungeon Master.</response>
+    /// <response code="404">Si la Party o el objeto no existen.</response>
+    [HttpPost("{id:guid}/stash/{itemId:guid}/identify")]
+    [ProducesResponseType(typeof(StashItemResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<StashItemResponseDto>> IdentifyItem(Guid id, Guid itemId, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var party = await _partyRepository.GetByIdAsync(id, ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Party no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró la Party con ID '{id}'."
+            });
+        }
+
+        if (!IsUserPartyMember(party, userId.Value))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para modificar el Stash de una Party a la que no pertenece."
+            });
+        }
+
+        if (!IsUserPartyDm(party, userId.Value))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "Solo el Dungeon Master tiene autorización para identificar objetos mágicos en el Stash."
+            });
+        }
+
+        var item = party.StashItems.FirstOrDefault(i => i.Id == itemId);
+        if (item is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Objeto no encontrado",
+                Status = StatusCodes.Status404NotFound,
+                Detail = $"No se encontró el objeto con ID '{itemId}' en el alijo de la Party."
+            });
+        }
+
+        item.Identify();
+        await _partyRepository.UpdateAsync(party, ct);
+
+        var log = new StashActivityLog(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            User.GetDisplayName() ?? "DM",
+            "ItemIdentified",
+            $"Objeto identificado por el Dungeon Master: '{item.Name}'."
+        );
+        await _partyRepository.AddActivityLogAsync(log, ct);
+        await _partyRepository.SaveChangesAsync(ct);
+
+        var dto = StashItemResponseDto.FromEntity(item);
+        var fullStashResponse = new PartyStashResponseDto(
+            party.Id,
+            party.Name,
+            party.TotalStashWeight,
+            party.StashItems.Select(StashItemResponseDto.FromEntity).ToList(),
+            PartyFundDto.FromEntity(party)
+        );
+        await _notificationService.NotifyStashUpdatedAsync(party.Id, fullStashResponse, ct);
+        await _notificationService.NotifyActivityLoggedAsync(party.Id, StashActivityLogDto.FromEntity(log), ct);
+
+        return Ok(dto);
+    }
+
+    /// <summary>
     /// Consulta los fondos monetarios (Party Fund) de la Party.
     /// </summary>
     [HttpGet("{id:guid}/funds")]
@@ -671,13 +765,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para ver los fondos de esta Party."
+                Detail = "No tiene autorización para ver los fondos de una Party a la que no pertenece."
             });
         }
 
@@ -721,13 +815,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para modificar los fondos de esta Party."
+                Detail = "No tiene autorización para modificar los fondos de una Party a la que no pertenece."
             });
         }
 
@@ -779,13 +873,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para consultar la cola de fabricación de esta Party."
+                Detail = "No tiene autorización para consultar la cola de fabricación de una Party a la que no pertenece."
             });
         }
 
@@ -830,13 +924,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para encolar fabricación en esta Party."
+                Detail = "No tiene autorización para encolar fabricación en una Party a la que no pertenece."
             });
         }
 
@@ -921,13 +1015,13 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyDm(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para avanzar el Downtime de esta Party."
+                Detail = "Solo el Dungeon Master tiene autorización para avanzar el Downtime de esta Party."
             });
         }
 
@@ -1033,17 +1127,32 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (!IsUserPartyMember(party, userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
                 Title = "Acceso denegado",
                 Status = StatusCodes.Status403Forbidden,
-                Detail = "No tiene autorización para consultar los registros de auditoría de esta Party."
+                Detail = "No tiene autorización para consultar los registros de auditoría de una Party a la que no pertenece."
             });
         }
 
         var logs = await _partyRepository.GetActivityLogsAsync(id, Math.Clamp(limit, 1, 100), ct);
         return Ok(logs.Select(StashActivityLogDto.FromEntity).ToList());
+    }
+
+    private static bool IsUserPartyMember(Party party, Guid userId)
+    {
+        return party.OwnerUserId == userId || party.PartyMembers.Any(pm => pm.UserId == userId);
+    }
+
+    private static bool IsUserPartyDm(Party party, Guid userId)
+    {
+        if (party.OwnerUserId == userId)
+        {
+            return true;
+        }
+
+        return party.PartyMembers.Any(pm => pm.UserId == userId && pm.Role == "DungeonMaster");
     }
 }

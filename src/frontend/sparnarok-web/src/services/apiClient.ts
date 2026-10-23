@@ -1947,19 +1947,42 @@ export const apiClient = {
       // Fallback local
     }
 
-    // Filtrar objetos en memoria para esta party
+    // Filtrar objetos en memoria para esta party (o recuperar de localStorage si existe)
     const party = inMemoryParties.find((p) => p.id === partyId);
-    const items = inMemoryStashItems.filter((i) => i.partyId === partyId);
+    let items = inMemoryStashItems.filter((i) => i.partyId === partyId);
+    if (items.length === 0 && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem(`sparnarok_stash_${partyId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            items = parsed;
+          }
+        }
+      } catch {}
+    }
     const totalWeight = items.reduce((acc, curr) => acc + curr.weight * curr.quantity, 0);
-    const funds = inMemoryPartyFunds[partyId] || {
-      partyId,
-      copperPieces: 0,
-      silverPieces: 0,
-      electrumPieces: 0,
-      goldPieces: 100,
-      platinumPieces: 0,
-      totalGoldEquivalent: 100,
-    };
+
+    let funds = inMemoryPartyFunds[partyId];
+    if (!funds && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const storedFunds = window.localStorage.getItem(`sparnarok_funds_${partyId}`);
+        if (storedFunds) {
+          funds = JSON.parse(storedFunds);
+        }
+      } catch {}
+    }
+    if (!funds) {
+      funds = {
+        partyId,
+        copperPieces: 0,
+        silverPieces: 0,
+        electrumPieces: 0,
+        goldPieces: 100,
+        platinumPieces: 0,
+        totalGoldEquivalent: 100,
+      };
+    }
     const craftingQueue = inMemoryCraftingQueue.filter((c) => c.partyId === partyId);
 
     return {
@@ -2001,12 +2024,25 @@ export const apiClient = {
       rarity: request.rarity || 'Common',
       itemType: request.itemType || 'Adventuring Gear',
       isOfficialSrd: !!request.isOfficialSrd,
+      isIdentified: request.isIdentified !== undefined ? request.isIdentified : true,
       referenceIndex: request.referenceIndex || null,
       assignedCreatureId: request.assignedCreatureId || null,
       createdAt: new Date().toISOString(),
     };
 
     inMemoryStashItems = [newItem, ...inMemoryStashItems];
+    if (typeof window !== 'undefined') {
+      try {
+        const partyItems = inMemoryStashItems.filter((i) => i.partyId === partyId);
+        window.localStorage.setItem(`sparnarok_stash_${partyId}`, JSON.stringify(partyItems));
+        window.dispatchEvent(
+          new CustomEvent('sparnarok_stash_external_event', {
+            detail: { partyId, type: 'ItemAdded', payload: newItem },
+          })
+        );
+      } catch {}
+    }
+
     inMemoryActivityLogs = [
       {
         id: `log-${Date.now()}`,
@@ -2053,6 +2089,44 @@ export const apiClient = {
         ...inMemoryActivityLogs,
       ];
     }
+  },
+
+  /**
+   * Identifica un objeto del alijo revelando sus propiedades mágicas (DM).
+   */
+  async identifyStashItem(partyId: string, itemId: string): Promise<StashItemDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/stash/${itemId}/identify`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryStashItems = inMemoryStashItems.map((i) => (i.id === itemId ? data : i));
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const item = inMemoryStashItems.find((i) => i.id === itemId);
+    if (item) {
+      const updated: StashItemDto = { ...item, isIdentified: true };
+      inMemoryStashItems = inMemoryStashItems.map((i) => (i.id === itemId ? updated : i));
+      if (typeof window !== 'undefined') {
+        try {
+          const partyItems = inMemoryStashItems.filter((i) => i.partyId === partyId);
+          window.localStorage.setItem(`sparnarok_stash_${partyId}`, JSON.stringify(partyItems));
+          window.dispatchEvent(
+            new CustomEvent('sparnarok_stash_external_event', {
+              detail: { partyId, type: 'ItemUpdated', payload: updated },
+            })
+          );
+        } catch {}
+      }
+      return updated;
+    }
+    throw new Error('Item not found');
   },
 
   /**
@@ -2122,6 +2196,16 @@ export const apiClient = {
     };
 
     inMemoryPartyFunds[partyId] = funds;
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(`sparnarok_funds_${partyId}`, JSON.stringify(funds));
+        window.dispatchEvent(
+          new CustomEvent('sparnarok_stash_external_event', {
+            detail: { partyId, type: 'FundsUpdated', payload: funds },
+          })
+        );
+      } catch {}
+    }
     inMemoryActivityLogs = [
       {
         id: `log-${Date.now()}`,

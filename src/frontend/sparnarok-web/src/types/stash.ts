@@ -35,6 +35,7 @@ export interface StashItemDto {
   isOfficialSrd: boolean;
   referenceIndex?: string | null;
   assignedCreatureId?: string | null;
+  isIdentified?: boolean;
   createdAt: string;
 }
 
@@ -48,6 +49,7 @@ export interface CreateStashItemRequestDto {
   isOfficialSrd?: boolean;
   referenceIndex?: string | null;
   assignedCreatureId?: string | null;
+  isIdentified?: boolean;
 }
 
 export interface PartyFundDto {
