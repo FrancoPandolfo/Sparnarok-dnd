@@ -9,6 +9,7 @@ import type {
   PartyRole,
   LiveCombatStatus,
   AddQuickCombatantRequest,
+  SortMode,
 } from '../types/liveCombat';
 
 export interface EncounterStartedNotificationDto {
@@ -312,6 +313,49 @@ class LiveCombatHubService {
       this.saveRawState(partyId, state);
       this.broadcastFallbackUpdate(partyId);
     }
+  }
+
+  /**
+   * Auto-ordena los combatientes en la lista de iniciativa según el modo especificado (DM).
+   */
+  async autoSortInitiative(partyId: string, mode: SortMode): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      await this.connection.invoke('AutoSortInitiative', partyId, mode);
+      return;
+    }
+
+    const state = this.getRawState(partyId);
+    if (!state || state.combatants.length === 0) return;
+
+    if (mode === 'PushNullsToBottom') {
+      const withInitiative = state.combatants
+        .filter((c) => c.initiative !== null && c.initiative !== undefined)
+        .sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0));
+      const withoutInitiative = state.combatants.filter(
+        (c) => c.initiative === null || c.initiative === undefined
+      );
+      state.combatants = [...withInitiative, ...withoutInitiative];
+    } else if (mode === 'KeepNullsInPlace') {
+      const sortedNumerics = state.combatants
+        .filter((c) => c.initiative !== null && c.initiative !== undefined)
+        .sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0));
+
+      const result: RawCombatant[] = [];
+      let numericIdx = 0;
+
+      for (let i = 0; i < state.combatants.length; i++) {
+        const current = state.combatants[i];
+        if (current.initiative === null || current.initiative === undefined) {
+          result.push(current);
+        } else {
+          result.push(sortedNumerics[numericIdx++]);
+        }
+      }
+      state.combatants = result;
+    }
+
+    this.saveRawState(partyId, state);
+    this.broadcastFallbackUpdate(partyId);
   }
 
   /**

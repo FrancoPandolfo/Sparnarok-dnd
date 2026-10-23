@@ -115,7 +115,11 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // 5.2 Tiempo Real (SignalR) para Alijo Colaborativo y Sesiones en Vivo
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddScoped<IStashNotificationService, Sparnarok.Api.Infrastructure.Hubs.StashNotificationService>();
 builder.Services.AddSingleton<ILiveCombatManager, Sparnarok.Api.Infrastructure.Services.LiveCombatManager>();
 

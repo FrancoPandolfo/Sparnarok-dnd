@@ -9,6 +9,11 @@ export type LiveCombatStatus = 'NotStarted' | 'WaitingForInitiative' | 'InProgre
 export type PartyRole = 'DungeonMaster' | 'Player';
 
 /**
+ * Modos de auto-ordenamiento de iniciativa para el Dungeon Master.
+ */
+export type SortMode = 'PushNullsToBottom' | 'KeepNullsInPlace';
+
+/**
  * Combatiente proyectado para el Dungeon Master (visión completa sin censura).
  */
 export interface LiveCombatantDmDto {

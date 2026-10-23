@@ -19,6 +19,23 @@ public enum LiveCombatStatus
 }
 
 /// <summary>
+/// Estrategia de auto-ordenamiento de iniciativa para el Dungeon Master.
+/// </summary>
+public enum SortMode
+{
+    /// <summary>
+    /// Ordena los combatientes con iniciativa de forma descendente y coloca los que tienen valor nulo al final.
+    /// </summary>
+    PushNullsToBottom,
+
+    /// <summary>
+    /// Conserva a los combatientes con iniciativa nula en sus índices (SortOrder) originales exactos,
+    /// rellenando los huecos restantes con los combatientes ordenados descendentemente.
+    /// </summary>
+    KeepNullsInPlace
+}
+
+/// <summary>
 /// Modelo de combatiente en memoria para el tracker interactivo de combate.
 /// </summary>
 public class LiveCombatant

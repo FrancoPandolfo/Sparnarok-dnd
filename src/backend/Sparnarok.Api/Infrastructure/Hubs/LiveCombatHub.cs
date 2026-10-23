@@ -220,6 +220,28 @@ public class LiveCombatHub : Hub
         }
     }
 
+    /// <summary>
+    /// Auto-ordena los combatientes de acuerdo a la estrategia de SortMode especificada (Acción exclusiva del DM).
+    /// Emite el broadcast estándar 'CombatStateUpdated' a todos los clientes de ese PartyId.
+    /// </summary>
+    public async Task AutoSortInitiative(string? partyId, SortMode mode)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+
+        var isDm = await IsCallerDungeonMasterAsync(id);
+        if (!isDm)
+        {
+            _logger.LogWarning("Acceso no autorizado: Intento de auto-ordenar iniciativas en Party {PartyId} sin rol de Dungeon Master", id);
+            return;
+        }
+
+        if (_combatManager.AutoSortInitiative(id, mode))
+        {
+            await PersistCombatStateAsync(id);
+            await BroadcastCombatStateAsync(id);
+        }
+    }
+
     private async Task<bool> IsCallerDungeonMasterAsync(Guid partyId)
     {
         if (Context.Items.TryGetValue("Role", out var roleObj) && roleObj is string r)

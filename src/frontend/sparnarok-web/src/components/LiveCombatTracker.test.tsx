@@ -47,6 +47,7 @@ vi.mock('../services/liveCombatHubService', () => ({
     joinEncounter: vi.fn(),
     updateCombatantInitiative: vi.fn(),
     removeCombatant: vi.fn(),
+    autoSortInitiative: vi.fn(),
   },
 }));
 
@@ -606,6 +607,60 @@ describe('LiveCombatTracker Component Suite', () => {
       })
     );
   });
+
+  it('DM View: opens Auto-Sort dropdown, selects PushNullsToBottom or KeepNullsInPlace, and calls autoSortInitiative', () => {
+    // Render DM View
+    const { unmount } = render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    const sortDropdownBtn = document.getElementById('auto-sort-dropdown-btn') as HTMLButtonElement;
+    expect(sortDropdownBtn).toBeInTheDocument();
+    expect(sortDropdownBtn).toHaveTextContent(/Ordenar Iniciativas/i);
+
+    // Menu is initially closed
+    expect(document.getElementById('auto-sort-dropdown-menu')).toBeNull();
+
+    // 1. Open dropdown
+    fireEvent.click(sortDropdownBtn);
+    expect(document.getElementById('auto-sort-dropdown-menu')).toBeInTheDocument();
+
+    const pushNullsBtn = document.getElementById('sort-push-nulls-bottom-btn') as HTMLButtonElement;
+    const keepNullsBtn = document.getElementById('sort-keep-nulls-place-btn') as HTMLButtonElement;
+    expect(pushNullsBtn).toBeInTheDocument();
+    expect(keepNullsBtn).toBeInTheDocument();
+
+    // 2. Select PushNullsToBottom
+    fireEvent.click(pushNullsBtn);
+    expect(liveCombatHubService.autoSortInitiative).toHaveBeenCalledWith('party-1', 'PushNullsToBottom');
+    // Dropdown closes
+    expect(document.getElementById('auto-sort-dropdown-menu')).toBeNull();
+
+    // 3. Re-open and select KeepNullsInPlace
+    fireEvent.click(sortDropdownBtn);
+    const keepNullsBtnAgain = document.getElementById('sort-keep-nulls-place-btn') as HTMLButtonElement;
+    fireEvent.click(keepNullsBtnAgain);
+    expect(liveCombatHubService.autoSortInitiative).toHaveBeenCalledWith('party-1', 'KeepNullsInPlace');
+    expect(document.getElementById('auto-sort-dropdown-menu')).toBeNull();
+
+    unmount();
+
+    // Render Player View: Auto-Sort button should NOT be rendered
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="Player"
+        combatState={playerState}
+      />
+    );
+
+    expect(document.getElementById('auto-sort-dropdown-btn')).toBeNull();
+  });
 });
+
 
 

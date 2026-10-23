@@ -25,6 +25,7 @@ import type {
   LiveCombatantDmDto,
   LiveCombatantPlayerDto,
   PartyRole,
+  SortMode,
 } from '../types/liveCombat';
 import type { PartyResponseDto } from '../types/partyEncounter';
 import type { CreatureResponseDto } from '../types/dnd';
@@ -426,6 +427,23 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   // Estado para el panel de miembros de party (DM)
   const [isPartyMembersOpen, setIsPartyMembersOpen] = useState(false);
 
+  // Estado para el menú desplegable de auto-ordenamiento (DM)
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSortDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && !target.closest('.auto-sort-dropdown-container')) {
+        setIsSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSortDropdownOpen]);
+
   // Estado para modal de unirse al combate manualmente (Jugador)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [joinCharName, setJoinCharName] = useState('');
@@ -590,6 +608,15 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
 
   const handleAutoRollMonsters = async () => {
     await liveCombatHubService.autoRollMonsters(effectivePartyId);
+  };
+
+  const handleAutoSortInitiative = async (mode: SortMode) => {
+    setIsSortDropdownOpen(false);
+    try {
+      await liveCombatHubService.autoSortInitiative(effectivePartyId, mode);
+    } catch (err) {
+      console.error('[LiveCombatTracker] Error al auto-ordenar iniciativas:', err);
+    }
   };
 
   const handleStartCombat = async () => {
@@ -1308,6 +1335,90 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
               >
                 + {t('liveCombat.addQuickCombatantBtn', 'Añadir Combatiente Rápido')}
               </button>
+
+              {/* Botón desplegable de Auto-Ordenamiento de Iniciativas (DM Only) */}
+              <div className="auto-sort-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  type="button"
+                  id="auto-sort-dropdown-btn"
+                  data-testid="auto-sort-dropdown-btn"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIsSortDropdownOpen((prev) => !prev)}
+                  aria-expanded={isSortDropdownOpen}
+                  aria-haspopup="true"
+                  aria-label={t('liveCombat.autoSortAria', 'Opciones de auto-ordenamiento de iniciativa')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  ⚡ {t('liveCombat.autoSortBtn', 'Ordenar Iniciativas')} <span style={{ fontSize: '0.7rem' }}>▼</span>
+                </button>
+
+                {isSortDropdownOpen && (
+                  <div
+                    id="auto-sort-dropdown-menu"
+                    data-testid="auto-sort-dropdown-menu"
+                    className="auto-sort-dropdown-menu"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      background: 'var(--color-surface-elevated, #2a2e35)',
+                      border: '1px solid var(--color-gold, #c8aa6e)',
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
+                      zIndex: 1200,
+                      minWidth: '270px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '4px 0',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      id="sort-push-nulls-bottom-btn"
+                      data-testid="sort-push-nulls-bottom-btn"
+                      className="btn-dropdown-option"
+                      onClick={() => handleAutoSortInitiative('PushNullsToBottom')}
+                      style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-text-primary, #f0e6d2)',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        transition: 'background 0.2s',
+                        width: '100%',
+                      }}
+                      onMouseEnter={(e) => ((e.target as HTMLElement).style.background = 'rgba(200, 170, 110, 0.15)')}
+                      onMouseLeave={(e) => ((e.target as HTMLElement).style.background = 'transparent')}
+                    >
+                      ⬇️ {t('liveCombat.sortPushNullsBottom', 'Ordenar (Mover vacíos al final)')}
+                    </button>
+                    <button
+                      type="button"
+                      id="sort-keep-nulls-place-btn"
+                      data-testid="sort-keep-nulls-place-btn"
+                      className="btn-dropdown-option"
+                      onClick={() => handleAutoSortInitiative('KeepNullsInPlace')}
+                      style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-text-primary, #f0e6d2)',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        transition: 'background 0.2s',
+                        width: '100%',
+                      }}
+                      onMouseEnter={(e) => ((e.target as HTMLElement).style.background = 'rgba(200, 170, 110, 0.15)')}
+                      onMouseLeave={(e) => ((e.target as HTMLElement).style.background = 'transparent')}
+                    >
+                      🎯 {t('liveCombat.sortKeepNullsPlace', 'Ordenar (Mantener vacíos en posición)')}
+                    </button>
+                  </div>
+                )}
+              </div>
               {status === 'WaitingForInitiative' && (
                 <>
                   <button
