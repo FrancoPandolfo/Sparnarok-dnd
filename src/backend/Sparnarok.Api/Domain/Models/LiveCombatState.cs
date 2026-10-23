@@ -33,6 +33,7 @@ public class LiveCombatant
     public bool IsVisibleToPlayers { get; set; } = true;
     public Guid? AssignedPlayerUserId { get; set; }
     public string? Conditions { get; set; }
+    public int SortOrder { get; set; } = 0;
 
     public LiveCombatant() { }
 

@@ -25,9 +25,19 @@ public interface ILiveCombatManager
     LiveCombatState InitializeCombat(Guid partyId, string partyName, IEnumerable<LiveCombatant> combatants);
 
     /// <summary>
-    /// Asigna la iniciativa de un combatiente específico.
+    /// Asigna la iniciativa de un combatiente específico (opcional, puede ser nula).
     /// </summary>
-    bool SetInitiative(Guid partyId, Guid combatantId, decimal initiative);
+    bool SetInitiative(Guid partyId, Guid combatantId, decimal? initiative);
+
+    /// <summary>
+    /// Reordena un combatiente moviéndolo a una nueva posición en la lista (Drag and Drop en vivo).
+    /// </summary>
+    bool ReorderCombatant(Guid partyId, Guid combatantId, int newIndex);
+
+    /// <summary>
+    /// Adjunta un nuevo combatiente al final de la lista respetando el orden posicional existente.
+    /// </summary>
+    LiveCombatant AddCombatant(Guid partyId, LiveCombatant combatant);
 
     /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs que aún no tengan valor asignado.
@@ -35,7 +45,7 @@ public interface ILiveCombatManager
     void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null);
 
     /// <summary>
-    /// Inicia formalmente el combate, ordenando los combatientes por iniciativa descendente y fijando la ronda en 1.
+    /// Inicia formalmente el combate respetando el orden posicional de los combatientes y fijando la ronda en 1.
     /// </summary>
     bool StartCombat(Guid partyId);
 

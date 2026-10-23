@@ -33,6 +33,12 @@ public class LiveCombatManager : ILiveCombatManager
 
     public LiveCombatState InitializeCombat(Guid partyId, string partyName, IEnumerable<LiveCombatant> combatants)
     {
+        var list = combatants.ToList();
+        for (int i = 0; i < list.Count; i++)
+        {
+            list[i].SortOrder = i;
+        }
+
         var state = new LiveCombatState
         {
             PartyId = partyId,
@@ -40,14 +46,14 @@ public class LiveCombatManager : ILiveCombatManager
             Status = LiveCombatStatus.WaitingForInitiative,
             CurrentRound = 1,
             CurrentTurnIndex = 0,
-            Combatants = combatants.ToList()
+            Combatants = list
         };
 
         _states[partyId] = state;
         return state;
     }
 
-    public bool SetInitiative(Guid partyId, Guid combatantId, decimal initiative)
+    public bool SetInitiative(Guid partyId, Guid combatantId, decimal? initiative)
     {
         if (!_states.TryGetValue(partyId, out var state))
         {
@@ -62,6 +68,55 @@ public class LiveCombatManager : ILiveCombatManager
 
         combatant.Initiative = initiative;
         return true;
+    }
+
+    public bool ReorderCombatant(Guid partyId, Guid combatantId, int newIndex)
+    {
+        if (!_states.TryGetValue(partyId, out var state) || state.Combatants.Count == 0)
+        {
+            return false;
+        }
+
+        var oldIndex = state.Combatants.FindIndex(c => c.Id == combatantId);
+        if (oldIndex < 0)
+        {
+            return false;
+        }
+
+        var clampedIndex = Math.Clamp(newIndex, 0, state.Combatants.Count - 1);
+        if (oldIndex == clampedIndex)
+        {
+            return true;
+        }
+
+        var activeCombatant = state.GetCurrentCombatant();
+        var combatant = state.Combatants[oldIndex];
+        state.Combatants.RemoveAt(oldIndex);
+        state.Combatants.Insert(clampedIndex, combatant);
+
+        for (int i = 0; i < state.Combatants.Count; i++)
+        {
+            state.Combatants[i].SortOrder = i;
+        }
+
+        if (activeCombatant != null)
+        {
+            var newActiveIndex = state.Combatants.IndexOf(activeCombatant);
+            if (newActiveIndex >= 0)
+            {
+                state.CurrentTurnIndex = newActiveIndex;
+            }
+        }
+
+        return true;
+    }
+
+    public LiveCombatant AddCombatant(Guid partyId, LiveCombatant combatant)
+    {
+        var state = GetOrCreateState(partyId);
+        combatant.SortOrder = state.Combatants.Count;
+        state.Combatants.Add(combatant);
+        return combatant;
     }
 
     public void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null)
@@ -86,18 +141,12 @@ public class LiveCombatManager : ILiveCombatManager
             return false;
         }
 
-        // Si algún combatiente no tiene iniciativa aún, asignamos 10 por defecto
-        foreach (var combatant in state.Combatants)
+        // El orden posicional de Combatants (SortOrder) es la única fuente de verdad.
+        // No se reordena por iniciativa ni se fuerza un valor arbitrario.
+        for (int i = 0; i < state.Combatants.Count; i++)
         {
-            combatant.Initiative ??= 10m;
+            state.Combatants[i].SortOrder = i;
         }
-
-        // Ordenar por iniciativa descendente (los héroes desempatan primero)
-        state.Combatants = state.Combatants
-            .OrderByDescending(c => c.Initiative)
-            .ThenByDescending(c => c.IsPlayerCharacter)
-            .ThenBy(c => c.Name)
-            .ToList();
 
         state.Status = LiveCombatStatus.Active;
         state.CurrentRound = 1;
@@ -199,7 +248,8 @@ public class LiveCombatManager : ILiveCombatManager
             c.IsPlayerCharacter,
             c.IsVisibleToPlayers,
             c.AssignedPlayerUserId,
-            c.Conditions
+            c.Conditions,
+            c.SortOrder
         )).ToList();
 
         return new LiveCombatDmProjectionDto(
@@ -238,7 +288,8 @@ public class LiveCombatManager : ILiveCombatManager
                     hp,
                     maxHp,
                     healthStatus,
-                    c.Conditions
+                    c.Conditions,
+                    c.SortOrder
                 );
             }).ToList();
 

@@ -11,6 +11,7 @@ vi.mock('../services/liveCombatHubService', () => ({
   liveCombatHubService: {
     submitInitiative: vi.fn(),
     overrideInitiative: vi.fn(),
+    reorderCombatant: vi.fn(),
     autoRollMonsters: vi.fn(),
     startCombat: vi.fn(),
     nextTurn: vi.fn(),
@@ -152,4 +153,79 @@ describe('LiveCombatTracker Component Suite', () => {
     fireEvent.click(toggleBtn);
     expect(liveCombatHubService.toggleVisibility).toHaveBeenCalledWith('party-1', 'goblin-boss-1', true);
   });
+
+  it('Drag Handles: renders drag handle (≡) only for DM and never in Player view', () => {
+    // 1. Player View
+    const { unmount } = render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="Player"
+        combatState={playerState}
+      />
+    );
+
+    expect(screen.queryByTestId('drag-handle-hero-1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reordenar/i })).not.toBeInTheDocument();
+
+    unmount();
+
+    // 2. DM View
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    const dmHandleHero = screen.getByTestId('drag-handle-hero-1');
+    const dmHandleGoblin = screen.getByTestId('drag-handle-goblin-boss-1');
+
+    expect(dmHandleHero).toBeInTheDocument();
+    expect(dmHandleHero).toHaveTextContent('≡');
+    expect(dmHandleGoblin).toBeInTheDocument();
+    expect(dmHandleGoblin).toHaveTextContent('≡');
+  });
+
+  it('Allows clearing initiative without crashing UI and submits null initiative', () => {
+    // 1. DM view allows setting initiative to null/empty
+    const { unmount } = render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    const editButtons = screen.getAllByRole('button', { name: /✏️/i });
+    fireEvent.click(editButtons[0]); // Edit Kaelen's initiative
+
+    const overrideInput = screen.getByLabelText(/Modificar Iniciativa/i);
+    fireEvent.change(overrideInput, { target: { value: '' } });
+
+    const confirmBtn = screen.getByRole('button', { name: '✓' });
+    fireEvent.click(confirmBtn);
+
+    expect(liveCombatHubService.overrideInitiative).toHaveBeenCalledWith('party-1', 'hero-1', null);
+
+    unmount();
+
+    // 2. Player view allows submitting empty initiative
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="Player"
+        combatState={playerState}
+      />
+    );
+
+    const playerInput = screen.getByRole('spinbutton');
+    fireEvent.change(playerInput, { target: { value: '' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Enviar Iniciativa/i });
+    fireEvent.click(submitBtn);
+
+    expect(liveCombatHubService.submitInitiative).toHaveBeenCalledWith('party-1', 'hero-1', null);
+  });
 });
+

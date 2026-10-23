@@ -29,6 +29,7 @@ public class LiveCombatHub : Hub
             return;
         }
 
+        Context.Items["PartyId"] = id;
         var isDm = string.Equals(role, "DungeonMaster", StringComparison.OrdinalIgnoreCase);
 
         if (isDm)
@@ -82,9 +83,9 @@ public class LiveCombatHub : Hub
     }
 
     /// <summary>
-    /// Registra la iniciativa ingresada por un Jugador o por el DM.
+    /// Registra la iniciativa ingresada por un Jugador o por el DM (opcional, puede ser nula).
     /// </summary>
-    public async Task SubmitInitiative(string partyId, Guid combatantId, decimal initiative)
+    public async Task SubmitInitiative(string partyId, Guid combatantId, decimal? initiative)
     {
         if (!Guid.TryParse(partyId, out var id)) return;
 
@@ -95,15 +96,59 @@ public class LiveCombatHub : Hub
     }
 
     /// <summary>
-    /// Permite al DM forzar/sobreescribir la iniciativa de cualquier combatiente (ej. si alguien está AFK).
+    /// Permite al DM forzar/sobreescribir la iniciativa de cualquier combatiente.
     /// </summary>
-    public async Task OverrideInitiative(string partyId, Guid combatantId, decimal initiative)
+    public async Task OverrideInitiative(string partyId, Guid combatantId, decimal? initiative)
     {
         if (!Guid.TryParse(partyId, out var id)) return;
 
         if (_combatManager.SetInitiative(id, combatantId, initiative))
         {
             await BroadcastCombatStateAsync(id);
+        }
+    }
+
+    /// <summary>
+    /// Reordena un combatiente en la lista posicional mediante Drag and Drop (Acción exclusiva del DM).
+    /// Infiere la Party desde el contexto de conexión activo asignado en JoinCombat.
+    /// </summary>
+    public async Task ReorderCombatant(string combatantId, int newIndex)
+    {
+        Guid? partyId = null;
+        if (Context.Items.TryGetValue("PartyId", out var val))
+        {
+            if (val is Guid g)
+            {
+                partyId = g;
+            }
+            else if (val is string s && Guid.TryParse(s, out var parsed))
+            {
+                partyId = parsed;
+            }
+        }
+
+        if (partyId.HasValue && Guid.TryParse(combatantId, out var cId))
+        {
+            if (_combatManager.ReorderCombatant(partyId.Value, cId, newIndex))
+            {
+                await BroadcastCombatStateAsync(partyId.Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reordena un combatiente especificando explícitamente el identificador de la Party (Acción exclusiva del DM).
+    /// </summary>
+    public async Task ReorderCombatantInParty(string partyId, string combatantId, int newIndex)
+    {
+        if (!Guid.TryParse(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
+        {
+            return;
+        }
+
+        if (_combatManager.ReorderCombatant(pId, cId, newIndex))
+        {
+            await BroadcastCombatStateAsync(pId);
         }
     }
 
