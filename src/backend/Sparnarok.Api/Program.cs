@@ -170,6 +170,17 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowRenderFrontend", policy =>
+    {
+        policy.WithOrigins("https://sparnarokdnd.onrender.com") // La URL exacta de tu frontend
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Fundamental para que funcione SignalR luego
+    });
+});
+
 var app = builder.Build();
 
 // 3. Pipeline de Localización
@@ -210,6 +221,8 @@ if (enableSwagger)
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("AllowRenderFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
