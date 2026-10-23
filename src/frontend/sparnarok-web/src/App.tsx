@@ -16,6 +16,7 @@ import { CombatSimulatorView } from './components/CombatSimulatorView';
 import { WeaponIngestionModal } from './components/WeaponIngestionModal';
 import { LiveSessionModal } from './components/LiveSessionModal';
 import { PartyOnboardingModal } from './components/PartyOnboardingModal';
+import { PartyManagerModal } from './components/PartyManagerModal';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -45,6 +46,8 @@ export function AppContent() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
   const [isLiveSessionOpen, setIsLiveSessionOpen] = useState<boolean>(false);
+  const [isPartiesModalOpen, setIsPartiesModalOpen] = useState<boolean>(false);
+  const [liveSessionPartyId, setLiveSessionPartyId] = useState<string | undefined>(undefined);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
 
@@ -148,6 +151,7 @@ export function AppContent() {
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         onOpenIngestionModal={() => setIsIngestionModalOpen(true)}
         onOpenLiveSession={() => setIsLiveSessionOpen(true)}
+        onOpenPartiesModal={() => setIsPartiesModalOpen(true)}
       />
 
       {/* Hero Section */}
@@ -248,12 +252,32 @@ export function AppContent() {
         onUpload={apiClient.uploadWeaponsCsv}
       />
 
-      {/* Modal de Modo Partida Colaborativo (Tracker de Iniciativa & Notas de Sesión) */}
+      {/* Modal de Modo Partida Colaborativo (Tracker de Iniciativa & Mis Notas Privadas) */}
       <LiveSessionModal
         isOpen={isLiveSessionOpen}
         parties={parties}
+        activePartyId={liveSessionPartyId}
         currentUserId={user?.id}
         onClose={() => setIsLiveSessionOpen(false)}
+      />
+
+      {/* Modal de Gestión de Partys (CRUD, Enlaces de Invitación y Lanzador) */}
+      <PartyManagerModal
+        isOpen={isPartiesModalOpen}
+        parties={parties}
+        currentUserId={user?.id}
+        currentUserDisplayName={user?.globalNickname || user?.displayName}
+        onClose={() => setIsPartiesModalOpen(false)}
+        onPartyCreated={(newParty) => {
+          setParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
+        }}
+        onPartyDeleted={(deletedId) => {
+          setParties((prev) => prev.filter((p) => p.id !== deletedId));
+        }}
+        onOpenLiveSession={(partyId) => {
+          setLiveSessionPartyId(partyId);
+          setIsLiveSessionOpen(true);
+        }}
       />
 
       {/* Modal de Onboarding con Enlace de Invitación de Party */}

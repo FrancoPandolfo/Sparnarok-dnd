@@ -60,12 +60,25 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   >(null);
   const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
 
-  const currentParty = effectiveParties.find((p) => p.id === selectedPartyId);
+  const isQuickMode = selectedPartyId === 'quick-session';
+  const currentParty = isQuickMode
+    ? {
+        id: 'quick-session',
+        name: t('liveCombat.quickSessionOption', 'Sin Party (Modo Rápido)'),
+        ownerUserId: currentUserId || 'dm',
+        createdAt: new Date().toISOString(),
+        members: [],
+      }
+    : effectiveParties.find((p) => p.id === selectedPartyId);
 
   useEffect(() => {
     if (activePartyId) {
       setSelectedPartyId(activePartyId);
-    } else if (effectiveParties.length > 0 && (!selectedPartyId || !effectiveParties.some(p => p.id === selectedPartyId))) {
+    } else if (
+      selectedPartyId !== 'quick-session' &&
+      effectiveParties.length > 0 &&
+      (!selectedPartyId || !effectiveParties.some((p) => p.id === selectedPartyId))
+    ) {
       setSelectedPartyId(effectiveParties[0].id);
     }
   }, [activePartyId, effectiveParties, selectedPartyId]);
@@ -74,6 +87,10 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   useEffect(() => {
     if (initialRole) {
       setRole(initialRole);
+      return;
+    }
+    if (selectedPartyId === 'quick-session') {
+      setRole('DungeonMaster');
       return;
     }
     const currentParty = effectiveParties.find((p) => p.id === selectedPartyId);
@@ -108,9 +125,15 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
     };
   }, [isOpen, selectedPartyId, role, connectSignalR]);
 
-
-
   const handleInitializeCombat = async () => {
+    if (selectedPartyId === 'quick-session') {
+      await liveCombatHubService.initializeCombat('quick-session', {
+        partyName: 'Partida Rápida',
+        combatants: [],
+      });
+      return;
+    }
+
     const party = parties.find((p) => p.id === selectedPartyId);
     if (!party) return;
 
@@ -171,7 +194,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
           </div>
 
           <div className="modal-header-right">
-            {/* Selector de Party */}
+            {/* Selector de Party con opción Modo Rápido */}
             <div className="party-select-wrapper">
               <label htmlFor="live-session-party-select">
                 {t('liveCombat.selectParty', 'Party:')}
@@ -180,8 +203,17 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 id="live-session-party-select"
                 className="form-select form-select-sm"
                 value={selectedPartyId}
-                onChange={(e) => setSelectedPartyId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedPartyId(val);
+                  if (val === 'quick-session') {
+                    setRole('DungeonMaster');
+                  }
+                }}
               >
+                <option value="quick-session">
+                  {t('liveCombat.quickSessionOption', '⚡ Sin Party (Modo Rápido)')}
+                </option>
                 {effectiveParties.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -232,7 +264,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
           </div>
         </div>
 
-        {/* Barra de Pestañas */}
+        {/* Barra de Pestañas: Siempre visible para todos los roles (RLS a nivel de nota) */}
         <div className="modal-tabs-bar" role="tablist">
           <button
             type="button"
@@ -253,7 +285,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
             className={`modal-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
             onClick={() => setActiveTab('notes')}
           >
-            {t('liveCombat.notesTab', '📜 Mis Notas')}
+            {t('liveCombat.notesTab', '📜 Mis Notas Privadas')}
           </button>
         </div>
 
@@ -273,7 +305,9 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                     className="btn btn-primary btn-sm primary-gold"
                     onClick={handleInitializeCombat}
                   >
-                    ⚔️ {t('liveCombat.loadEncounterBtn', 'Inicializar Combate con la Party')}
+                    ⚔️ {selectedPartyId === 'quick-session'
+                      ? '⚡ Inicializar Combate Rápido'
+                      : t('liveCombat.loadEncounterBtn', 'Inicializar Combate con la Party')}
                   </button>
                 </div>
               )}

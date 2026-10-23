@@ -115,3 +115,16 @@ public record ReorderCombatantRequest(
     int NewIndex
 );
 
+/// <summary>
+/// Solicitud para agregar un combatiente rápido en caliente directamente a la iniciativa activa (sin entidad persistida en BD).
+/// </summary>
+public record AddQuickCombatantRequest(
+    string Name,
+    int MaxHp,
+    int ArmorClass,
+    bool IsPlayerCharacter = false,
+    bool IsVisibleToPlayers = true,
+    decimal? Initiative = null
+);
+
+

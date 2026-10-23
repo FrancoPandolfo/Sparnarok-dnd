@@ -9,8 +9,8 @@ using Sparnarok.Api.Domain.Entities;
 namespace Sparnarok.Api.Controllers;
 
 /// <summary>
-/// Gestiona las notas de sesión y apuntes de campaña de una Party,
-/// con autorización exclusiva para el rol de Dungeon Master (propietario de la Party).
+/// Gestiona las notas privadas de sesión y apuntes personales de campaña para cualquier integrante autenticado de una Party,
+/// con aislamiento estricto por usuario (Logical Row-Level Security: OwnerUserId == CurrentUserId).
 /// </summary>
 [ApiController]
 [Authorize]

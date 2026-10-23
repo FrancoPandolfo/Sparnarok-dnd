@@ -312,6 +312,15 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   const [overrideCombatantId, setOverrideCombatantId] = useState<string | null>(null);
   const [overrideValue, setOverrideValue] = useState<number | string>(10);
 
+  // Estado para modal ligero de Combatiente Rápido
+  const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickHp, setQuickHp] = useState<number | string>(20);
+  const [quickAc, setQuickAc] = useState<number | string>(12);
+  const [quickIsHero, setQuickIsHero] = useState(false);
+  const [quickInitiative, setQuickInitiative] = useState<number | string>('');
+  const [quickError, setQuickError] = useState<string | null>(null);
+
   const isDm = role === 'DungeonMaster';
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -379,12 +388,231 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     await liveCombatHubService.toggleVisibility(partyId, combatantId, !currentVisibility);
   };
 
-  if (!combatState) {
+  const handleQuickCombatantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim()) {
+      setQuickError('El nombre es obligatorio.');
+      return;
+    }
+
+    const hpNum = Math.max(1, Number(quickHp) || 1);
+    const acNum = Math.max(0, Number(quickAc) || 10);
+    const initNum = quickInitiative !== '' ? Number(quickInitiative) : null;
+    const newId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `quick-${Date.now()}`;
+
+    // Actualización optimista inmediata
+    const newDto: LiveCombatantDmDto = {
+      id: newId,
+      name: quickName.trim(),
+      initiative: initNum,
+      maxHp: hpNum,
+      currentHp: hpNum,
+      armorClass: acNum,
+      isPlayerCharacter: quickIsHero,
+      isVisibleToPlayers: true,
+      assignedPlayerUserId: null,
+      conditions: null,
+      sortOrder: localCombatants.length,
+    };
+
+    setLocalCombatants((prev) => [...prev, newDto]);
+    setIsQuickModalOpen(false);
+    setQuickName('');
+    setQuickHp(20);
+    setQuickAc(12);
+    setQuickInitiative('');
+    setQuickIsHero(false);
+    setQuickError(null);
+
+    try {
+      await liveCombatHubService.addQuickCombatant(partyId, {
+        name: newDto.name,
+        maxHp: newDto.maxHp,
+        armorClass: newDto.armorClass,
+        isPlayerCharacter: newDto.isPlayerCharacter,
+        isVisibleToPlayers: newDto.isVisibleToPlayers,
+        initiative: newDto.initiative,
+      });
+    } catch (err) {
+      console.warn('[LiveCombatTracker] Error adding quick combatant:', err);
+    }
+  };
+
+  const renderQuickCombatantModal = () => {
+    if (!isQuickModalOpen) return null;
+
     return (
-      <div className="live-combat-empty-state" id="live-combat-empty-state">
-        <div className="empty-state-icon">⚔️</div>
-        <h3>{t('liveCombat.waitingInitiative', 'Esperando Combate')}</h3>
-        <p>{t('liveCombat.emptyCombatants', 'No hay combate activo para esta Party.')}</p>
+      <div className="modal-backdrop" id="quick-combatant-modal-backdrop" style={{ zIndex: 1100 }}>
+        <div
+          className="modal-content quick-combatant-modal-dialog"
+          role="dialog"
+          aria-modal="true"
+          id="quick-combatant-modal"
+          style={{ maxWidth: '420px', width: '90%' }}
+        >
+          <div className="modal-header">
+            <h3 className="modal-title" style={{ fontSize: '1.15rem' }}>
+              ⚡ {t('liveCombat.quickCombatantModalTitle', 'Añadir Combatiente Rápido')}
+            </h3>
+            <button
+              type="button"
+              id="quick-combatant-close-btn"
+              className="modal-close-btn"
+              onClick={() => setIsQuickModalOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+          <form onSubmit={handleQuickCombatantSubmit} className="modal-body quick-combatant-form">
+            {quickError && <div className="form-error-banner">⚠️ {quickError}</div>}
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label htmlFor="quick-combatant-name">
+                {t('liveCombat.quickCombatantName', 'Nombre')} *
+              </label>
+              <input
+                type="text"
+                id="quick-combatant-name"
+                className="form-input"
+                value={quickName}
+                onChange={(e) => setQuickName(e.target.value)}
+                placeholder="ej. Goblin Arquero o Sir Tristan"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div
+              className="form-row-dual"
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}
+            >
+              <div className="form-group">
+                <label htmlFor="quick-combatant-hp">
+                  {t('liveCombat.quickCombatantHp', 'Puntos de Golpe (HP)')} *
+                </label>
+                <input
+                  type="number"
+                  id="quick-combatant-hp"
+                  className="form-input"
+                  min={1}
+                  value={quickHp}
+                  onChange={(e) => setQuickHp(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="quick-combatant-ac">
+                  {t('liveCombat.quickCombatantAc', 'Clase de Armadura (CA)')} *
+                </label>
+                <input
+                  type="number"
+                  id="quick-combatant-ac"
+                  className="form-input"
+                  min={0}
+                  value={quickAc}
+                  onChange={(e) => setQuickAc(e.target.value === '' ? '' : Number(e.target.value))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div
+              className="form-row-dual"
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}
+            >
+              <div className="form-group">
+                <label htmlFor="quick-combatant-type">
+                  {t('liveCombat.quickCombatantType', 'Tipo')}
+                </label>
+                <select
+                  id="quick-combatant-type"
+                  className="form-select"
+                  value={quickIsHero ? 'hero' : 'monster'}
+                  onChange={(e) => setQuickIsHero(e.target.value === 'hero')}
+                >
+                  <option value="monster">👾 {t('liveCombat.quickCombatantMonster', 'Monstruo / NPC')}</option>
+                  <option value="hero">🛡️ {t('liveCombat.quickCombatantHero', 'Héroe / PJ')}</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="quick-combatant-initiative">
+                  {t('liveCombat.quickCombatantInitiative', 'Iniciativa')}
+                </label>
+                <input
+                  type="number"
+                  id="quick-combatant-initiative"
+                  className="form-input"
+                  placeholder="-"
+                  value={quickInitiative}
+                  onChange={(e) => setQuickInitiative(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="form-actions-right" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                id="quick-combatant-cancel-btn"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setIsQuickModalOpen(false)}
+              >
+                {t('liveCombat.quickCombatantCancel', 'Cancelar')}
+              </button>
+              <button
+                type="submit"
+                id="quick-combatant-submit-btn"
+                className="btn btn-primary btn-sm primary-gold"
+                disabled={!quickName.trim()}
+              >
+                + {t('liveCombat.quickCombatantSubmit', 'Añadir')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  if (!combatState || localCombatants.length === 0) {
+    return (
+      <div className="live-combat-tracker-panel" id="live-combat-tracker">
+        {isDm && (
+          <div className="dm-master-controls-bar" id="dm-master-controls">
+            <div className="dm-controls-title">👑 {t('liveCombat.roleDm', 'Dungeon Master')}</div>
+            <div className="dm-buttons-group">
+              <button
+                type="button"
+                id="add-quick-combatant-btn"
+                className="btn btn-primary btn-sm primary-gold"
+                onClick={() => setIsQuickModalOpen(true)}
+              >
+                + {t('liveCombat.addQuickCombatantBtn', 'Añadir Combatiente Rápido')}
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="live-combat-empty-state" id="live-combat-empty-state">
+          <div className="empty-state-icon">⚔️</div>
+          <h3>{t('liveCombat.waitingInitiative', 'Esperando Combate')}</h3>
+          <p>{t('liveCombat.emptyCombatants', 'No hay combatientes en este combate activo.')}</p>
+          {isDm && (
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                id="add-quick-combatant-empty-btn"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setIsQuickModalOpen(true)}
+              >
+                + {t('liveCombat.addQuickCombatantBtn', 'Añadir Combatiente Rápido')}
+              </button>
+            </div>
+          )}
+        </div>
+        {renderQuickCombatantModal()}
       </div>
     );
   }
@@ -431,6 +659,14 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
         <div className="dm-master-controls-bar" id="dm-master-controls">
           <div className="dm-controls-title">👑 {t('liveCombat.roleDm', 'Dungeon Master')}</div>
           <div className="dm-buttons-group">
+            <button
+              type="button"
+              id="add-quick-combatant-btn"
+              className="btn btn-outline btn-sm"
+              onClick={() => setIsQuickModalOpen(true)}
+            >
+              + {t('liveCombat.addQuickCombatantBtn', 'Añadir Combatiente Rápido')}
+            </button>
             {status === 'WaitingForInitiative' && (
               <>
                 <button
@@ -580,6 +816,7 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
           </table>
         </DndContext>
       </div>
+      {renderQuickCombatantModal()}
     </div>
   );
 };

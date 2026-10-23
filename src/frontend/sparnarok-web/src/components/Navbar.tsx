@@ -10,6 +10,7 @@ export interface NavbarProps {
   onOpenCreateModal: () => void;
   onOpenIngestionModal: () => void;
   onOpenLiveSession?: () => void;
+  onOpenPartiesModal?: () => void;
 }
 
 /**
@@ -21,6 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateModal,
   onOpenIngestionModal,
   onOpenLiveSession,
+  onOpenPartiesModal,
 }) => {
   const { t, i18n } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
@@ -70,9 +72,30 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="nav-open-live-session-btn"
               className="action-btn live-session-nav-btn primary-gold"
               onClick={onOpenLiveSession}
-              title="Abrir Modo Partida en Vivo: Tracker de Iniciativa y Notas de Sesión (DM)"
+              title="Abrir Modo Partida en Vivo: Tracker de Iniciativa y Mis Notas Privadas"
             >
               ⚔️ Modo Partida (En Vivo)
+            </button>
+          )}
+          {onOpenPartiesModal && (
+            <button
+              type="button"
+              id="open-parties-modal-btn"
+              className="action-btn parties-nav-btn"
+              onClick={onOpenPartiesModal}
+              title={t('parties.myPartiesTitle', 'Gestionar mis Partys de juego')}
+            >
+              🛡️ {t('parties.myPartiesBtn', 'Mis Partys')}
+            </button>
+          )}
+          {activeTab === 'bestiary' && (
+            <button
+              type="button"
+              id="create-creature-btn"
+              className="action-btn primary-gold"
+              onClick={onOpenCreateModal}
+            >
+              {t('app.nav.newCreature')}
             </button>
           )}
           <button
@@ -84,16 +107,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             📥 {t('app.nav.ingestCsv')}
           </button>
-          {activeTab === 'bestiary' && (
-            <button
-              type="button"
-              id="create-creature-btn"
-              className="action-btn primary-gold"
-              onClick={onOpenCreateModal}
-            >
-              {t('app.nav.newCreature')}
-            </button>
-          )}
           <button
             type="button"
             id="lang-toggle-btn"
