@@ -13,7 +13,8 @@ public record LiveCombatantDmDto(
     bool IsPlayerCharacter,
     bool IsVisibleToPlayers,
     Guid? AssignedPlayerUserId,
-    string? Conditions
+    string? Conditions,
+    int SortOrder = 0
 );
 
 /// <summary>
@@ -28,7 +29,8 @@ public record LiveCombatantPlayerDto(
     int? CurrentHp,
     int? MaxHp,
     string HealthStatus,
-    string? Conditions
+    string? Conditions,
+    int SortOrder = 0
 );
 
 /// <summary>
@@ -104,3 +106,12 @@ public record ToggleVisibilityRequest(
     Guid CombatantId,
     bool IsVisible
 );
+
+/// <summary>
+/// Solicitud de reordenamiento posicional de un combatiente (Drag and Drop).
+/// </summary>
+public record ReorderCombatantRequest(
+    Guid CombatantId,
+    int NewIndex
+);
+

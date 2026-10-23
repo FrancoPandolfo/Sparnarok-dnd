@@ -143,11 +143,11 @@ public class LiveCombatHubTests
         var partyId = Guid.NewGuid();
         var manager = new LiveCombatManager();
 
-        var hero = new LiveCombatant(Guid.NewGuid(), "Gimli", maxHp: 50, armorClass: 18, isPlayerCharacter: true, isVisibleToPlayers: true, initiative: 12);
         var hiddenBoss = new LiveCombatant(Guid.NewGuid(), "Goblin Boss", maxHp: 60, armorClass: 17, isPlayerCharacter: false, isVisibleToPlayers: false, initiative: 25);
+        var hero = new LiveCombatant(Guid.NewGuid(), "Gimli", maxHp: 50, armorClass: 18, isPlayerCharacter: true, isVisibleToPlayers: true, initiative: 12);
 
-        manager.InitializeCombat(partyId, "Party", new[] { hero, hiddenBoss });
-        manager.StartCombat(partyId); // Boss tiene 25, actúa primero en el turno 0
+        manager.InitializeCombat(partyId, "Party", new[] { hiddenBoss, hero });
+        manager.StartCombat(partyId); // Boss está en la posición 0, actúa primero en el turno 0
 
         // Act
         var dmProj = manager.CreateDmProjection(partyId);
@@ -239,4 +239,156 @@ public class LiveCombatHubTests
         manager.ModifyCombatantHp(partyId, combatant.Id, +100);
         combatant.CurrentHp.Should().Be(30);
     }
+
+    [Fact]
+    public void LiveCombatManager_ReorderCombatant_MovesElementFromIndex0ToIndex3_ShiftsOthersAndRecalculatesSortOrder()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Combatant A", 20, 10, true);
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Combatant B", 20, 10, true);
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Combatant C", 20, 10, true);
+        var c3 = new LiveCombatant(Guid.NewGuid(), "Combatant D", 20, 10, true);
+
+        manager.InitializeCombat(partyId, "Party Test", new[] { c0, c1, c2, c3 });
+
+        // Act: Mover el combatiente en el índice 0 (A) al índice 3
+        var reorderResult = manager.ReorderCombatant(partyId, c0.Id, 3);
+
+        // Assert
+        reorderResult.Should().BeTrue();
+        var state = manager.GetState(partyId)!;
+        state.Combatants.Should().HaveCount(4);
+
+        // Validar orden posicional desplazado
+        state.Combatants[0].Id.Should().Be(c1.Id);
+        state.Combatants[0].Name.Should().Be("Combatant B");
+        state.Combatants[0].SortOrder.Should().Be(0);
+
+        state.Combatants[1].Id.Should().Be(c2.Id);
+        state.Combatants[1].Name.Should().Be("Combatant C");
+        state.Combatants[1].SortOrder.Should().Be(1);
+
+        state.Combatants[2].Id.Should().Be(c3.Id);
+        state.Combatants[2].Name.Should().Be("Combatant D");
+        state.Combatants[2].SortOrder.Should().Be(2);
+
+        state.Combatants[3].Id.Should().Be(c0.Id);
+        state.Combatants[3].Name.Should().Be("Combatant A");
+        state.Combatants[3].SortOrder.Should().Be(3);
+    }
+
+    [Fact]
+    public void LiveCombatManager_ReorderCombatant_PreservesActiveCombatantTurn()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Hero 1", 30, 12, true);
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Hero 2 (Active)", 30, 12, true);
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Monster 1", 30, 12, false);
+        var c3 = new LiveCombatant(Guid.NewGuid(), "Monster 2", 30, 12, false);
+
+        manager.InitializeCombat(partyId, "Party Test", new[] { c0, c1, c2, c3 });
+        manager.StartCombat(partyId);
+        manager.NextTurn(partyId); // CurrentTurnIndex = 1 -> "Hero 2 (Active)"
+
+        var stateBefore = manager.GetState(partyId)!;
+        stateBefore.GetCurrentCombatant()!.Name.Should().Be("Hero 2 (Active)");
+        stateBefore.CurrentTurnIndex.Should().Be(1);
+
+        // Act: Mover c0 (índice 0) al índice 3 -> c1 pasa al índice 0
+        manager.ReorderCombatant(partyId, c0.Id, 3);
+
+        // Assert: El combatiente activo sigue siendo Hero 2, y CurrentTurnIndex se actualizó a 0
+        var stateAfter = manager.GetState(partyId)!;
+        stateAfter.GetCurrentCombatant()!.Name.Should().Be("Hero 2 (Active)");
+        stateAfter.CurrentTurnIndex.Should().Be(0);
+    }
+
+    [Fact]
+    public void LiveCombatManager_StartCombat_DoesNotSortByInitiativeAndAllowsNullInitiatives()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "No Initiative Rogue", 25, 14, true, initiative: null);
+        var c1 = new LiveCombatant(Guid.NewGuid(), "High Initiative Wizard", 18, 12, true, initiative: 22);
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Mid Initiative Fighter", 35, 16, true, initiative: 14);
+
+        manager.InitializeCombat(partyId, "Party Test", new[] { c0, c1, c2 });
+
+        // Act: Iniciar combate
+        manager.StartCombat(partyId);
+
+        // Assert: El orden posicional original se preserva intacto y la iniciativa nula no es alterada
+        var state = manager.GetState(partyId)!;
+        state.Status.Should().Be(LiveCombatStatus.Active);
+        state.Combatants.Should().HaveCount(3);
+
+        state.Combatants[0].Name.Should().Be("No Initiative Rogue");
+        state.Combatants[0].Initiative.Should().BeNull();
+        state.Combatants[0].SortOrder.Should().Be(0);
+
+        state.Combatants[1].Name.Should().Be("High Initiative Wizard");
+        state.Combatants[1].Initiative.Should().Be(22);
+        state.Combatants[1].SortOrder.Should().Be(1);
+
+        state.Combatants[2].Name.Should().Be("Mid Initiative Fighter");
+        state.Combatants[2].Initiative.Should().Be(14);
+        state.Combatants[2].SortOrder.Should().Be(2);
+
+        state.GetCurrentCombatant()!.Name.Should().Be("No Initiative Rogue");
+    }
+
+    [Fact]
+    public async Task LiveCombatHub_ReorderCombatant_BroadcastsToBothDmAndPlayerGroups()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Alpha", 20, 10, true);
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Beta", 20, 10, true);
+        manager.InitializeCombat(partyId, "Party", new[] { c0, c1 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId.ToString() });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: Invocación con sobrecarga (combatantId, newIndex)
+        await hub.ReorderCombatant(c0.Id.ToString(), 1);
+
+        // Assert: Se envió la actualización de estado a ambos grupos
+        await dmGroupProxy.Received(1).SendCoreAsync(
+            "CombatStateUpdated",
+            Arg.Any<object?[]>(),
+            default);
+
+        await playerGroupProxy.Received(1).SendCoreAsync(
+            "CombatStateUpdated",
+            Arg.Any<object?[]>(),
+            default);
+
+        var state = manager.GetState(partyId)!;
+        state.Combatants[0].Id.Should().Be(c1.Id);
+        state.Combatants[1].Id.Should().Be(c0.Id);
+    }
 }
+

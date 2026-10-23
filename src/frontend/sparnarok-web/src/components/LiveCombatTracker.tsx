@@ -1,5 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { liveCombatHubService } from '../services/liveCombatHubService';
 import type {
   LiveCombatDmProjectionDto,
@@ -16,9 +33,245 @@ export interface LiveCombatTrackerProps {
   currentUserId?: string | null;
 }
 
+interface SortableCombatantRowProps {
+  combatant: LiveCombatantDmDto | LiveCombatantPlayerDto;
+  index: number;
+  isActive: boolean;
+  isDm: boolean;
+  overrideCombatantId: string | null;
+  overrideValue: number | string;
+  setOverrideCombatantId: (id: string | null) => void;
+  setOverrideValue: (val: number | string) => void;
+  handleDmOverrideInitiative: (combatantId: string) => void;
+  handleModifyHp: (combatantId: string, delta: number) => void;
+  handleToggleVisibility: (combatantId: string, currentVisibility: boolean) => void;
+}
+
+/**
+ * Fila individual sortable para combatiente.
+ * En la vista de Dungeon Master, incluye un Drag Handle táctil y accesible (≡).
+ */
+const SortableCombatantRow: React.FC<SortableCombatantRowProps> = ({
+  combatant: c,
+  index,
+  isActive,
+  isDm,
+  overrideCombatantId,
+  overrideValue,
+  setOverrideCombatantId,
+  setOverrideValue,
+  handleDmOverrideInitiative,
+  handleModifyHp,
+  handleToggleVisibility,
+}) => {
+  const { t } = useTranslation();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: c.id,
+    disabled: !isDm,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    position: isDragging ? 'relative' : undefined,
+    zIndex: isDragging ? 999 : undefined,
+  };
+
+  const dmCombatant = isDm ? (c as LiveCombatantDmDto) : null;
+  const playerCombatant = !isDm ? (c as LiveCombatantPlayerDto) : null;
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`combatant-row ${isActive ? 'active-turn-row' : ''} ${
+        c.isPlayerCharacter ? 'hero-row' : 'monster-row'
+      } ${isDragging ? 'is-dragging' : ''}`}
+      id={`combatant-row-${c.id}`}
+      data-testid={`combatant-row-${c.id}`}
+    >
+      <td className="row-index">
+        <div className="row-index-container">
+          {isDm && (
+            <button
+              type="button"
+              id={`drag-handle-${c.id}`}
+              data-testid={`drag-handle-${c.id}`}
+              className="drag-handle-btn"
+              aria-label={t('liveCombat.dragHandleAria', {
+                defaultValue: 'Reordenar {{name}}',
+                name: c.name,
+              })}
+              title={t('liveCombat.dragHandleTitle', 'Arrastrar para reordenar turno')}
+              {...attributes}
+              {...listeners}
+            >
+              ≡
+            </button>
+          )}
+          <span className="index-number">{index + 1}</span>
+        </div>
+      </td>
+
+      <td className="row-name">
+        <span className="combatant-name">{c.name}</span>
+        <span
+          className={`combatant-badge ${
+            c.isPlayerCharacter ? 'badge-hero' : 'badge-monster'
+          }`}
+        >
+          {c.isPlayerCharacter
+            ? t('liveCombat.heroBadge', 'Héroe')
+            : t('liveCombat.monsterBadge', 'Monstruo')}
+        </span>
+        {isActive && <span className="active-turn-indicator">⭐</span>}
+      </td>
+
+      {/* Iniciativa: Admite números o null/vacío sin romper la UI */}
+      <td className="row-initiative">
+        {isDm && overrideCombatantId === c.id ? (
+          <div className="initiative-override-box">
+            <input
+              type="number"
+              className="input-xs"
+              value={overrideValue}
+              onChange={(e) =>
+                setOverrideValue(e.target.value === '' ? '' : Number(e.target.value))
+              }
+              placeholder="-"
+              aria-label={t('liveCombat.overrideInitiativeTitle', 'Modificar Iniciativa')}
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-xs"
+              onClick={() => handleDmOverrideInitiative(c.id)}
+            >
+              ✓
+            </button>
+          </div>
+        ) : (
+          <span className="initiative-score">
+            {c.initiative !== null && c.initiative !== undefined ? c.initiative : '-'}
+            {isDm && (
+              <button
+                type="button"
+                className="btn-link-icon"
+                title={t('liveCombat.overrideInitiativeTitle', 'Modificar Iniciativa')}
+                onClick={() => {
+                  setOverrideCombatantId(c.id);
+                  setOverrideValue(c.initiative !== null && c.initiative !== undefined ? c.initiative : '');
+                }}
+              >
+                ✏️
+              </button>
+            )}
+          </span>
+        )}
+      </td>
+
+      {/* HP / Salud */}
+      <td className="row-hp">
+        {isDm && dmCombatant ? (
+          <div className="hp-real-control">
+            <span className="hp-value">
+              {dmCombatant.currentHp} / {dmCombatant.maxHp}
+            </span>
+            <div className="hp-quick-buttons">
+              <button
+                type="button"
+                className="hp-btn minus"
+                onClick={() => handleModifyHp(c.id, -5)}
+                title="-5 HP"
+              >
+                -5
+              </button>
+              <button
+                type="button"
+                className="hp-btn minus"
+                onClick={() => handleModifyHp(c.id, -1)}
+                title="-1 HP"
+              >
+                -1
+              </button>
+              <button
+                type="button"
+                className="hp-btn plus"
+                onClick={() => handleModifyHp(c.id, 1)}
+                title="+1 HP"
+              >
+                +1
+              </button>
+              <button
+                type="button"
+                className="hp-btn plus"
+                onClick={() => handleModifyHp(c.id, 5)}
+                title="+5 HP"
+              >
+                +5
+              </button>
+            </div>
+          </div>
+        ) : (
+          <span
+            className={`health-status-badge health-${playerCombatant?.healthStatus.toLowerCase()}`}
+          >
+            {playerCombatant?.isPlayerCharacter &&
+            playerCombatant?.currentHp !== undefined &&
+            playerCombatant.currentHp !== null
+              ? `${playerCombatant.currentHp} / ${playerCombatant.maxHp}`
+              : playerCombatant?.healthStatus}
+          </span>
+        )}
+      </td>
+
+      {/* CA (DM Only) */}
+      {isDm && dmCombatant && (
+        <td className="row-ac">
+          <span className="ac-shield-pill">🛡️ {dmCombatant.armorClass}</span>
+        </td>
+      )}
+
+      {/* Visibilidad (DM Only) */}
+      {isDm && dmCombatant && (
+        <td className="row-visibility">
+          <button
+            type="button"
+            id={`toggle-visibility-${c.id}`}
+            className={`visibility-toggle-btn ${
+              dmCombatant.isVisibleToPlayers ? 'is-visible' : 'is-hidden'
+            }`}
+            onClick={() =>
+              handleToggleVisibility(c.id, dmCombatant.isVisibleToPlayers)
+            }
+            title={t('liveCombat.toggleVisibility', 'Alternar Visibilidad')}
+          >
+            {dmCombatant.isVisibleToPlayers ? '👁️ Visible' : '🙈 Oculto'}
+          </button>
+        </td>
+      )}
+
+      {/* Acciones del DM */}
+      {isDm && (
+        <td className="row-actions">
+          {/* Espacio para acciones rápidas o condiciones */}
+        </td>
+      )}
+    </tr>
+  );
+};
+
 /**
  * Rastreador de combate e iniciativa táctica en vivo con sincronización SignalR.
- * Ofrece controles maestros para el Dungeon Master y una vista censurada anti-metagaming para Jugadores.
+ * Ofrece controles maestros para el Dungeon Master con Drag & Drop interactivo (@dnd-kit)
+ * y una vista censurada anti-metagaming para Jugadores.
  */
 export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   partyId,
@@ -27,25 +280,74 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  // Estado local para actualización optimista del ordenamiento
+  const [localCombatants, setLocalCombatants] = useState<
+    (LiveCombatantDmDto | LiveCombatantPlayerDto)[]
+  >(combatState?.combatants ?? []);
+
+  // Sincronizar estado local cuando SignalR actualiza el estado del servidor
+  useEffect(() => {
+    if (combatState?.combatants) {
+      setLocalCombatants(combatState.combatants);
+    }
+  }, [combatState?.combatants]);
+
+  // Sensores de DnD Kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // Estado para la tirada de iniciativa individual del jugador
   const [playerSelectedCombatantId, setPlayerSelectedCombatantId] = useState<string>('');
-  const [playerInitiativeValue, setPlayerInitiativeValue] = useState<number>(10);
+  const [playerInitiativeValue, setPlayerInitiativeValue] = useState<number | string>(10);
 
   // Estado para override de iniciativa del DM (para jugadores AFK o monstruos)
   const [overrideCombatantId, setOverrideCombatantId] = useState<string | null>(null);
-  const [overrideValue, setOverrideValue] = useState<number>(10);
+  const [overrideValue, setOverrideValue] = useState<number | string>(10);
 
   const isDm = role === 'DungeonMaster';
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !isDm) return;
+
+    const oldIndex = localCombatants.findIndex((c) => c.id === active.id);
+    const newIndex = localCombatants.findIndex((c) => c.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      // 1. Actualización optimista inmediata en la UI de React
+      const updated = arrayMove(localCombatants, oldIndex, newIndex);
+      setLocalCombatants(updated);
+
+      // 2. Notificación en tiempo real vía SignalR
+      try {
+        await liveCombatHubService.reorderCombatant(partyId, String(active.id), newIndex);
+      } catch (err) {
+        console.error('[LiveCombatTracker] Error al sincronizar reordenamiento:', err);
+      }
+    }
+  };
 
   const handlePlayerSubmitInitiative = async () => {
     const targetHeroId =
       playerSelectedCombatantId || (playerHeroes.length === 1 ? playerHeroes[0].id : '');
     if (!combatState || !targetHeroId) return;
-    await liveCombatHubService.submitInitiative(partyId, targetHeroId, playerInitiativeValue);
+
+    const numericInit =
+      playerInitiativeValue === '' ? null : Number(playerInitiativeValue);
+    await liveCombatHubService.submitInitiative(partyId, targetHeroId, numericInit);
   };
 
   const handleDmOverrideInitiative = async (combatantId: string) => {
-    await liveCombatHubService.overrideInitiative(partyId, combatantId, overrideValue);
+    const numericInit = overrideValue === '' ? null : Number(overrideValue);
+    await liveCombatHubService.overrideInitiative(partyId, combatantId, numericInit);
     setOverrideCombatantId(null);
   };
 
@@ -87,20 +389,26 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     );
   }
 
-  const { status, currentRound, activeCombatantId, activeCombatantName, combatants } = combatState;
+  const { status, currentRound, activeCombatantId, activeCombatantName } = combatState;
 
   // Encontrar héroes jugables para el selector de iniciativa del jugador
-  const playerHeroes = combatants.filter((c) => c.isPlayerCharacter);
+  const playerHeroes = localCombatants.filter((c) => c.isPlayerCharacter);
 
   return (
     <div className="live-combat-tracker-panel" id="live-combat-tracker">
       {/* Barra superior de Estado del Combate */}
       <div className="combat-status-header">
         <div className="status-badge-container">
-          <span className={`status-pill status-${status.toLowerCase()}`} id="combat-status-badge">
-            {status === 'WaitingForInitiative' && `⏳ ${t('liveCombat.waitingInitiative', 'Esperando Iniciativas')}`}
-            {status === 'InProgress' && `⚔️ ${t('liveCombat.inProgress', { round: currentRound })}`}
-            {status === 'Ended' && `🛑 ${t('liveCombat.combatEnded', 'Combate Finalizado')}`}
+          <span
+            className={`status-pill status-${status.toLowerCase()}`}
+            id="combat-status-badge"
+          >
+            {status === 'WaitingForInitiative' &&
+              `⏳ ${t('liveCombat.waitingInitiative', 'Esperando Iniciativas')}`}
+            {status === 'InProgress' &&
+              `⚔️ ${t('liveCombat.inProgress', { round: currentRound })}`}
+            {status === 'Ended' &&
+              `🛑 ${t('liveCombat.combatEnded', 'Combate Finalizado')}`}
             {status === 'NotStarted' && `💤 No Iniciado`}
           </span>
           <span className="party-name-badge">🏰 {combatState.partyName}</span>
@@ -206,7 +514,12 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
               min={1}
               max={40}
               value={playerInitiativeValue}
-              onChange={(e) => setPlayerInitiativeValue(Number(e.target.value))}
+              onChange={(e) =>
+                setPlayerInitiativeValue(
+                  e.target.value === '' ? '' : Number(e.target.value)
+                )
+              }
+              placeholder="-"
             />
 
             <button
@@ -222,175 +535,50 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
         </div>
       )}
 
-      {/* Tabla de Combatientes en el Orden de Iniciativa */}
+      {/* Tabla de Combatientes en el Orden de Turnos con Drag & Drop */}
       <div className="combatants-table-container">
-        <table className="combatants-table" id="initiative-order-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>{t('liveCombat.colName', 'Combatiente')}</th>
-              <th>{t('liveCombat.colInitiative', 'Iniciativa')}</th>
-              <th>{t('liveCombat.colHp', 'PG / Salud')}</th>
-              {isDm && <th>{t('liveCombat.colAc', 'CA')}</th>}
-              {isDm && <th>{t('liveCombat.colVisibility', 'Visibilidad')}</th>}
-              {isDm && <th>{t('liveCombat.colActions', 'Acciones')}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {combatants.map((c, index) => {
-              const isActive = c.id === activeCombatantId;
-              const dmCombatant = isDm ? (c as LiveCombatantDmDto) : null;
-              const playerCombatant = !isDm ? (c as LiveCombatantPlayerDto) : null;
-
-              return (
-                <tr
-                  key={c.id}
-                  className={`combatant-row ${isActive ? 'active-turn-row' : ''} ${
-                    c.isPlayerCharacter ? 'hero-row' : 'monster-row'
-                  }`}
-                  id={`combatant-row-${c.id}`}
-                >
-                  <td className="row-index">{index + 1}</td>
-                  <td className="row-name">
-                    <span className="combatant-name">{c.name}</span>
-                    <span
-                      className={`combatant-badge ${
-                        c.isPlayerCharacter ? 'badge-hero' : 'badge-monster'
-                      }`}
-                    >
-                      {c.isPlayerCharacter
-                        ? t('liveCombat.heroBadge', 'Héroe')
-                        : t('liveCombat.monsterBadge', 'Monstruo')}
-                    </span>
-                    {isActive && <span className="active-turn-indicator">⭐</span>}
-                  </td>
-
-                  {/* Iniciativa */}
-                  <td className="row-initiative">
-                    {isDm && overrideCombatantId === c.id ? (
-                      <div className="initiative-override-box">
-                        <input
-                          type="number"
-                          className="input-xs"
-                          value={overrideValue}
-                          onChange={(e) => setOverrideValue(Number(e.target.value))}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-xs"
-                          onClick={() => handleDmOverrideInitiative(c.id)}
-                        >
-                          ✓
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="initiative-score">
-                        {c.initiative !== null ? c.initiative : '-'}
-                        {isDm && (
-                          <button
-                            type="button"
-                            className="btn-link-icon"
-                            title={t('liveCombat.overrideInitiativeTitle', 'Modificar Iniciativa')}
-                            onClick={() => {
-                              setOverrideCombatantId(c.id);
-                              setOverrideValue(c.initiative ?? 10);
-                            }}
-                          >
-                            ✏️
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* HP / Salud */}
-                  <td className="row-hp">
-                    {isDm && dmCombatant ? (
-                      <div className="hp-real-control">
-                        <span className="hp-value">
-                          {dmCombatant.currentHp} / {dmCombatant.maxHp}
-                        </span>
-                        <div className="hp-quick-buttons">
-                          <button
-                            type="button"
-                            className="hp-btn minus"
-                            onClick={() => handleModifyHp(c.id, -5)}
-                            title="-5 HP"
-                          >
-                            -5
-                          </button>
-                          <button
-                            type="button"
-                            className="hp-btn minus"
-                            onClick={() => handleModifyHp(c.id, -1)}
-                            title="-1 HP"
-                          >
-                            -1
-                          </button>
-                          <button
-                            type="button"
-                            className="hp-btn plus"
-                            onClick={() => handleModifyHp(c.id, 1)}
-                            title="+1 HP"
-                          >
-                            +1
-                          </button>
-                          <button
-                            type="button"
-                            className="hp-btn plus"
-                            onClick={() => handleModifyHp(c.id, 5)}
-                            title="+5 HP"
-                          >
-                            +5
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className={`health-status-badge health-${playerCombatant?.healthStatus.toLowerCase()}`}>
-                        {playerCombatant?.isPlayerCharacter && playerCombatant?.currentHp !== undefined && playerCombatant.currentHp !== null
-                          ? `${playerCombatant.currentHp} / ${playerCombatant.maxHp}`
-                          : playerCombatant?.healthStatus}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* CA (DM Only) */}
-                  {isDm && dmCombatant && (
-                    <td className="row-ac">
-                      <span className="ac-shield-pill">🛡️ {dmCombatant.armorClass}</span>
-                    </td>
-                  )}
-
-                  {/* Visibilidad (DM Only) */}
-                  {isDm && dmCombatant && (
-                    <td className="row-visibility">
-                      <button
-                        type="button"
-                        id={`toggle-visibility-${c.id}`}
-                        className={`visibility-toggle-btn ${
-                          dmCombatant.isVisibleToPlayers ? 'is-visible' : 'is-hidden'
-                        }`}
-                        onClick={() =>
-                          handleToggleVisibility(c.id, dmCombatant.isVisibleToPlayers)
-                        }
-                        title={t('liveCombat.toggleVisibility', 'Alternar Visibilidad')}
-                      >
-                        {dmCombatant.isVisibleToPlayers ? '👁️ Visible' : '🙈 Oculto'}
-                      </button>
-                    </td>
-                  )}
-
-                  {/* Acciones del DM */}
-                  {isDm && (
-                    <td className="row-actions">
-                      {/* Espacio para condiciones o acciones rápidas */}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <table className="combatants-table" id="initiative-order-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{t('liveCombat.colName', 'Combatiente')}</th>
+                <th>{t('liveCombat.colInitiative', 'Iniciativa')}</th>
+                <th>{t('liveCombat.colHp', 'PG / Salud')}</th>
+                {isDm && <th>{t('liveCombat.colAc', 'CA')}</th>}
+                {isDm && <th>{t('liveCombat.colVisibility', 'Visibilidad')}</th>}
+                {isDm && <th>{t('liveCombat.colActions', 'Acciones')}</th>}
+              </tr>
+            </thead>
+            <SortableContext
+              items={localCombatants.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <tbody>
+                {localCombatants.map((c, index) => (
+                  <SortableCombatantRow
+                    key={c.id}
+                    combatant={c}
+                    index={index}
+                    isActive={c.id === activeCombatantId}
+                    isDm={isDm}
+                    overrideCombatantId={overrideCombatantId}
+                    overrideValue={overrideValue}
+                    setOverrideCombatantId={setOverrideCombatantId}
+                    setOverrideValue={setOverrideValue}
+                    handleDmOverrideInitiative={handleDmOverrideInitiative}
+                    handleModifyHp={handleModifyHp}
+                    handleToggleVisibility={handleToggleVisibility}
+                  />
+                ))}
+              </tbody>
+            </SortableContext>
+          </table>
+        </DndContext>
       </div>
     </div>
   );

@@ -210,12 +210,12 @@ class LiveCombatHubService {
   }
 
   /**
-   * Registra la iniciativa de un jugador.
+   * Registra la iniciativa de un jugador (o limpia el valor si es null).
    */
   async submitInitiative(
     partyId: string,
     combatantId: string,
-    initiative: number
+    initiative: number | null
   ): Promise<void> {
     if (this.connection && this.connection.state === HubConnectionState.Connected) {
       await this.connection.invoke('SubmitInitiative', partyId, combatantId, initiative);
@@ -239,7 +239,7 @@ class LiveCombatHubService {
   async overrideInitiative(
     partyId: string,
     combatantId: string,
-    initiative: number
+    initiative: number | null
   ): Promise<void> {
     if (this.connection && this.connection.state === HubConnectionState.Connected) {
       await this.connection.invoke('OverrideInitiative', partyId, combatantId, initiative);
@@ -272,7 +272,34 @@ class LiveCombatHubService {
   }
 
   /**
-   * Inicia el combate formalmente (DM).
+   * Reordena un combatiente moviéndolo a una nueva posición en la lista (Drag & Drop en vivo).
+   */
+  async reorderCombatant(
+    partyId: string,
+    combatantId: string,
+    newIndex: number
+  ): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      await this.connection.invoke('ReorderCombatant', partyId, combatantId, newIndex);
+      return;
+    }
+
+    const state = this.getRawState(partyId);
+    if (!state || state.combatants.length === 0) return;
+
+    const oldIndex = state.combatants.findIndex((c) => c.id === combatantId);
+    if (oldIndex === -1) return;
+
+    const clampedIndex = Math.max(0, Math.min(newIndex, state.combatants.length - 1));
+    const [moved] = state.combatants.splice(oldIndex, 1);
+    state.combatants.splice(clampedIndex, 0, moved);
+
+    this.saveRawState(partyId, state);
+    this.broadcastFallbackUpdate(partyId);
+  }
+
+  /**
+   * Inicia el combate formalmente respetando el orden posicional establecido (DM).
    */
   async startCombat(partyId: string): Promise<void> {
     if (this.connection && this.connection.state === HubConnectionState.Connected) {
@@ -283,19 +310,7 @@ class LiveCombatHubService {
     const state = this.getRawState(partyId);
     if (!state || state.combatants.length === 0) return;
 
-    for (const c of state.combatants) {
-      if (c.initiative === null) c.initiative = 10;
-    }
-
-    state.combatants.sort((a, b) => {
-      const initDiff = (b.initiative ?? 0) - (a.initiative ?? 0);
-      if (initDiff !== 0) return initDiff;
-      if (a.isPlayerCharacter !== b.isPlayerCharacter) {
-        return a.isPlayerCharacter ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
+    // Preservar el orden posicional establecido por el DM; la iniciativa numérica es opcional
     state.status = 'InProgress';
     state.currentRound = 1;
     state.currentTurnIndex = 0;
@@ -535,3 +550,7 @@ class LiveCombatHubService {
 }
 
 export const liveCombatHubService = new LiveCombatHubService();
+
+if (typeof window !== 'undefined') {
+  (window as any).__liveCombatHubService = liveCombatHubService;
+}

@@ -22,6 +22,7 @@ export interface LiveCombatantDmDto {
   isVisibleToPlayers: boolean;
   assignedPlayerUserId?: string | null;
   conditions?: string | null;
+  sortOrder?: number;
 }
 
 /**
@@ -36,6 +37,7 @@ export interface LiveCombatantPlayerDto {
   maxHp?: number | null;
   healthStatus: string;
   conditions?: string | null;
+  sortOrder?: number;
 }
 
 /**
