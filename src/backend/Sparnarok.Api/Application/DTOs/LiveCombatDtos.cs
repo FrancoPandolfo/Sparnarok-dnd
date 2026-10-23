@@ -30,7 +30,8 @@ public record LiveCombatantPlayerDto(
     int? MaxHp,
     string HealthStatus,
     string? Conditions,
-    int SortOrder = 0
+    int SortOrder = 0,
+    Guid? AssignedPlayerUserId = null
 );
 
 /// <summary>

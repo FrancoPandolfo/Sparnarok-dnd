@@ -390,5 +390,104 @@ public class LiveCombatHubTests
         state.Combatants[0].Id.Should().Be(c1.Id);
         state.Combatants[1].Id.Should().Be(c0.Id);
     }
+
+    [Fact]
+    public async Task InvitePlayerToEncounter_WhenInvited_SendsCombatInviteReceivedOnlyToTargetUserConnection()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var targetUserId = "user-player-target-456";
+        var manager = new LiveCombatManager();
+        manager.InitializeCombat(partyId, "La Compañía del Dragón", new List<LiveCombatant>());
+
+        var targetUserProxy = Substitute.For<IClientProxy>();
+        var allProxy = Substitute.For<IClientProxy>();
+
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.User(targetUserId).Returns(targetUserProxy);
+        hubClients.All.Returns(allProxy);
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients
+        };
+
+        // Act
+        await hub.InvitePlayerToEncounter(partyId.ToString(), targetUserId);
+
+        // Assert: Se envió el evento exclusivamente al usuario objetivo
+        await targetUserProxy.Received(1).SendCoreAsync(
+            "CombatInviteReceived",
+            Arg.Do<object?[]>(args =>
+            {
+                args.Should().ContainSingle();
+                var json = JsonSerializer.Serialize(args[0]);
+                json.Should().Contain(partyId.ToString());
+                json.Should().Contain(targetUserId);
+                json.Should().Contain("La Compañía del Dragón");
+            }),
+            default);
+
+        // Assert: NO se envió a All (cero broadcast general indiscriminado)
+        await allProxy.DidNotReceive().SendCoreAsync(Arg.Any<string>(), Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task JoinEncounter_WhenPlayerJoins_AddsCombatantToStateAndBroadcastsUpdate()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+        manager.InitializeCombat(partyId, "La Compañía del Dragón", new List<LiveCombatant>());
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var playerUserId = Guid.NewGuid();
+        var claims = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(
+                new[]
+                {
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, playerUserId.ToString()),
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "Gimli")
+                },
+                "TestAuth"));
+
+        var context = Substitute.For<HubCallerContext>();
+        context.User.Returns(claims);
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        var playerDto = new LiveCombatantPlayerDto(
+            Id: Guid.NewGuid(),
+            Name: "Gimli",
+            Initiative: 14,
+            IsPlayerCharacter: true,
+            CurrentHp: 35,
+            MaxHp: 35,
+            HealthStatus: "Healthy",
+            Conditions: null
+        );
+
+        // Act
+        await hub.JoinEncounter(partyId.ToString(), playerDto);
+
+        // Assert: El combatiente se agregó en memoria
+        var state = manager.GetState(partyId);
+        state.Should().NotBeNull();
+        state!.Combatants.Should().ContainSingle(c => c.Name == "Gimli" && c.Initiative == 14 && c.IsPlayerCharacter);
+
+        // Assert: Se emitió la actualización a ambos grupos
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
 }
 

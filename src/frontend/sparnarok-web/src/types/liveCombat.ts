@@ -36,6 +36,7 @@ export interface LiveCombatantPlayerDto {
   currentHp?: number | null;
   maxHp?: number | null;
   healthStatus: string;
+  assignedPlayerUserId?: string | null;
   conditions?: string | null;
   sortOrder?: number;
 }

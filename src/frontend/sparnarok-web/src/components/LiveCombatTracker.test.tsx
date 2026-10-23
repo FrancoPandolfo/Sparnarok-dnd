@@ -20,6 +20,8 @@ vi.mock('../services/liveCombatHubService', () => ({
     toggleVisibility: vi.fn(),
     endCombat: vi.fn(),
     addQuickCombatant: vi.fn(),
+    invitePlayerToEncounter: vi.fn(),
+    joinEncounter: vi.fn(),
   },
 }));
 
@@ -272,22 +274,159 @@ describe('LiveCombatTracker Component Suite', () => {
     expect(screen.getByText('Bandido Rápido')).toBeInTheDocument();
   });
 
-  it('Empty State: unblocks DM by providing "+ Añadir Combatiente Rápido" button when combatState is null', () => {
+  it('Player Lobby: shows lobby when combat is active and player is not in initiative list', () => {
+    const mockParty = {
+      id: 'party-1',
+      name: 'La Compañía del Dragón',
+      ownerUserId: 'dm-1',
+      createdAt: new Date().toISOString(),
+      members: [],
+      partyMembers: [
+        {
+          id: 'pm-2',
+          partyId: 'party-1',
+          userId: 'player-user-99',
+          role: 'Player' as const,
+          inGameName: 'Legolas',
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const activeEncounterState: LiveCombatPlayerProjectionDto = {
+      partyId: 'party-1',
+      partyName: 'La Compañía del Dragón',
+      status: 'InProgress',
+      currentRound: 1,
+      currentTurnIndex: 0,
+      activeCombatantId: 'monster-1',
+      activeCombatantName: 'Orc Chieftain',
+      combatants: [
+        {
+          id: 'monster-1',
+          name: 'Orc Chieftain',
+          initiative: 15,
+          isPlayerCharacter: false,
+          healthStatus: 'Sano',
+        },
+      ],
+    };
+
     render(
       <LiveCombatTracker
-        partyId="quick-session"
+        partyId="party-1"
+        party={mockParty}
+        role="Player"
+        combatState={activeEncounterState}
+        currentUserId="player-user-99"
+      />
+    );
+
+    // Should render player combat lobby
+    expect(screen.getByText(/Un encuentro está en curso/i)).toBeInTheDocument();
+    const joinBtn = screen.getByRole('button', { name: /Unirse al Combate/i });
+    expect(joinBtn).toBeInTheDocument();
+
+    // Clicking join opens player join modal
+    fireEvent.click(joinBtn);
+    expect(screen.getByRole('button', { name: /Entrar al Combate/i })).toBeInTheDocument();
+
+    // Confirming join calls liveCombatHubService.joinEncounter
+    fireEvent.click(screen.getByRole('button', { name: /Entrar al Combate/i }));
+    expect(liveCombatHubService.joinEncounter).toHaveBeenCalledWith(
+      'party-1',
+      expect.objectContaining({
+        name: 'Legolas',
+        assignedPlayerUserId: 'player-user-99',
+      })
+    );
+  });
+
+  it('Player Invite Modal: shows invite modal and accepting triggers joinEncounter', () => {
+    const invite = {
+      partyId: 'party-1',
+      partyName: 'La Compañía del Dragón',
+      targetUserId: 'player-user-99',
+      invitedAt: new Date().toISOString(),
+    };
+
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="Player"
+        combatState={null}
+        currentUserId="player-user-99"
+        pendingInvite={invite}
+      />
+    );
+
+    expect(
+      screen.getByText(/El Dungeon Master te invita a unirte al combate actual/i)
+    ).toBeInTheDocument();
+    const acceptBtn = screen.getByRole('button', { name: /Aceptar/i });
+    expect(acceptBtn).toBeInTheDocument();
+
+    fireEvent.click(acceptBtn);
+    expect(liveCombatHubService.joinEncounter).toHaveBeenCalledWith(
+      'party-1',
+      expect.objectContaining({
+        assignedPlayerUserId: 'player-user-99',
+      })
+    );
+  });
+
+  it('DM Party Members Panel: lists unjoined members and clicking "Invitar" calls invitePlayerToEncounter', () => {
+    const mockParty = {
+      id: 'party-1',
+      name: 'La Compañía del Dragón',
+      ownerUserId: 'dm-1',
+      createdAt: new Date().toISOString(),
+      members: [],
+      partyMembers: [
+        {
+          id: 'pm-1',
+          partyId: 'party-1',
+          userId: 'dm-1',
+          role: 'DungeonMaster' as const,
+          inGameName: 'Dungeon Master',
+          joinedAt: new Date().toISOString(),
+        },
+        {
+          id: 'pm-2',
+          partyId: 'party-1',
+          userId: 'player-user-2',
+          role: 'Player' as const,
+          inGameName: 'Thorin',
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        party={mockParty}
         role="DungeonMaster"
         combatState={null}
       />
     );
 
-    // DM should see unblocked action buttons even without an active combat state
-    const quickButtons = screen.getAllByRole('button', { name: /\+ Añadir Combatiente Rápido/i });
-    expect(quickButtons.length).toBeGreaterThanOrEqual(1);
+    // Open party members panel
+    const toggleBtn = screen.getByRole('button', { name: /Miembros de la Party/i });
+    expect(toggleBtn).toBeInTheDocument();
+    fireEvent.click(toggleBtn);
 
-    // Clicking it opens the quick combatant modal
-    fireEvent.click(quickButtons[0]);
-    expect(screen.getByLabelText(/Nombre/i)).toBeInTheDocument();
+    // Player Thorin is listed as unjoined
+    expect(screen.getByText(/Thorin/i)).toBeInTheDocument();
+    const inviteBtn = screen.getByRole('button', { name: /Invitar/i });
+    expect(inviteBtn).toBeInTheDocument();
+
+    // Click invite
+    fireEvent.click(inviteBtn);
+    expect(liveCombatHubService.invitePlayerToEncounter).toHaveBeenCalledWith(
+      'party-1',
+      'player-user-2'
+    );
   });
 });
 

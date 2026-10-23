@@ -2329,10 +2329,24 @@ export const apiClient = {
         signal,
       });
       if (response.ok) {
-        return await response.json();
+        const data: SessionNoteResponseDto[] = await response.json();
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(data));
+        }
+        return data;
       }
     } catch {
       // Fallback local
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+        if (raw) {
+          const storedNotes: SessionNoteResponseDto[] = JSON.parse(raw);
+          return storedNotes;
+        }
+      } catch {}
     }
 
     const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
@@ -2359,8 +2373,13 @@ export const apiClient = {
         body: JSON.stringify(request),
       });
       if (response.ok) {
-        const data = await response.json();
+        const data: SessionNoteResponseDto = await response.json();
         inMemorySessionNotes = [data, ...inMemorySessionNotes.filter((n) => n.id !== data.id)];
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+          const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+          window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify([data, ...stored.filter(n => n.id !== data.id)]));
+        }
         return data;
       }
     } catch {
@@ -2385,6 +2404,13 @@ export const apiClient = {
       updatedAt: new Date().toISOString(),
     };
     inMemorySessionNotes = [newNote, ...inMemorySessionNotes];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+        const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+        window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify([newNote, ...stored]));
+      } catch {}
+    }
     return newNote;
   },
 
@@ -2399,8 +2425,13 @@ export const apiClient = {
         body: JSON.stringify(request),
       });
       if (response.ok) {
-        const data = await response.json();
+        const data: SessionNoteResponseDto = await response.json();
         inMemorySessionNotes = inMemorySessionNotes.map((n) => (n.id === noteId ? data : n));
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+          const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+          window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.map(n => n.id === noteId ? data : n)));
+        }
         return data;
       }
     } catch {
@@ -2421,7 +2452,7 @@ export const apiClient = {
       return n;
     });
 
-    return updatedNote || {
+    const fallbackNote: SessionNoteResponseDto = updatedNote || {
       id: noteId,
       partyId,
       title: request.title,
@@ -2429,6 +2460,16 @@ export const apiClient = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+        const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+        window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.map(n => n.id === noteId ? fallbackNote : n)));
+      } catch {}
+    }
+
+    return fallbackNote;
   },
 
   /**
@@ -2442,12 +2483,24 @@ export const apiClient = {
       });
       if (response.ok) {
         inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+          const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+          window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.filter(n => n.id !== noteId)));
+        }
         return;
       }
     } catch {
       // Fallback local
     }
     inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(`sparnarok_session_notes_${partyId}`);
+        const stored: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+        window.localStorage.setItem(`sparnarok_session_notes_${partyId}`, JSON.stringify(stored.filter(n => n.id !== noteId)));
+      } catch {}
+    }
   },
 
   /**
