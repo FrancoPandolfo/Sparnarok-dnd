@@ -152,6 +152,45 @@ public class LiveCombatManager : ILiveCombatManager
         return combatant;
     }
 
+    public bool RemoveCombatant(Guid partyId, Guid combatantId)
+    {
+        if (!_states.TryGetValue(partyId, out var state) || state.Combatants.Count == 0)
+        {
+            return false;
+        }
+
+        var index = state.Combatants.FindIndex(c => c.Id == combatantId);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        var activeCombatant = state.GetCurrentCombatant();
+        state.Combatants.RemoveAt(index);
+
+        for (int i = 0; i < state.Combatants.Count; i++)
+        {
+            state.Combatants[i].SortOrder = i;
+        }
+
+        if (state.Combatants.Count == 0)
+        {
+            state.CurrentTurnIndex = 0;
+            state.Status = LiveCombatStatus.WaitingForInitiative;
+        }
+        else if (activeCombatant != null && activeCombatant.Id != combatantId)
+        {
+            var newActiveIndex = state.Combatants.IndexOf(activeCombatant);
+            state.CurrentTurnIndex = newActiveIndex >= 0 ? newActiveIndex : Math.Clamp(state.CurrentTurnIndex, 0, state.Combatants.Count - 1);
+        }
+        else
+        {
+            state.CurrentTurnIndex = Math.Clamp(state.CurrentTurnIndex, 0, state.Combatants.Count - 1);
+        }
+
+        return true;
+    }
+
     public void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null)
     {
         if (!_states.TryGetValue(partyId, out var state))

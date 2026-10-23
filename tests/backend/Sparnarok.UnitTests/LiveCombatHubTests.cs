@@ -492,5 +492,214 @@ public class LiveCombatHubTests
         await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
         await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
     }
+
+    [Fact]
+    public async Task UpdateCombatantInitiative_WhenCalledByPlayerForOtherPlayerCombatant_IsRejectedAndDoesNotUpdate()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var playerAUserId = Guid.NewGuid();
+        var playerBUserId = Guid.NewGuid();
+
+        var combatantA = new LiveCombatant(Guid.NewGuid(), "Legolas", 30, 15, true, assignedPlayerUserId: playerAUserId, initiative: 10);
+        var combatantB = new LiveCombatant(Guid.NewGuid(), "Gimli", 40, 14, true, assignedPlayerUserId: playerBUserId, initiative: 8);
+
+        manager.InitializeCombat(partyId, "La Compañía", new[] { combatantA, combatantB });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var claims = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(
+                new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, playerAUserId.ToString()) },
+                "TestAuth"));
+
+        var context = Substitute.For<HubCallerContext>();
+        context.User.Returns(claims);
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "Player" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: Jugador A intenta cambiar la iniciativa del combatiente del Jugador B a 99
+        await hub.UpdateCombatantInitiative(partyId.ToString(), combatantB.Id.ToString(), 99);
+
+        // Assert: La iniciativa de B permanece inalterada en 8
+        var state = manager.GetState(partyId)!;
+        state.Combatants.First(c => c.Id == combatantB.Id).Initiative.Should().Be(8);
+
+        // No se debe emitir broadcast debido al rechazo por falta de autorización
+        await dmGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task UpdateCombatantInitiative_WhenCalledByPlayerForOwnCombatant_UpdatesInitiativeAndBroadcasts()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var playerAUserId = Guid.NewGuid();
+        var combatantA = new LiveCombatant(Guid.NewGuid(), "Legolas", 30, 15, true, assignedPlayerUserId: playerAUserId, initiative: null);
+
+        manager.InitializeCombat(partyId, "La Compañía", new[] { combatantA });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var claims = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(
+                new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, playerAUserId.ToString()) },
+                "TestAuth"));
+
+        var context = Substitute.For<HubCallerContext>();
+        context.User.Returns(claims);
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "Player" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: Jugador A actualiza su propia iniciativa a 18
+        await hub.UpdateCombatantInitiative(partyId.ToString(), combatantA.Id.ToString(), 18);
+
+        // Assert: Su iniciativa se actualiza correctamente
+        var state = manager.GetState(partyId)!;
+        state.Combatants.First(c => c.Id == combatantA.Id).Initiative.Should().Be(18);
+
+        // Se emite el broadcast a ambos grupos
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task UpdateCombatantInitiative_WhenCalledByDm_UpdatesAnyCombatantAndBroadcasts()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var combatantMonster = new LiveCombatant(Guid.NewGuid(), "Orco Jefe", 30, 13, false, initiative: null);
+        manager.InitializeCombat(partyId, "La Compañía", new[] { combatantMonster });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "DungeonMaster" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: DM actualiza iniciativa del monstruo a 15
+        await hub.UpdateCombatantInitiative(partyId.ToString(), combatantMonster.Id.ToString(), 15);
+
+        // Assert
+        var state = manager.GetState(partyId)!;
+        state.Combatants.First(c => c.Id == combatantMonster.Id).Initiative.Should().Be(15);
+
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task RemoveCombatant_WhenCalledByPlayer_IsRejectedAndDoesNotRemove()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Legolas", 30, 15, true) { SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Orco", 20, 13, false) { SortOrder = 1 };
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "Player" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: Jugador intenta eliminar al Orco
+        await hub.RemoveCombatant(partyId.ToString(), c1.Id.ToString());
+
+        // Assert: El combatiente NO se eliminó
+        var state = manager.GetState(partyId)!;
+        state.Combatants.Should().HaveCount(2);
+
+        await dmGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.DidNotReceive().SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
+
+    [Fact]
+    public async Task RemoveCombatant_WhenCalledByDm_RemovesCombatantRecalculatesSortOrderAndBroadcasts()
+    {
+        // Arrange
+        var partyId = Guid.NewGuid();
+        var manager = new LiveCombatManager();
+
+        var c0 = new LiveCombatant(Guid.NewGuid(), "Legolas", 30, 15, true) { SortOrder = 0 };
+        var c1 = new LiveCombatant(Guid.NewGuid(), "Orco 1", 20, 13, false) { SortOrder = 1 };
+        var c2 = new LiveCombatant(Guid.NewGuid(), "Orco 2", 20, 13, false) { SortOrder = 2 };
+        manager.InitializeCombat(partyId, "La Compañía", new[] { c0, c1, c2 });
+
+        var dmGroupProxy = Substitute.For<IClientProxy>();
+        var playerGroupProxy = Substitute.For<IClientProxy>();
+        var hubClients = Substitute.For<IHubCallerClients>();
+        hubClients.Group(LiveCombatHub.GetDmGroupName(partyId)).Returns(dmGroupProxy);
+        hubClients.Group(LiveCombatHub.GetPlayerGroupName(partyId)).Returns(playerGroupProxy);
+
+        var context = Substitute.For<HubCallerContext>();
+        context.Items.Returns(new Dictionary<object, object?> { ["PartyId"] = partyId, ["Role"] = "DungeonMaster" });
+
+        var hub = new LiveCombatHub(manager)
+        {
+            Clients = hubClients,
+            Context = context
+        };
+
+        // Act: DM elimina Orco 1 (índice 1)
+        await hub.RemoveCombatant(partyId.ToString(), c1.Id.ToString());
+
+        // Assert: Quedan 2 combatientes y el SortOrder se recalculó (0 y 1)
+        var state = manager.GetState(partyId)!;
+        state.Combatants.Should().HaveCount(2);
+        state.Combatants[0].Id.Should().Be(c0.Id);
+        state.Combatants[0].SortOrder.Should().Be(0);
+        state.Combatants[1].Id.Should().Be(c2.Id);
+        state.Combatants[1].SortOrder.Should().Be(1);
+
+        // Se emite el broadcast
+        await dmGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+        await playerGroupProxy.Received(1).SendCoreAsync("CombatStateUpdated", Arg.Any<object?[]>(), default);
+    }
 }
 

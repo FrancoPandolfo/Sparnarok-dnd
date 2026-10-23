@@ -46,6 +46,11 @@ public interface ILiveCombatManager
     LiveCombatant ForceAddPartyMember(Guid partyId, Guid? assignedUserId, string name, int maxHp, int armorClass, int? currentHp = null);
 
     /// <summary>
+    /// Remueve un combatiente del estado activo y recalcula el SortOrder posicional de los combatientes restantes.
+    /// </summary>
+    bool RemoveCombatant(Guid partyId, Guid combatantId);
+
+    /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs que aún no tengan valor asignado.
     /// </summary>
     void AutoRollMonsters(Guid partyId, Func<int>? d20Roller = null);

@@ -40,6 +40,7 @@ public class LiveCombatHub : Hub
         }
 
         Context.Items["PartyId"] = id;
+        Context.Items["Role"] = role;
 
         // Intentar restaurar (rehidratar) el estado desde la base de datos si la memoria está vacía
         if (id != QuickSessionGuid)
@@ -143,6 +144,109 @@ public class LiveCombatHub : Hub
             await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
+    }
+
+    /// <summary>
+    /// Actualiza la iniciativa de un combatiente.
+    /// Si el usuario tiene el rol de 'Player', solo puede actualizar la iniciativa de su propio combatiente.
+    /// El Dungeon Master puede actualizar la iniciativa de cualquier combatiente.
+    /// </summary>
+    public async Task UpdateCombatantInitiative(string? partyId, string combatantId, decimal? newInitiative)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+        if (string.IsNullOrWhiteSpace(combatantId)) return;
+        if (!Guid.TryParse(combatantId.Trim(), out var parsedCombatantId)) return;
+
+        var state = _combatManager.GetState(id);
+        if (state == null) return;
+
+        var targetCombatant = state.Combatants.FirstOrDefault(c => c.Id == parsedCombatantId);
+        if (targetCombatant == null) return;
+
+        var isDm = await IsCallerDungeonMasterAsync(id);
+
+        if (!isDm)
+        {
+            var currentUserId = Context.User?.GetUserId();
+            var isOwnCombatant = false;
+
+            if (currentUserId.HasValue)
+            {
+                if (targetCombatant.AssignedPlayerUserId.HasValue && targetCombatant.AssignedPlayerUserId.Value == currentUserId.Value)
+                {
+                    isOwnCombatant = true;
+                }
+                else if (targetCombatant.Id == currentUserId.Value)
+                {
+                    isOwnCombatant = true;
+                }
+            }
+
+            if (!isOwnCombatant)
+            {
+                _logger.LogWarning("Acceso no autorizado: El usuario {UserId} intentó modificar la iniciativa del combatiente {CombatantId} ajeno", currentUserId, combatantId);
+                return;
+            }
+        }
+
+        if (_combatManager.SetInitiative(id, parsedCombatantId, newInitiative))
+        {
+            await PersistCombatStateAsync(id);
+            await BroadcastCombatStateAsync(id);
+        }
+    }
+
+    /// <summary>
+    /// Elimina un combatiente del combate activo y recalcula el SortOrder del resto de la lista (Acción exclusiva del DM).
+    /// Emite el broadcast estándar 'CombatStateUpdated' a todos los clientes de ese PartyId.
+    /// </summary>
+    public async Task RemoveCombatant(string? partyId, string combatantId)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+        if (string.IsNullOrWhiteSpace(combatantId)) return;
+        if (!Guid.TryParse(combatantId.Trim(), out var parsedCombatantId)) return;
+
+        var isDm = await IsCallerDungeonMasterAsync(id);
+        if (!isDm)
+        {
+            _logger.LogWarning("Acceso no autorizado: Intento de eliminar combatiente {CombatantId} en Party {PartyId} sin rol de Dungeon Master", combatantId, id);
+            return;
+        }
+
+        if (_combatManager.RemoveCombatant(id, parsedCombatantId))
+        {
+            await PersistCombatStateAsync(id);
+            await BroadcastCombatStateAsync(id);
+        }
+    }
+
+    private async Task<bool> IsCallerDungeonMasterAsync(Guid partyId)
+    {
+        if (Context.Items.TryGetValue("Role", out var roleObj) && roleObj is string r)
+        {
+            if (string.Equals(r, "DungeonMaster", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        var currentUserId = Context.User?.GetUserId();
+        if (currentUserId.HasValue && _scopeFactory != null && partyId != QuickSessionGuid)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var partyRepo = scope.ServiceProvider.GetRequiredService<IPartyRepository>();
+                var party = await partyRepo.GetByIdAsync(partyId);
+                if (party != null && party.OwnerUserId == currentUserId.Value)
+                {
+                    return true;
+                }
+            }
+            catch {}
+        }
+
+        return false;
     }
 
     /// <summary>

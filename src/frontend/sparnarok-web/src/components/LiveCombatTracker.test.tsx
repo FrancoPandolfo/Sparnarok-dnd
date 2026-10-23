@@ -7,6 +7,29 @@ import type {
   LiveCombatPlayerProjectionDto,
 } from '../types/liveCombat';
 
+vi.mock('../services/apiClient', () => ({
+  apiClient: {
+    getCreatures: vi.fn().mockResolvedValue([
+      {
+        id: 'creature-1',
+        name: 'Goblin Boss',
+        hitPoints: { max: 21 },
+        armorClass: { base: 17 },
+        effectiveArmorClass: 17,
+        challengeRating: '1',
+      },
+      {
+        id: 'creature-2',
+        name: 'Bugbear Stalker',
+        hitPoints: { max: 27 },
+        armorClass: { base: 16 },
+        effectiveArmorClass: 16,
+        challengeRating: '2',
+      },
+    ]),
+  },
+}));
+
 vi.mock('../services/liveCombatHubService', () => ({
   liveCombatHubService: {
     submitInitiative: vi.fn(),
@@ -22,6 +45,8 @@ vi.mock('../services/liveCombatHubService', () => ({
     addQuickCombatant: vi.fn(),
     forceAddPartyMemberToCombat: vi.fn(),
     joinEncounter: vi.fn(),
+    updateCombatantInitiative: vi.fn(),
+    removeCombatant: vi.fn(),
   },
 }));
 
@@ -101,7 +126,7 @@ describe('LiveCombatTracker Component Suite', () => {
     expect(screen.queryByText('CA')).not.toBeInTheDocument();
 
     // Input own initiative and submit
-    const input = screen.getByRole('spinbutton');
+    const input = document.getElementById('player-initiative-input') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '18' } });
     const submitBtn = screen.getByRole('button', { name: /Enviar Iniciativa/i });
     fireEvent.click(submitBtn);
@@ -222,7 +247,7 @@ describe('LiveCombatTracker Component Suite', () => {
       />
     );
 
-    const playerInput = screen.getByRole('spinbutton');
+    const playerInput = document.getElementById('player-initiative-input') as HTMLInputElement;
     fireEvent.change(playerInput, { target: { value: '' } });
 
     const submitBtn = screen.getByRole('button', { name: /Enviar Iniciativa/i });
@@ -395,5 +420,192 @@ describe('LiveCombatTracker Component Suite', () => {
       'player-user-2'
     );
   });
+
+  it('Player View: player can edit their own initiative directly on row input (onBlur & Enter) but cannot edit others', () => {
+    const twoHeroState: LiveCombatPlayerProjectionDto = {
+      partyId: 'party-1',
+      partyName: 'La Compañía del Dragón',
+      status: 'WaitingForInitiative',
+      currentRound: 1,
+      currentTurnIndex: 0,
+      activeCombatantId: 'hero-1',
+      activeCombatantName: 'Kaelen Paladin',
+      combatants: [
+        {
+          id: 'hero-1',
+          name: 'Kaelen Paladin',
+          initiative: 14,
+          isPlayerCharacter: true,
+          currentHp: 28,
+          maxHp: 28,
+          healthStatus: 'Healthy',
+          assignedPlayerUserId: 'player-user-1',
+        } as any,
+        {
+          id: 'hero-2',
+          name: 'Thorin Dwarf',
+          initiative: 10,
+          isPlayerCharacter: true,
+          currentHp: 32,
+          maxHp: 32,
+          healthStatus: 'Healthy',
+          assignedPlayerUserId: 'player-user-2',
+        } as any,
+      ],
+    };
+
+    const mockParty = {
+      id: 'party-1',
+      name: 'La Compañía del Dragón',
+      ownerUserId: 'dm-1',
+      createdAt: new Date().toISOString(),
+      members: [],
+      partyMembers: [
+        {
+          id: 'pm-1',
+          partyId: 'party-1',
+          userId: 'player-user-1',
+          role: 'Player' as const,
+          inGameName: 'Kaelen Paladin',
+          joinedAt: new Date().toISOString(),
+        },
+        {
+          id: 'pm-2',
+          partyId: 'party-1',
+          userId: 'player-user-2',
+          role: 'Player' as const,
+          inGameName: 'Thorin Dwarf',
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        party={mockParty}
+        role="Player"
+        combatState={twoHeroState}
+        currentUserId="player-user-1"
+      />
+    );
+
+    const ownInput = document.getElementById('combatant-initiative-input-hero-1') as HTMLInputElement;
+    const otherInput = document.getElementById('combatant-initiative-input-hero-2') as HTMLInputElement;
+
+    expect(ownInput).toBeInTheDocument();
+    expect(otherInput).toBeInTheDocument();
+    expect(ownInput).not.toBeDisabled();
+    expect(otherInput).toBeDisabled();
+
+    // 1. Trigger onBlur update
+    fireEvent.change(ownInput, { target: { value: '22' } });
+    fireEvent.blur(ownInput);
+    expect(liveCombatHubService.updateCombatantInitiative).toHaveBeenCalledWith('party-1', 'hero-1', 22);
+
+    // 2. Trigger onKeyDown Enter update
+    fireEvent.change(ownInput, { target: { value: '25' } });
+    fireEvent.keyDown(ownInput, { key: 'Enter', code: 'Enter' });
+    expect(liveCombatHubService.updateCombatantInitiative).toHaveBeenCalledWith('party-1', 'hero-1', 25);
+  });
+
+  it('DM View: displays delete button on each combatant, confirms before calling removeCombatant, button absent in player view', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+
+    // Render DM View
+    const { unmount } = render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    const deleteBtn = document.getElementById('remove-combatant-btn-hero-1') as HTMLButtonElement;
+    expect(deleteBtn).toBeInTheDocument();
+
+    // 1. Cancel confirmation -> should not call removeCombatant
+    confirmSpy.mockReturnValueOnce(false);
+    fireEvent.click(deleteBtn);
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(liveCombatHubService.removeCombatant).not.toHaveBeenCalled();
+
+    // 2. Accept confirmation -> should call removeCombatant
+    confirmSpy.mockReturnValueOnce(true);
+    fireEvent.click(deleteBtn);
+    expect(liveCombatHubService.removeCombatant).toHaveBeenCalledWith('party-1', 'hero-1');
+
+    unmount();
+
+    // Render Player View: delete button should NOT be rendered
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="Player"
+        combatState={playerState}
+      />
+    );
+
+    expect(document.getElementById('remove-combatant-btn-hero-1')).toBeNull();
+
+    confirmSpy.mockRestore();
+  });
+
+  it('DM View: quick combatant modal offers bestiary autocomplete, autofills stats, allows custom editing, and submits', async () => {
+    render(
+      <LiveCombatTracker
+        partyId="party-1"
+        role="DungeonMaster"
+        combatState={dmState}
+      />
+    );
+
+    // Open quick combatant modal
+    const addBtn = screen.getByRole('button', { name: /\+ Añadir Combatiente Rápido/i });
+    fireEvent.click(addBtn);
+
+    const nameInput = document.getElementById('quick-combatant-name') as HTMLInputElement;
+    const hpInput = document.getElementById('quick-combatant-hp') as HTMLInputElement;
+    const acInput = document.getElementById('quick-combatant-ac') as HTMLInputElement;
+
+    expect(nameInput).toBeInTheDocument();
+    expect(hpInput).toBeInTheDocument();
+    expect(acInput).toBeInTheDocument();
+
+    // Type "Goblin" into bestiary combobox
+    fireEvent.change(nameInput, { target: { value: 'Goblin' } });
+
+    // Suggestion item for "Goblin Boss" should be visible
+    const suggestion = await screen.findByTestId('creature-suggestion-goblin-boss');
+    expect(suggestion).toBeInTheDocument();
+
+    // Click suggestion
+    fireEvent.click(suggestion);
+
+    // Values should be autofilled from bestiary mock (HP: 21, AC: 17)
+    expect(nameInput.value).toBe('Goblin Boss');
+    expect(hpInput.value).toBe('21');
+    expect(acInput.value).toBe('17');
+
+    // DM customizes / overrides HP to 30
+    fireEvent.change(hpInput, { target: { value: '30' } });
+    expect(hpInput.value).toBe('30');
+
+    // Submit form
+    const submitBtn = document.getElementById('quick-combatant-submit-btn') as HTMLButtonElement;
+    fireEvent.click(submitBtn);
+
+    // addQuickCombatant should be called with autofilled & customized values
+    expect(liveCombatHubService.addQuickCombatant).toHaveBeenCalledWith(
+      'party-1',
+      expect.objectContaining({
+        name: 'Goblin Boss',
+        maxHp: 30,
+        armorClass: 17,
+        isPlayerCharacter: false,
+      })
+    );
+  });
 });
+
 
