@@ -13,7 +13,12 @@ import type {
   MontecarloResultDto,
   DprBaselineDto,
 } from '../types/dnd';
-import type { AuthResponseDto } from '../types/auth';
+import type {
+  AuthResponseDto,
+  RegisterRequestDto,
+  LoginRequestDto,
+  SetPasswordRequestDto,
+} from '../types/auth';
 import type {
   CreatePartyRequestDto,
   PartyResponseDto,
@@ -33,10 +38,16 @@ import type {
   DowntimeAdvanceResultDto,
   PartyStashDto,
 } from '../types/stash';
+import type {
+  SessionNoteResponseDto,
+  CreateSessionNoteRequest,
+  UpdateSessionNoteRequest,
+} from '../types/liveCombat';
 
 const API_BASE_URL = '/api/v1';
 
 let currentAuthToken: string | null = null;
+let inMemorySessionNotes: SessionNoteResponseDto[] = [];
 
 function getAuthHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = { ...additionalHeaders };
@@ -246,6 +257,314 @@ export const INITIAL_CREATURES: CreatureResponseDto[] = [
       },
     ],
     knownMasteries: [CANONICAL_MASTERIES.find((m) => m.property === 'Vex')!],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000004',
+    name: 'Goblin Scout',
+    size: 'Small',
+    type: 'Humanoid',
+    alignment: 'Neutral Evil',
+    challengeRating: 0.25,
+    speedFeet: 30,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 15,
+    abilityScores: {
+      strength: 8,
+      strengthModifier: -1,
+      dexterity: 14,
+      dexterityModifier: 2,
+      constitution: 10,
+      constitutionModifier: 0,
+      intelligence: 10,
+      intelligenceModifier: 0,
+      wisdom: 8,
+      wisdomModifier: -1,
+      charisma: 8,
+      charismaModifier: -1,
+    },
+    hitPoints: { max: 7, current: 7, temporary: 0 },
+    armorClass: { base: 15, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000004',
+        creatureId: 'b0000001-0000-0000-0000-000000000004',
+        name: 'Scimitar Slash',
+        type: 'Action',
+        description: 'Ataque rápido y cortante de corta distancia.',
+        isAttack: true,
+        attackBonus: 4,
+        reachOrRangeFeet: 5,
+        damageFormula: '1d6+2',
+        damageType: 'Slashing',
+        attackModifierAbility: 'Dexterity',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000005',
+    name: 'Skeleton',
+    size: 'Medium',
+    type: 'Undead',
+    alignment: 'Lawful Evil',
+    challengeRating: 0.25,
+    speedFeet: 30,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 13,
+    abilityScores: {
+      strength: 10,
+      strengthModifier: 0,
+      dexterity: 14,
+      dexterityModifier: 2,
+      constitution: 15,
+      constitutionModifier: 2,
+      intelligence: 6,
+      intelligenceModifier: -2,
+      wisdom: 8,
+      wisdomModifier: -1,
+      charisma: 5,
+      charismaModifier: -3,
+    },
+    hitPoints: { max: 13, current: 13, temporary: 0 },
+    armorClass: { base: 13, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000005',
+        creatureId: 'b0000001-0000-0000-0000-000000000005',
+        name: 'Shortsword Strike',
+        type: 'Action',
+        description: 'Estocada ósea con espada herrumbrosa.',
+        isAttack: true,
+        attackBonus: 4,
+        reachOrRangeFeet: 5,
+        damageFormula: '1d6+2',
+        damageType: 'Piercing',
+        attackModifierAbility: 'Dexterity',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000006',
+    name: 'Dire Wolf',
+    size: 'Large',
+    type: 'Beast',
+    alignment: 'Unaligned',
+    challengeRating: 1,
+    speedFeet: 50,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 14,
+    abilityScores: {
+      strength: 17,
+      strengthModifier: 3,
+      dexterity: 15,
+      dexterityModifier: 2,
+      constitution: 15,
+      constitutionModifier: 2,
+      intelligence: 3,
+      intelligenceModifier: -4,
+      wisdom: 12,
+      wisdomModifier: 1,
+      charisma: 7,
+      charismaModifier: -2,
+    },
+    hitPoints: { max: 37, current: 37, temporary: 0 },
+    armorClass: { base: 14, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000006',
+        creatureId: 'b0000001-0000-0000-0000-000000000006',
+        name: 'Bite',
+        type: 'Action',
+        description: 'Mordisco feroz con probabilidad de derribar al objetivo.',
+        isAttack: true,
+        attackBonus: 5,
+        reachOrRangeFeet: 5,
+        damageFormula: '2d6+3',
+        damageType: 'Piercing',
+        attackModifierAbility: 'Strength',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000007',
+    name: 'Red Dragon Wyrmling',
+    size: 'Medium',
+    type: 'Dragon',
+    alignment: 'Chaotic Evil',
+    challengeRating: 4,
+    speedFeet: 30,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 17,
+    abilityScores: {
+      strength: 19,
+      strengthModifier: 4,
+      dexterity: 10,
+      dexterityModifier: 0,
+      constitution: 17,
+      constitutionModifier: 3,
+      intelligence: 12,
+      intelligenceModifier: 1,
+      wisdom: 11,
+      wisdomModifier: 0,
+      charisma: 15,
+      charismaModifier: 2,
+    },
+    hitPoints: { max: 75, current: 75, temporary: 0 },
+    armorClass: { base: 17, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000007',
+        creatureId: 'b0000001-0000-0000-0000-000000000007',
+        name: 'Bite',
+        type: 'Action',
+        description: 'Dentellada ardiente de colmillos dracónicos.',
+        isAttack: true,
+        attackBonus: 6,
+        reachOrRangeFeet: 5,
+        damageFormula: '1d10+4',
+        damageType: 'Piercing',
+        attackModifierAbility: 'Strength',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000008',
+    name: 'Ogre Brute',
+    size: 'Large',
+    type: 'Giant',
+    alignment: 'Chaotic Evil',
+    challengeRating: 2,
+    speedFeet: 40,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 11,
+    abilityScores: {
+      strength: 19,
+      strengthModifier: 4,
+      dexterity: 8,
+      dexterityModifier: -1,
+      constitution: 16,
+      constitutionModifier: 3,
+      intelligence: 5,
+      intelligenceModifier: -3,
+      wisdom: 7,
+      wisdomModifier: -2,
+      charisma: 7,
+      charismaModifier: -2,
+    },
+    hitPoints: { max: 59, current: 59, temporary: 0 },
+    armorClass: { base: 11, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000008',
+        creatureId: 'b0000001-0000-0000-0000-000000000008',
+        name: 'Greatclub Smash',
+        type: 'Action',
+        description: 'Aplastamiento brutal con un mazo de madera maciza.',
+        isAttack: true,
+        attackBonus: 6,
+        reachOrRangeFeet: 5,
+        damageFormula: '2d8+4',
+        damageType: 'Bludgeoning',
+        attackModifierAbility: 'Strength',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000009',
+    name: 'Fire Elemental',
+    size: 'Large',
+    type: 'Elemental',
+    alignment: 'Neutral',
+    challengeRating: 5,
+    speedFeet: 50,
+    proficiencyBonus: 3,
+    effectiveArmorClass: 13,
+    abilityScores: {
+      strength: 10,
+      strengthModifier: 0,
+      dexterity: 17,
+      dexterityModifier: 3,
+      constitution: 16,
+      constitutionModifier: 3,
+      intelligence: 6,
+      intelligenceModifier: -2,
+      wisdom: 10,
+      wisdomModifier: 0,
+      charisma: 7,
+      charismaModifier: -2,
+    },
+    hitPoints: { max: 102, current: 102, temporary: 0 },
+    armorClass: { base: 13, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000009',
+        creatureId: 'b0000001-0000-0000-0000-000000000009',
+        name: 'Touch',
+        type: 'Action',
+        description: 'Toque ígneo abrasador que enciende a los objetivos.',
+        isAttack: true,
+        attackBonus: 6,
+        reachOrRangeFeet: 5,
+        damageFormula: '2d6+3',
+        damageType: 'Fire',
+        attackModifierAbility: 'Dexterity',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
+  },
+  {
+    id: 'b0000001-0000-0000-0000-000000000010',
+    name: 'Gelatinous Cube',
+    size: 'Large',
+    type: 'Ooze',
+    alignment: 'Unaligned',
+    challengeRating: 2,
+    speedFeet: 15,
+    proficiencyBonus: 2,
+    effectiveArmorClass: 6,
+    abilityScores: {
+      strength: 14,
+      strengthModifier: 2,
+      dexterity: 3,
+      dexterityModifier: -4,
+      constitution: 20,
+      constitutionModifier: 5,
+      intelligence: 1,
+      intelligenceModifier: -5,
+      wisdom: 6,
+      wisdomModifier: -2,
+      charisma: 1,
+      charismaModifier: -5,
+    },
+    hitPoints: { max: 84, current: 84, temporary: 0 },
+    armorClass: { base: 6, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+    actions: [
+      {
+        id: 'c0000001-0000-0000-0000-000000000010',
+        creatureId: 'b0000001-0000-0000-0000-000000000010',
+        name: 'Pseudopod',
+        type: 'Action',
+        description: 'Golpe ácido con masa gelatinosa translúcida.',
+        isAttack: true,
+        attackBonus: 4,
+        reachOrRangeFeet: 5,
+        damageFormula: '3d6',
+        damageType: 'Acid',
+        attackModifierAbility: 'Strength',
+        associatedMasteryId: null,
+      },
+    ],
+    knownMasteries: [],
   },
 ];
 
@@ -554,6 +873,118 @@ export const apiClient = {
       this.setAuthToken(syntheticUser.token);
       return syntheticUser;
     }
+  },
+
+  /**
+   * Registra una nueva cuenta convencional con email y contraseña.
+   */
+  async registerConventional(data: RegisterRequestDto): Promise<AuthResponseDto> {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const result: AuthResponseDto = await response.json();
+        this.setAuthToken(result.token);
+        return result;
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Error en el registro' }));
+        throw new Error(errorData.detail || errorData.title || 'Error en el registro');
+      }
+    } catch (err) {
+      if (err instanceof Error && !err.message.includes('fetch') && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+        throw err;
+      }
+      const syntheticUser: AuthResponseDto = {
+        token: `mock-jwt-${Date.now()}`,
+        userId: crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000001',
+        email: data.email,
+        displayName: data.displayName,
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: false,
+      };
+      this.setAuthToken(syntheticUser.token);
+      return syntheticUser;
+    }
+  },
+
+  /**
+   * Inicia sesión con credenciales convencionales (email y contraseña).
+   */
+  async loginConventional(data: LoginRequestDto): Promise<AuthResponseDto> {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const result: AuthResponseDto = await response.json();
+        this.setAuthToken(result.token);
+        return result;
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Credenciales inválidas' }));
+        throw new Error(errorData.detail || errorData.title || 'Credenciales inválidas');
+      }
+    } catch (err) {
+      if (err instanceof Error && !err.message.includes('fetch') && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+        throw err;
+      }
+      const syntheticUser: AuthResponseDto = {
+        token: `mock-jwt-${Date.now()}`,
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: data.email,
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: false,
+      };
+      this.setAuthToken(syntheticUser.token);
+      return syntheticUser;
+    }
+  },
+
+  /**
+   * Configura o actualiza la contraseña para el usuario autenticado.
+   */
+  async setPassword(data: SetPasswordRequestDto): Promise<AuthResponseDto> {
+    const response = await fetch('/api/auth/set-password', {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data),
+    });
+
+    if (response.ok) {
+      const result: AuthResponseDto = await response.json();
+      this.setAuthToken(result.token);
+      return result;
+    }
+    const errorData = await response.json().catch(() => ({ detail: 'Error al configurar la contraseña' }));
+    throw new Error(errorData.detail || errorData.title || 'Error al configurar la contraseña');
+  },
+
+  /**
+   * Vincula una cuenta de Google al usuario autenticado.
+   */
+  async linkGoogle(idToken: string): Promise<AuthResponseDto> {
+    const response = await fetch('/api/auth/link-google', {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ idToken }),
+    });
+
+    if (response.ok) {
+      const result: AuthResponseDto = await response.json();
+      this.setAuthToken(result.token);
+      return result;
+    }
+    const errorData = await response.json().catch(() => ({ detail: 'Error al vincular la cuenta de Google' }));
+    throw new Error(errorData.detail || errorData.title || 'Error al vincular la cuenta de Google');
   },
 
   /**
@@ -1843,6 +2274,118 @@ export const apiClient = {
     }
 
     return inMemoryActivityLogs.filter((l) => l.partyId === partyId).slice(0, limit);
+  },
+
+  /**
+   * Obtiene todas las notas de sesión de una Party (DM Only).
+   */
+  async getSessionNotes(partyId: string, signal?: AbortSignal): Promise<SessionNoteResponseDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+    return inMemorySessionNotes.filter((n) => n.partyId === partyId);
+  },
+
+  /**
+   * Crea una nueva nota de sesión para la Party (DM Only).
+   */
+  async createSessionNote(partyId: string, request: CreateSessionNoteRequest): Promise<SessionNoteResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemorySessionNotes = [data, ...inMemorySessionNotes.filter((n) => n.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const newNote: SessionNoteResponseDto = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      partyId,
+      title: request.title,
+      content: request.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemorySessionNotes = [newNote, ...inMemorySessionNotes];
+    return newNote;
+  },
+
+  /**
+   * Actualiza una nota de sesión existente (DM Only).
+   */
+  async updateSessionNote(partyId: string, noteId: string, request: UpdateSessionNoteRequest): Promise<SessionNoteResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes/${noteId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemorySessionNotes = inMemorySessionNotes.map((n) => (n.id === noteId ? data : n));
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    let updatedNote: SessionNoteResponseDto | null = null;
+    inMemorySessionNotes = inMemorySessionNotes.map((n) => {
+      if (n.id === noteId) {
+        updatedNote = {
+          ...n,
+          title: request.title,
+          content: request.content,
+          updatedAt: new Date().toISOString(),
+        };
+        return updatedNote;
+      }
+      return n;
+    });
+
+    return updatedNote || {
+      id: noteId,
+      partyId,
+      title: request.title,
+      content: request.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  /**
+   * Elimina una nota de sesión por ID (DM Only).
+   */
+  async deleteSessionNote(partyId: string, noteId: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
+        return;
+      }
+    } catch {
+      // Fallback local
+    }
+    inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
   },
 };
 

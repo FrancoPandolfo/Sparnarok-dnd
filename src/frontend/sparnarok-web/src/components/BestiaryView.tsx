@@ -65,12 +65,30 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
   const [selectedCreature, setSelectedCreature] = useState<CreatureResponseDto | null>(null);
   const [actionModalCreature, setActionModalCreature] = useState<CreatureResponseDto | null>(null);
 
-  // Filtrado reactivo en memoria
+  // Normalizador de texto tolerante a tildes y mayúsculas
+  const normalize = (val: string | undefined | null) =>
+    (val || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+  // Filtrado reactivo en memoria multi-criterio (Nombre, Tipo, Alineamiento, Acciones)
   const filteredCreatures = useMemo(() => {
+    const term = normalize(searchTerm);
+    const targetSize = normalize(selectedSize);
+    const targetType = normalize(selectedType);
+
     return creatures.filter((c) => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase().trim());
-      const matchesSize = !selectedSize || c.size === selectedSize;
-      const matchesType = !selectedType || c.type === selectedType;
+      const nameMatch = normalize(c.name).includes(term);
+      const typeTextMatch = normalize(c.type).includes(term);
+      const alignmentMatch = normalize(c.alignment).includes(term);
+      const actionMatch = c.actions?.some((a) => normalize(a.name).includes(term));
+      const matchesSearch = !term || nameMatch || typeTextMatch || alignmentMatch || actionMatch;
+
+      const matchesSize = !targetSize || normalize(c.size) === targetSize;
+      const matchesType = !targetType || normalize(c.type) === targetType;
+
       return matchesSearch && matchesSize && matchesType;
     });
   }, [creatures, searchTerm, selectedSize, selectedType]);

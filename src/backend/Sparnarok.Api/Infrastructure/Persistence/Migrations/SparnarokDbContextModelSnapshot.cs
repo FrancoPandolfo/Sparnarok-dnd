@@ -17,7 +17,7 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -146,19 +146,24 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<string>("GoogleSubjectId")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
                     b.Property<DateTime>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Email");
+                    b.HasIndex("Email")
+                        .IsUnique();
 
                     b.HasIndex("GoogleSubjectId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"GoogleSubjectId\" IS NOT NULL");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -436,6 +441,39 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerUserId");
 
                     b.ToTable("Parties", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.SessionNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("PartyId", "CreatedAt");
+
+                    b.ToTable("SessionNotes", (string)null);
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashActivityLog", b =>
@@ -874,6 +912,17 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.SessionNote", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", "Party")
+                        .WithMany("SessionNotes")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Party");
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.StashActivityLog", b =>
                 {
                     b.HasOne("Sparnarok.Api.Domain.Entities.Party", null)
@@ -907,6 +956,8 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("ActivityLogs");
 
                     b.Navigation("CraftingQueue");
+
+                    b.Navigation("SessionNotes");
 
                     b.Navigation("StashItems");
                 });

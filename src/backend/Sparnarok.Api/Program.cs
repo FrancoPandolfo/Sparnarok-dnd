@@ -34,6 +34,7 @@ builder.Services.AddScoped<ICreatureRepository, CreatureRepository>();
 builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
 builder.Services.AddScoped<IPartyRepository, PartyRepository>();
 builder.Services.AddScoped<IEncounterRepository, EncounterRepository>();
+builder.Services.AddScoped<ISessionNoteRepository, SessionNoteRepository>();
 
 // 4. Servicios de Ingestión de Datos (CSV & Streaming)
 builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();
@@ -64,9 +65,10 @@ builder.Services.AddSingleton<IDprBaselineService, Sparnarok.Api.Infrastructure.
 builder.Services.AddScoped<ICombatSimulatorService, Sparnarok.Api.Infrastructure.Services.CombatSimulatorService>();
 builder.Services.AddScoped<IMontecarloSimulationService, Sparnarok.Api.Infrastructure.Services.MontecarloSimulationService>();
 
-// 5.1 Identidad y Autenticación Federada (Google OAuth2 & JWT)
+// 5.1 Identidad y Autenticación Federada (Google OAuth2 & JWT) & Convencional
 builder.Services.AddSingleton<IJwtTokenService, Sparnarok.Api.Infrastructure.Services.JwtTokenService>();
 builder.Services.AddScoped<IGoogleAuthService, Sparnarok.Api.Infrastructure.Services.GoogleAuthService>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<Sparnarok.Api.Domain.Entities.ApplicationUser>, Microsoft.AspNetCore.Identity.PasswordHasher<Sparnarok.Api.Domain.Entities.ApplicationUser>>();
 
 var jwtKey = builder.Configuration["Authentication:Jwt:Key"]
     ?? Sparnarok.Api.Infrastructure.Services.JwtTokenService.DefaultDevKey;
@@ -115,6 +117,7 @@ builder.Services.AddAuthorization();
 // 5.2 Tiempo Real (SignalR) para Alijo Colaborativo y Sesiones en Vivo
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IStashNotificationService, Sparnarok.Api.Infrastructure.Hubs.StashNotificationService>();
+builder.Services.AddSingleton<ILiveCombatManager, Sparnarok.Api.Infrastructure.Services.LiveCombatManager>();
 
 // 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
@@ -175,6 +178,21 @@ app.UseRequestLocalization(localizationOptions);
 // 4. Configuración del Entorno de Desarrollo y Swagger UI
 if (app.Environment.IsDevelopment())
 {
+    using (var scope = app.Services.CreateScope())
+    {
+        try
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            db.Database.Migrate();
+            Sparnarok.Api.Infrastructure.Persistence.DataSeeder.SeedInitialData(db);
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "No se pudo migrar o sembrar la base de datos automáticamente en inicio de desarrollo.");
+        }
+    }
+
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -190,6 +208,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<Sparnarok.Api.Infrastructure.Hubs.StashHub>("/hubs/stash");
+app.MapHub<Sparnarok.Api.Infrastructure.Hubs.LiveCombatHub>("/hubs/live-combat");
 
 app.Run();
 

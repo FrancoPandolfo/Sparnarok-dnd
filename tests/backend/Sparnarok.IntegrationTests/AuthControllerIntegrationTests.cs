@@ -180,4 +180,106 @@ public class AuthControllerIntegrationTests : IClassFixture<CustomWebApplication
             await db.SaveChangesAsync();
         }
     }
+
+    [Fact]
+    public async Task RegisterAndLogin_WithConventionalCredentials_Succeeds()
+    {
+        // Arrange
+        var email = $"fighter_{Guid.NewGuid():N}@sparnarok.dnd";
+        var password = "StrongPassword123!";
+        var displayName = "Valeros the Fighter";
+
+        // 1. Registro
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequestDto(email, password, displayName));
+        regResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var regAuth = await regResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        regAuth.Should().NotBeNull();
+        regAuth!.Email.Should().Be(email);
+        regAuth.DisplayName.Should().Be(displayName);
+        regAuth.HasPassword.Should().BeTrue();
+        regAuth.HasGoogleLinked.Should().BeFalse();
+
+        // 2. Login con contraseña correcta
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto(email, password));
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var loginAuth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        loginAuth.Should().NotBeNull();
+        loginAuth!.UserId.Should().Be(regAuth.UserId);
+
+        // 3. Login con contraseña incorrecta -> Unauthorized
+        var failResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto(email, "WrongPassword!"));
+        failResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RegisterConventional_ThenLoginWithGoogle_AutoLinksWithoutConflict()
+    {
+        // Arrange
+        var email = $"rogue_{Guid.NewGuid():N}@sparnarok.dnd";
+        var password = "ShadowPassword123!";
+        var displayName = "Merisiel";
+
+        // 1. Registro convencional
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequestDto(email, password, displayName));
+        regResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var regAuth = await regResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        regAuth!.HasPassword.Should().BeTrue();
+        regAuth.HasGoogleLinked.Should().BeFalse();
+
+        // 2. El usuario inicia sesión con Google usando el mismo email
+        var googleSub = $"google-sub-{Guid.NewGuid():N}";
+        var idToken = $"mock-google-token:{email}:Merisiel Thief:{googleSub}:https://avatar.url/merisiel.png";
+        var googleResponse = await _client.PostAsJsonAsync("/api/auth/google", new GoogleLoginRequestDto(idToken));
+        googleResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var googleAuth = await googleResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        googleAuth.Should().NotBeNull();
+        googleAuth!.UserId.Should().Be(regAuth.UserId);
+        googleAuth.HasPassword.Should().BeTrue();
+        googleAuth.HasGoogleLinked.Should().BeTrue();
+
+        // 3. Puede seguir iniciando sesión con contraseña convencional
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto(email, password));
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var loginAuth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        loginAuth!.HasGoogleLinked.Should().BeTrue();
+        loginAuth.HasPassword.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegisterWithGoogle_ThenSetPassword_AllowsConventionalLogin()
+    {
+        // Arrange
+        var email = $"wizard_{Guid.NewGuid():N}@sparnarok.dnd";
+        var googleSub = $"google-sub-{Guid.NewGuid():N}";
+        var idToken = $"mock-google-token:{email}:Ezren The Wizard:{googleSub}:https://avatar.url/ezren.png";
+
+        // 1. Iniciar sesión con Google
+        var googleResponse = await _client.PostAsJsonAsync("/api/auth/google", new GoogleLoginRequestDto(idToken));
+        googleResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var googleAuth = await googleResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        googleAuth!.HasGoogleLinked.Should().BeTrue();
+        googleAuth.HasPassword.Should().BeFalse();
+
+        // 2. Intentar login convencional sin contraseña -> Unauthorized con mensaje explicativo
+        var preLoginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto(email, "AnyPassword123!"));
+        preLoginResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // 3. Usuario autenticado establece una contraseña
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", googleAuth.Token);
+        var setPassResponse = await _client.PostAsJsonAsync("/api/auth/set-password", new SetPasswordRequestDto("MagicPass2026!"));
+        setPassResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var setPassAuth = await setPassResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        setPassAuth!.HasPassword.Should().BeTrue();
+        setPassAuth.HasGoogleLinked.Should().BeTrue();
+
+        // 4. Ahora puede loguearse convencionalmente con la nueva contraseña
+        _client.DefaultRequestHeaders.Authorization = null;
+        var postLoginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto(email, "MagicPass2026!"));
+        postLoginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var postLoginAuth = await postLoginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(_jsonOptions);
+        postLoginAuth!.UserId.Should().Be(googleAuth.UserId);
+        postLoginAuth.HasPassword.Should().BeTrue();
+        postLoginAuth.HasGoogleLinked.Should().BeTrue();
+    }
 }
+

@@ -12,6 +12,7 @@ public class Party
     private readonly List<StashItem> _stashItems = [];
     private readonly List<CraftingQueueItem> _craftingQueue = [];
     private readonly List<StashActivityLog> _activityLogs = [];
+    private readonly List<SessionNote> _sessionNotes = [];
 
     /// <summary>Identificador único de la Party.</summary>
     public Guid Id { get; private set; }
@@ -57,6 +58,9 @@ public class Party
 
     /// <summary>Historial de transacciones y auditoría del alijo y fondos.</summary>
     public IReadOnlyCollection<StashActivityLog> ActivityLogs => _activityLogs.AsReadOnly();
+
+    /// <summary>Notas de sesión y apuntes de campaña exclusivos del Dungeon Master.</summary>
+    public IReadOnlyCollection<SessionNote> SessionNotes => _sessionNotes.AsReadOnly();
 
     /// <summary>Peso total acumulado en libras (lbs) de todos los objetos en el alijo de la Party.</summary>
     public decimal TotalStashWeight => _stashItems.Sum(i => i.Weight * i.Quantity);
