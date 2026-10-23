@@ -1,0 +1,11 @@
+**/.git
+**/.github
+**/.vs
+**/bin
+**/obj
+**/node_modules
+**/test-results
+**/playwright-report
+**/.env
+**/*.log
+appsettings.private.json
