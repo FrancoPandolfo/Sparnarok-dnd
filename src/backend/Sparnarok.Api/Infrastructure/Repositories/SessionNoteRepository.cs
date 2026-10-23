@@ -31,6 +31,14 @@ public class SessionNoteRepository : ISessionNoteRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<SessionNote>> GetAllByPartyAndOwnerAsync(Guid partyId, Guid ownerUserId, CancellationToken ct = default)
+    {
+        return await _context.SessionNotes
+            .Where(n => n.PartyId == partyId && n.OwnerUserId == ownerUserId)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync(ct);
+    }
+
     public async Task AddAsync(SessionNote note, CancellationToken ct = default)
     {
         await _context.SessionNotes.AddAsync(note, ct);

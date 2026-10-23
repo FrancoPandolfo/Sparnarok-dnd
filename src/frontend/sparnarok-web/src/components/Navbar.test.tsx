@@ -39,6 +39,7 @@ describe('Navbar Component Suite', () => {
       registerConventional: vi.fn(),
       setPassword: vi.fn(),
       linkGoogle: vi.fn(),
+      updateProfile: vi.fn(),
       logout: vi.fn(),
     };
 
@@ -67,6 +68,7 @@ describe('Navbar Component Suite', () => {
       registerConventional: vi.fn(),
       setPassword: vi.fn(),
       linkGoogle: vi.fn(),
+      updateProfile: vi.fn(),
       logout: mockLogout,
     };
 

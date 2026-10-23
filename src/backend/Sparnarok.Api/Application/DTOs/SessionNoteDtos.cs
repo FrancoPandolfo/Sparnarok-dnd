@@ -3,11 +3,12 @@ using Sparnarok.Api.Domain.Entities;
 namespace Sparnarok.Api.Application.DTOs;
 
 /// <summary>
-/// DTO de respuesta para una nota de sesión o apunte de campaña.
+/// DTO de respuesta para una nota de sesión o apunte de campaña con aislamiento por usuario (Fase 3.7).
 /// </summary>
 public record SessionNoteResponseDto(
     Guid Id,
     Guid PartyId,
+    Guid OwnerUserId,
     string Title,
     string Content,
     DateTime CreatedAt,
@@ -21,6 +22,7 @@ public record SessionNoteResponseDto(
         new(
             note.Id,
             note.PartyId,
+            note.OwnerUserId,
             note.Title,
             note.Content,
             note.CreatedAt,

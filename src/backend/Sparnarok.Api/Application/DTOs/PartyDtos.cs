@@ -7,8 +7,54 @@ namespace Sparnarok.Api.Application.DTOs;
 /// </summary>
 public record CreatePartyRequestDto(
     string Name,
-    List<Guid> MemberCreatureIds
+    List<Guid>? MemberCreatureIds = null,
+    string? Role = "DungeonMaster",
+    string? InGameName = null
 );
+
+/// <summary>
+/// Solicitud para unirse a una Party existente mediante enlace o token de invitación (Fase 3.7).
+/// </summary>
+public record JoinPartyRequestDto(
+    string Role,
+    string InGameName
+);
+
+/// <summary>
+/// Información de la invitación a una Party para la pantalla previa de onboarding (Fase 3.7).
+/// </summary>
+public record PartyInviteDetailsDto(
+    Guid PartyId,
+    string PartyName,
+    string InviteToken,
+    int MemberCount
+);
+
+/// <summary>
+/// Representación DTO de un miembro registrado en la Party con su rol y nombre contextual (Fase 3.7).
+/// </summary>
+public record PartyMemberDto(
+    Guid Id,
+    Guid PartyId,
+    Guid UserId,
+    string Role,
+    string InGameName,
+    DateTime JoinedAt
+)
+{
+    /// <summary>
+    /// Mapea una entidad <see cref="PartyMember"/> a su DTO de respuesta.
+    /// </summary>
+    public static PartyMemberDto FromEntity(PartyMember member) =>
+        new(
+            member.Id,
+            member.PartyId,
+            member.UserId,
+            member.Role,
+            member.InGameName,
+            member.JoinedAt
+        );
+}
 
 /// <summary>
 /// Solicitud de actualización de una Party existente.
@@ -25,8 +71,10 @@ public record PartyResponseDto(
     Guid Id,
     string Name,
     Guid OwnerUserId,
+    string InviteToken,
     DateTime CreatedAt,
-    List<CreatureResponseDto> Members
+    List<CreatureResponseDto> Members,
+    List<PartyMemberDto> PartyMembers
 )
 {
     /// <summary>
@@ -39,8 +87,10 @@ public record PartyResponseDto(
             party.Id,
             party.Name,
             party.OwnerUserId,
+            party.InviteToken,
             party.CreatedAt,
-            party.Members.Select(CreatureResponseDto.FromEntity).ToList()
+            party.Members.Select(CreatureResponseDto.FromEntity).ToList(),
+            party.PartyMembers.Select(PartyMemberDto.FromEntity).ToList()
         );
     }
 }

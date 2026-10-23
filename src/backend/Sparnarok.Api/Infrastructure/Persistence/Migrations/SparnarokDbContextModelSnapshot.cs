@@ -145,6 +145,10 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("GlobalNickname")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("GoogleSubjectId")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
@@ -416,6 +420,11 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<string>("InviteToken")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -438,9 +447,47 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("InviteToken")
+                        .IsUnique();
+
                     b.HasIndex("OwnerUserId");
 
                     b.ToTable("Parties", (string)null);
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.PartyMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InGameName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PartyId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("PartyMembers", (string)null);
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.SessionNote", b =>
@@ -456,6 +503,9 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("PartyId")
                         .HasColumnType("uuid");
 
@@ -469,9 +519,13 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OwnerUserId");
+
                     b.HasIndex("PartyId");
 
                     b.HasIndex("PartyId", "CreatedAt");
+
+                    b.HasIndex("PartyId", "OwnerUserId");
 
                     b.ToTable("SessionNotes", (string)null);
                 });
@@ -912,13 +966,40 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.PartyMember", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", "Party")
+                        .WithMany("PartyMembers")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sparnarok.Api.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Party");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.SessionNote", b =>
                 {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.ApplicationUser", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Sparnarok.Api.Domain.Entities.Party", "Party")
                         .WithMany("SessionNotes")
                         .HasForeignKey("PartyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("OwnerUser");
 
                     b.Navigation("Party");
                 });
@@ -956,6 +1037,8 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("ActivityLogs");
 
                     b.Navigation("CraftingQueue");
+
+                    b.Navigation("PartyMembers");
 
                     b.Navigation("SessionNotes");
 

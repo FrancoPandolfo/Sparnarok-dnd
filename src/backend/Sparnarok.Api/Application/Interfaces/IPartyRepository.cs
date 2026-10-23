@@ -18,6 +18,11 @@ public interface IPartyRepository
     Task<Party?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Obtiene una party mediante su token único de invitación y onboarding (Fase 3.7).
+    /// </summary>
+    Task<Party?> GetByInviteTokenAsync(string inviteToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Agrega una nueva party al repositorio.
     /// </summary>
     Task AddAsync(Party party, CancellationToken cancellationToken = default);
@@ -66,6 +71,11 @@ public interface IPartyRepository
     /// Obtiene los registros de auditoría de una Party ordenados cronológicamente de forma descendente.
     /// </summary>
     Task<IReadOnlyList<StashActivityLog>> GetActivityLogsAsync(Guid partyId, int limit = 50, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Registra o incorpora un nuevo miembro en la membresía de la Party (Fase 3.7).
+    /// </summary>
+    Task AddPartyMemberAsync(PartyMember member, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Persiste los cambios pendientes en el almacenamiento.

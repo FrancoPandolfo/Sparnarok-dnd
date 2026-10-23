@@ -104,7 +104,7 @@ public class PartiesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
+        if (party.OwnerUserId != userId.Value && !party.PartyMembers.Any(pm => pm.UserId == userId.Value))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
             {
@@ -145,6 +145,13 @@ public class PartiesController : ControllerBase
 
         var party = new Party(Guid.NewGuid(), request.Name, userId.Value);
 
+        // Registrar membresía inicial del creador de la Party (Fase 3.7)
+        var creatorRole = string.IsNullOrWhiteSpace(request.Role) ? "DungeonMaster" : request.Role.Trim();
+        var creatorName = string.IsNullOrWhiteSpace(request.InGameName)
+            ? User.GetDisplayName()
+            : request.InGameName.Trim();
+        party.AddPartyMember(new PartyMember(Guid.NewGuid(), party.Id, userId.Value, creatorRole, creatorName));
+
         if (request.MemberCreatureIds != null && request.MemberCreatureIds.Count > 0)
         {
             foreach (var creatureId in request.MemberCreatureIds)
@@ -178,6 +185,122 @@ public class PartiesController : ControllerBase
         await _partyRepository.SaveChangesAsync(ct);
 
         return CreatedAtAction(nameof(GetById), new { id = party.Id }, PartyResponseDto.FromEntity(party));
+    }
+
+    /// <summary>
+    /// Obtiene los detalles previos de invitación a una Party mediante su token para onboarding.
+    /// </summary>
+    /// <param name="token">Token único de invitación.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    [HttpGet("/api/parties/join/{token}")]
+    [HttpGet("join/{token}")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PartyInviteDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PartyInviteDetailsDto>> GetInviteDetails(string token, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Invitación no válida",
+                Status = StatusCodes.Status404NotFound,
+                Detail = "El token de invitación no puede estar vacío."
+            });
+        }
+
+        var party = await _partyRepository.GetByInviteTokenAsync(token.Trim(), ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Invitación no encontrada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = "No se encontró ninguna Party asociada al enlace o token de invitación proporcionado."
+            });
+        }
+
+        return Ok(new PartyInviteDetailsDto(
+            party.Id,
+            party.Name,
+            party.InviteToken,
+            party.PartyMembers.Count
+        ));
+    }
+
+    /// <summary>
+    /// Une al usuario autenticado a una Party mediante un token de invitación válido,
+    /// requiriendo la definición de su rol contextual y nombre en partida (Fase 3.7 Onboarding).
+    /// </summary>
+    /// <param name="token">Token único de invitación.</param>
+    /// <param name="request">Rol y nombre dentro de la partida.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    [HttpPost("/api/parties/join/{token}")]
+    [HttpPost("join/{token}")]
+    [ProducesResponseType(typeof(PartyResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PartyResponseDto>> JoinByToken(
+        string token,
+        [FromBody] JoinPartyRequestDto request,
+        CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue) return Unauthorized();
+
+        if (request is null)
+        {
+            return BadRequest(new ProblemDetails { Title = "Solicitud inválida", Status = StatusCodes.Status400BadRequest });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Role) || (request.Role != "DungeonMaster" && request.Role != "Player"))
+        {
+            ModelState.AddModelError(nameof(request.Role), "El rol es obligatorio y debe ser 'DungeonMaster' o 'Player'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.InGameName))
+        {
+            ModelState.AddModelError(nameof(request.InGameName), "El nombre dentro de la partida (InGameName) es obligatorio.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var party = await _partyRepository.GetByInviteTokenAsync(token.Trim(), ct);
+        if (party is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Invitación no encontrada o expirada",
+                Status = StatusCodes.Status404NotFound,
+                Detail = "No se encontró ninguna Party activa asociada a este token de invitación."
+            });
+        }
+
+        var existingMember = party.PartyMembers.FirstOrDefault(m => m.UserId == userId.Value);
+        if (existingMember != null)
+        {
+            existingMember.SetRole(request.Role.Trim());
+            existingMember.SetInGameName(request.InGameName.Trim());
+        }
+        else
+        {
+            var newMember = new PartyMember(
+                Guid.NewGuid(),
+                party.Id,
+                userId.Value,
+                request.Role.Trim(),
+                request.InGameName.Trim()
+            );
+            party.AddPartyMember(newMember);
+            await _partyRepository.AddPartyMemberAsync(newMember, ct);
+        }
+
+        await _partyRepository.SaveChangesAsync(ct);
+        return Ok(PartyResponseDto.FromEntity(party));
     }
 
     /// <summary>

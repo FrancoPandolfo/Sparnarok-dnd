@@ -5,6 +5,7 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
+  globalNickname?: string | null;
   avatarUrl?: string | null;
   token: string;
   hasPassword?: boolean;
@@ -43,6 +44,26 @@ export interface SetPasswordRequestDto {
 }
 
 /**
+ * Solicitud de actualización de perfil global (Fase 3.7).
+ */
+export interface UpdateUserProfileRequestDto {
+  globalNickname: string | null;
+}
+
+/**
+ * Información detallada del perfil de usuario (Fase 3.7).
+ */
+export interface UserProfileResponseDto {
+  userId: string;
+  email: string;
+  displayName: string;
+  globalNickname?: string | null;
+  avatarUrl?: string | null;
+  hasPassword: boolean;
+  hasGoogleLinked: boolean;
+}
+
+/**
  * Respuesta del backend tras autenticación exitosa (Google o Convencional).
  */
 export interface AuthResponseDto {
@@ -50,6 +71,7 @@ export interface AuthResponseDto {
   userId: string;
   email: string;
   displayName: string;
+  globalNickname?: string | null;
   avatarUrl?: string | null;
   hasPassword?: boolean;
   hasGoogleLinked?: boolean;

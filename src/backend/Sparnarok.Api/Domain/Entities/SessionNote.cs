@@ -11,6 +11,9 @@ public class SessionNote
     /// <summary>Identificador de la Party a la que pertenece la nota.</summary>
     public Guid PartyId { get; private set; }
 
+    /// <summary>Identificador del usuario propietario y autor de la nota de sesión privada (Fase 3.7).</summary>
+    public Guid OwnerUserId { get; private set; }
+
     /// <summary>Título descriptivo de la nota o sesión (ej. 'Sesión 4: El templo subterráneo').</summary>
     public string Title { get; private set; } = string.Empty;
 
@@ -26,6 +29,9 @@ public class SessionNote
     /// <summary>Navegación EF Core hacia la Party.</summary>
     public Party? Party { get; private set; }
 
+    /// <summary>Navegación EF Core hacia el Usuario propietario.</summary>
+    public ApplicationUser? OwnerUser { get; private set; }
+
     /// <summary>Constructor protegido para Entity Framework Core.</summary>
     protected SessionNote() { }
 
@@ -34,13 +40,19 @@ public class SessionNote
     /// </summary>
     /// <param name="id">Identificador único o Guid.Empty para autogenerar.</param>
     /// <param name="partyId">Identificador de la Party propietaria.</param>
+    /// <param name="ownerUserId">Identificador del usuario autor y propietario de la nota.</param>
     /// <param name="title">Título de la nota.</param>
     /// <param name="content">Cuerpo en Markdown de la nota.</param>
-    public SessionNote(Guid id, Guid partyId, string title, string content)
+    public SessionNote(Guid id, Guid partyId, Guid ownerUserId, string title, string content)
     {
         if (partyId == Guid.Empty)
         {
             throw new ArgumentException("El identificador de la Party no puede estar vacío.", nameof(partyId));
+        }
+
+        if (ownerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("El identificador del usuario propietario no puede estar vacío.", nameof(ownerUserId));
         }
 
         if (string.IsNullOrWhiteSpace(title))
@@ -50,6 +62,7 @@ public class SessionNote
 
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
         PartyId = partyId;
+        OwnerUserId = ownerUserId;
         Title = title.Trim();
         Content = content?.Trim() ?? string.Empty;
         CreatedAt = DateTime.UtcNow;

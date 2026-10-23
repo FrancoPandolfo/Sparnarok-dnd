@@ -94,6 +94,7 @@ export interface InitializeLiveCombatRequest {
 export interface SessionNoteResponseDto {
   id: string;
   partyId: string;
+  ownerUserId?: string;
   title: string;
   content: string;
   createdAt: string;

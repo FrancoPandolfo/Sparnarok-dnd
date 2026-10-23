@@ -58,6 +58,9 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   const [combatState, setCombatState] = useState<
     LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null
   >(null);
+  const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
+
+  const currentParty = effectiveParties.find((p) => p.id === selectedPartyId);
 
   useEffect(() => {
     if (activePartyId) {
@@ -105,12 +108,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
     };
   }, [isOpen, selectedPartyId, role, connectSignalR]);
 
-  // Si cambia a Player mientras estaba en notas de sesión, volver a tracker
-  useEffect(() => {
-    if (role === 'Player' && activeTab === 'notes') {
-      setActiveTab('tracker');
-    }
-  }, [role, activeTab]);
+
 
   const handleInitializeCombat = async () => {
     const party = parties.find((p) => p.id === selectedPartyId);
@@ -205,6 +203,23 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
               </button>
             </div>
 
+            {currentParty?.inviteToken && (
+              <button
+                type="button"
+                id="copy-invite-link-btn"
+                className="btn btn-outline btn-xs"
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?inviteToken=${currentParty.inviteToken}`;
+                  navigator.clipboard?.writeText(url);
+                  setCopyFeedback(true);
+                  setTimeout(() => setCopyFeedback(false), 3000);
+                }}
+                title={`Copiar enlace con token: ${currentParty.inviteToken}`}
+              >
+                {copyFeedback ? '✓ Enlace Copiado' : '🔗 Invitar Jugadores'}
+              </button>
+            )}
+
             <button
               type="button"
               id="close-live-session-modal-btn"
@@ -230,31 +245,16 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
             {t('liveCombat.trackerTab', '⚔️ Tracker de Iniciativa')}
           </button>
 
-          {role === 'DungeonMaster' ? (
-            <button
-              type="button"
-              id="tab-session-notes"
-              role="tab"
-              aria-selected={activeTab === 'notes'}
-              className={`modal-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notes')}
-            >
-              {t('liveCombat.notesTab', '📜 Notas de Sesión (DM)')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              id="tab-session-notes-locked-hint"
-              className="modal-tab-btn locked-role-tab"
-              onClick={() => {
-                setRole('DungeonMaster');
-                setActiveTab('notes');
-              }}
-              title="Las Notas de Sesión son exclusivas del Dungeon Master. Haz clic aquí o en 'Vista DM' para activarlas."
-            >
-              🔒 {t('liveCombat.notesTab', 'Notas de Sesión')} (Exclusivo DM - Clic para ver)
-            </button>
-          )}
+          <button
+            type="button"
+            id="tab-session-notes"
+            role="tab"
+            aria-selected={activeTab === 'notes'}
+            className={`modal-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notes')}
+          >
+            {t('liveCombat.notesTab', '📜 Mis Notas')}
+          </button>
         </div>
 
         {/* Cuerpo del Modal */}

@@ -36,13 +36,11 @@ public class SessionNotesController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas las notas de sesión de una Party.
-    /// Exclusivo para el Dungeon Master (propietario de la Party).
+    /// Lista todas las notas de sesión privadas del usuario autenticado para la Party especificada (Fase 3.7).
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<SessionNoteResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<SessionNoteResponseDto>>> GetAll(Guid partyId, CancellationToken ct)
     {
@@ -60,23 +58,14 @@ public class SessionNotesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
-            {
-                Title = "Acceso denegado",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "Solo el Dungeon Master tiene autorización para consultar las notas de sesión de esta Party."
-            });
-        }
-
-        var notes = await _noteRepository.GetAllByPartyIdAsync(partyId, ct);
+        // Aislamiento estricto (Logical Row-Level Security): sólo se retornan las notas del usuario actual
+        var notes = await _noteRepository.GetAllByPartyAndOwnerAsync(partyId, userId.Value, ct);
         return Ok(notes.Select(SessionNoteResponseDto.FromEntity).ToList());
     }
 
     /// <summary>
-    /// Obtiene una nota de sesión por su identificador.
-    /// Exclusivo para el Dungeon Master.
+    /// Obtiene una nota de sesión privada por su identificador.
+    /// Exclusivo para el autor y propietario de la nota.
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(SessionNoteResponseDto), StatusCodes.Status200OK)]
@@ -99,16 +88,6 @@ public class SessionNotesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
-            {
-                Title = "Acceso denegado",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "Solo el Dungeon Master tiene autorización para visualizar las notas de sesión de esta Party."
-            });
-        }
-
         var note = await _noteRepository.GetByIdAsync(id, ct);
         if (note is null || note.PartyId != partyId)
         {
@@ -120,18 +99,27 @@ public class SessionNotesController : ControllerBase
             });
         }
 
+        if (note.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para visualizar las notas privadas de otro integrante del grupo."
+            });
+        }
+
         return Ok(SessionNoteResponseDto.FromEntity(note));
     }
 
     /// <summary>
-    /// Crea una nueva nota de sesión para la Party.
-    /// Exclusivo para el Dungeon Master.
+    /// Crea una nueva nota de sesión privada para la Party.
+    /// Accesible tanto para el Dungeon Master como para los Jugadores (Fase 3.7).
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(SessionNoteResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SessionNoteResponseDto>> Create(
         Guid partyId,
@@ -158,17 +146,8 @@ public class SessionNotesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
-            {
-                Title = "Acceso denegado",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "Solo el Dungeon Master puede crear notas de sesión para esta Party."
-            });
-        }
-
-        var note = new SessionNote(Guid.NewGuid(), partyId, request.Title, request.Content);
+        // Cada integrante puede redactar sus propias notas privadas
+        var note = new SessionNote(Guid.NewGuid(), partyId, userId.Value, request.Title, request.Content);
         await _noteRepository.AddAsync(note, ct);
         await _noteRepository.SaveChangesAsync(ct);
 
@@ -177,8 +156,8 @@ public class SessionNotesController : ControllerBase
     }
 
     /// <summary>
-    /// Modifica una nota de sesión existente.
-    /// Exclusivo para el Dungeon Master.
+    /// Modifica una nota de sesión privada existente.
+    /// Exclusivo para el usuario autor de la nota.
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(SessionNoteResponseDto), StatusCodes.Status200OK)]
@@ -212,16 +191,6 @@ public class SessionNotesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
-            {
-                Title = "Acceso denegado",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "Solo el Dungeon Master puede modificar notas de sesión de esta Party."
-            });
-        }
-
         var note = await _noteRepository.GetByIdAsync(id, ct);
         if (note is null || note.PartyId != partyId)
         {
@@ -233,6 +202,16 @@ public class SessionNotesController : ControllerBase
             });
         }
 
+        if (note.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para modificar las notas privadas de otro integrante del grupo."
+            });
+        }
+
         note.Update(request.Title, request.Content);
         await _noteRepository.UpdateAsync(note, ct);
         await _noteRepository.SaveChangesAsync(ct);
@@ -241,8 +220,8 @@ public class SessionNotesController : ControllerBase
     }
 
     /// <summary>
-    /// Elimina una nota de sesión.
-    /// Exclusivo para el Dungeon Master.
+    /// Elimina una nota de sesión privada.
+    /// Exclusivo para el usuario autor de la nota.
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -265,16 +244,6 @@ public class SessionNotesController : ControllerBase
             });
         }
 
-        if (party.OwnerUserId != userId.Value)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
-            {
-                Title = "Acceso denegado",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "Solo el Dungeon Master puede eliminar notas de sesión de esta Party."
-            });
-        }
-
         var note = await _noteRepository.GetByIdAsync(id, ct);
         if (note is null || note.PartyId != partyId)
         {
@@ -283,6 +252,16 @@ public class SessionNotesController : ControllerBase
                 Title = "Nota no encontrada",
                 Status = StatusCodes.Status404NotFound,
                 Detail = $"No se encontró la nota con ID '{id}' para esta Party."
+            });
+        }
+
+        if (note.OwnerUserId != userId.Value)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Acceso denegado",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = "No tiene autorización para eliminar las notas privadas de otro integrante del grupo."
             });
         }
 

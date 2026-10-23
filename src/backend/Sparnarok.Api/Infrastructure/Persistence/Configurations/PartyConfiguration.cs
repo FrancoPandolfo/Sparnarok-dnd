@@ -25,6 +25,13 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
 
         builder.HasIndex(p => p.OwnerUserId);
 
+        builder.Property(p => p.InviteToken)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        builder.HasIndex(p => p.InviteToken)
+            .IsUnique();
+
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
@@ -95,6 +102,15 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Navigation(p => p.SessionNotes)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Relación One-to-Many con PartyMember (Fase 3.7)
+        builder.HasMany(p => p.PartyMembers)
+            .WithOne(pm => pm.Party)
+            .HasForeignKey(pm => pm.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(p => p.PartyMembers)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

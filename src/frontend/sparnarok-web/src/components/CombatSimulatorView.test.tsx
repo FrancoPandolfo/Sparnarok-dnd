@@ -433,10 +433,12 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
     const confirmBtn = document.getElementById('confirm-save-party-btn')!;
     await userEvent.click(confirmBtn);
 
-    expect(createPartySpy).toHaveBeenCalledWith({
-      name: 'Nuevos Conquistadores',
-      memberCreatureIds: ['c-1'],
-    });
+    expect(createPartySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Nuevos Conquistadores',
+        memberCreatureIds: ['c-1'],
+      })
+    );
 
     await waitFor(() => {
       expect(document.getElementById('save-party-modal')).not.toBeInTheDocument();

@@ -34,7 +34,8 @@ public class PartyRepository : IPartyRepository
             .Include(p => p.Members)
                 .ThenInclude(m => m.EquippedShield)
             .Include(p => p.StashItems)
-            .Where(p => p.OwnerUserId == userId)
+            .Include(p => p.PartyMembers)
+            .Where(p => p.OwnerUserId == userId || p.PartyMembers.Any(pm => pm.UserId == userId))
             .OrderByDescending(p => p.CreatedAt)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -54,7 +55,20 @@ public class PartyRepository : IPartyRepository
             .Include(p => p.Members)
                 .ThenInclude(m => m.EquippedShield)
             .Include(p => p.StashItems)
+            .Include(p => p.PartyMembers)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Party?> GetByInviteTokenAsync(string inviteToken, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(inviteToken)) return null;
+
+        return await _context.Parties
+            .Include(p => p.Members)
+                .ThenInclude(m => m.Actions)
+            .Include(p => p.PartyMembers)
+            .FirstOrDefaultAsync(p => p.InviteToken == inviteToken.Trim(), cancellationToken);
     }
 
     /// <inheritdoc />
@@ -145,6 +159,13 @@ public class PartyRepository : IPartyRepository
             .OrderByDescending(a => a.TimestampUtc)
             .Take(limit)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task AddPartyMemberAsync(PartyMember member, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        await _context.PartyMembers.AddAsync(member, cancellationToken);
     }
 
     /// <inheritdoc />
