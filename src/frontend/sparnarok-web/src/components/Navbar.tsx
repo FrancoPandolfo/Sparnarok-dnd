@@ -9,6 +9,7 @@ export interface NavbarProps {
   onTabChange: (tab: 'bestiary' | 'simulation') => void;
   onOpenCreateModal: () => void;
   onOpenIngestionModal: () => void;
+  onOpenLiveSession?: () => void;
 }
 
 /**
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTabChange,
   onOpenCreateModal,
   onOpenIngestionModal,
+  onOpenLiveSession,
 }) => {
   const { t, i18n } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
@@ -62,6 +64,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         <div className="navbar-actions">
+          {onOpenLiveSession && (
+            <button
+              type="button"
+              id="nav-open-live-session-btn"
+              className="action-btn live-session-nav-btn primary-gold"
+              onClick={onOpenLiveSession}
+              title="Abrir Modo Partida en Vivo: Tracker de Iniciativa y Notas de Sesión (DM)"
+            >
+              ⚔️ Modo Partida (En Vivo)
+            </button>
+          )}
           <button
             type="button"
             id="open-ingestion-btn"

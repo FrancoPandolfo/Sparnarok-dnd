@@ -8,13 +8,15 @@ import type {
   CreateActionRequestDto,
   WeaponDto,
 } from './types/dnd';
+import type { PartyResponseDto } from './types/partyEncounter';
 import { apiClient } from './services/apiClient';
 import { Navbar } from './components/Navbar';
 import { BestiaryView } from './components/BestiaryView';
 import { CombatSimulatorView } from './components/CombatSimulatorView';
 import { WeaponIngestionModal } from './components/WeaponIngestionModal';
+import { LiveSessionModal } from './components/LiveSessionModal';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 const GOOGLE_CLIENT_ID =
   (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
@@ -30,6 +32,7 @@ const GOOGLE_CLIENT_ID =
  */
 export function AppContent() {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'bestiary' | 'simulation'>('bestiary');
   const [simulationCount, setSimulationCount] = useState<number>(0);
@@ -37,23 +40,27 @@ export function AppContent() {
   const [creatures, setCreatures] = useState<CreatureResponseDto[]>([]);
   const [allMasteries, setAllMasteries] = useState<WeaponMasteryResponseDto[]>([]);
   const [weapons, setWeapons] = useState<WeaponDto[]>([]);
+  const [parties, setParties] = useState<PartyResponseDto[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
+  const [isLiveSessionOpen, setIsLiveSessionOpen] = useState<boolean>(false);
 
-  // Carga inicial de criaturas, catálogo de maestrías y armas
+  // Carga inicial de criaturas, catálogo de maestrías, armas y partys
   useEffect(() => {
     const controller = new AbortController();
 
     const loadData = async () => {
       try {
-        const [creatureList, masteryList, weaponList] = await Promise.all([
+        const [creatureList, masteryList, weaponList, partyList] = await Promise.all([
           apiClient.getCreatures(controller.signal),
           apiClient.getWeaponMasteries(controller.signal),
           apiClient.getWeapons(controller.signal),
+          apiClient.getParties(),
         ]);
         setCreatures(creatureList);
         setAllMasteries(masteryList);
         setWeapons(weaponList);
+        setParties(partyList);
       } catch {
         // En caso de error o aborto, el cliente ya maneja fallback local
       }
@@ -127,6 +134,7 @@ export function AppContent() {
         onTabChange={setActiveTab}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         onOpenIngestionModal={() => setIsIngestionModalOpen(true)}
+        onOpenLiveSession={() => setIsLiveSessionOpen(true)}
       />
 
       {/* Hero Section */}
@@ -225,6 +233,14 @@ export function AppContent() {
         isOpen={isIngestionModalOpen}
         onClose={() => setIsIngestionModalOpen(false)}
         onUpload={apiClient.uploadWeaponsCsv}
+      />
+
+      {/* Modal de Modo Partida Colaborativo (Tracker de Iniciativa & Notas de Sesión) */}
+      <LiveSessionModal
+        isOpen={isLiveSessionOpen}
+        parties={parties}
+        currentUserId={user?.id}
+        onClose={() => setIsLiveSessionOpen(false)}
       />
     </div>
   );

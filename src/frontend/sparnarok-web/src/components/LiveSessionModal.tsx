@@ -230,7 +230,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
             {t('liveCombat.trackerTab', '⚔️ Tracker de Iniciativa')}
           </button>
 
-          {role === 'DungeonMaster' && (
+          {role === 'DungeonMaster' ? (
             <button
               type="button"
               id="tab-session-notes"
@@ -240,6 +240,19 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
               onClick={() => setActiveTab('notes')}
             >
               {t('liveCombat.notesTab', '📜 Notas de Sesión (DM)')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              id="tab-session-notes-locked-hint"
+              className="modal-tab-btn locked-role-tab"
+              onClick={() => {
+                setRole('DungeonMaster');
+                setActiveTab('notes');
+              }}
+              title="Las Notas de Sesión son exclusivas del Dungeon Master. Haz clic aquí o en 'Vista DM' para activarlas."
+            >
+              🔒 {t('liveCombat.notesTab', 'Notas de Sesión')} (Exclusivo DM - Clic para ver)
             </button>
           )}
         </div>
