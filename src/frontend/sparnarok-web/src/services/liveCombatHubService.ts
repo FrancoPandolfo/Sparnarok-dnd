@@ -11,13 +11,6 @@ import type {
   AddQuickCombatantRequest,
 } from '../types/liveCombat';
 
-export interface CombatInviteNotificationDto {
-  partyId: string;
-  partyName: string;
-  targetUserId: string;
-  invitedAt: string;
-}
-
 export interface EncounterStartedNotificationDto {
   partyId: string;
   partyName: string;
@@ -31,7 +24,6 @@ export interface LiveCombatHubCallbacks {
   onCombatStateUpdated?: (
     state: LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto
   ) => void;
-  onCombatInviteReceived?: (invite: CombatInviteNotificationDto) => void;
   onEncounterStarted?: (encounter: EncounterStartedNotificationDto) => void;
   onError?: (err: unknown) => void;
 }
@@ -76,9 +68,7 @@ class LiveCombatHubService {
         try {
           this.broadcastChannel = new BroadcastChannel('sparnarok_live_combat_channel');
           this.broadcastChannel.onmessage = (event) => {
-            if (event.data?.type === 'CombatInviteReceived') {
-              this.callbacks?.onCombatInviteReceived?.(event.data.invite);
-            } else if (event.data?.type === 'EncounterStarted') {
+            if (event.data?.type === 'EncounterStarted') {
               this.callbacks?.onEncounterStarted?.(event.data.encounter);
             } else if (event.data?.partyId === this.currentPartyId) {
               this.emitFallbackProjection();
@@ -96,20 +86,8 @@ class LiveCombatHubService {
         }
       });
 
-      window.addEventListener('sparnarok_combat_invite_local', (e: Event) => {
-        const customEvent = e as CustomEvent;
-        if (customEvent.detail) {
-          this.callbacks?.onCombatInviteReceived?.(customEvent.detail);
-        }
-      });
-
       window.addEventListener('storage', (e: StorageEvent) => {
-        if (e.key === 'sparnarok_combat_invite' && e.newValue) {
-          try {
-            const invite = JSON.parse(e.newValue);
-            this.callbacks?.onCombatInviteReceived?.(invite);
-          } catch {}
-        } else if (e.key === 'sparnarok_encounter_started' && e.newValue) {
+        if (e.key === 'sparnarok_encounter_started' && e.newValue) {
           try {
             const enc = JSON.parse(e.newValue);
             this.callbacks?.onEncounterStarted?.(enc);
@@ -165,10 +143,6 @@ class LiveCombatHubService {
         this.callbacks?.onCombatStateUpdated?.(state);
       }
     );
-
-    connection.on('CombatInviteReceived', (invite: CombatInviteNotificationDto) => {
-      this.callbacks?.onCombatInviteReceived?.(invite);
-    });
 
     connection.on('EncounterStarted', (enc: EncounterStartedNotificationDto) => {
       this.callbacks?.onEncounterStarted?.(enc);
@@ -384,37 +358,78 @@ class LiveCombatHubService {
   }
 
   /**
-   * Invita a un jugador específico a sumarse al combate en vivo (Acción del DM).
+   * Permite al Dungeon Master incorporar directamente a un miembro de la Party al combate activo
+   * sin requerir confirmación previa ni invitación.
    */
-  async invitePlayerToEncounter(partyId: string, targetUserId: string): Promise<void> {
+  async forceAddPartyMemberToCombat(partyId: string, partyMemberUserId: string): Promise<void> {
     if (this.connection && this.connection.state === HubConnectionState.Connected) {
       try {
-        await this.connection.invoke('InvitePlayerToEncounter', partyId, targetUserId);
+        await this.connection.invoke('ForceAddPartyMemberToCombat', partyId, partyMemberUserId);
         return;
       } catch (err) {
-        console.warn('[LiveCombatHub] Error al invocar InvitePlayerToEncounter vía SignalR, usando fallback local:', err);
+        console.warn('[LiveCombatHub] Error al invocar ForceAddPartyMemberToCombat vía SignalR, usando fallback local:', err);
       }
     }
 
-    // Fallback local y broadcast entre contextos/pestañas
-    const raw = this.getRawState(partyId);
-    const invite: CombatInviteNotificationDto = {
-      partyId,
-      partyName: raw?.partyName || 'Encuentro en Vivo',
-      targetUserId,
-      invitedAt: new Date().toISOString(),
-    };
+    // Fallback local: recuperar datos de la party y del miembro
+    let memberName = 'Héroe';
+    let hp = 20;
+    let ac = 14;
 
-    if (this.broadcastChannel) {
-      try {
-        this.broadcastChannel.postMessage({ type: 'CombatInviteReceived', invite });
-      } catch {}
-    }
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.setItem('sparnarok_combat_invite', JSON.stringify(invite));
-        window.dispatchEvent(new CustomEvent('sparnarok_combat_invite_local', { detail: invite }));
+        const storedParties = window.localStorage.getItem('sparnarok_parties');
+        if (storedParties) {
+          const parties = JSON.parse(storedParties);
+          const currentParty = parties.find((p: any) => p.id === partyId);
+          if (currentParty) {
+            const member = currentParty.partyMembers?.find(
+              (m: any) => m.userId === partyMemberUserId || m.id === partyMemberUserId
+            );
+            if (member) {
+              memberName = member.inGameName || memberName;
+              const creature = currentParty.members?.find(
+                (c: any) => c.name?.toLowerCase() === member.inGameName?.toLowerCase()
+              );
+              if (creature) {
+                hp = creature.hitPoints?.max || hp;
+                ac = creature.effectiveArmorClass || creature.armorClass?.base || ac;
+              }
+            }
+          }
+        }
       } catch {}
+    }
+
+    const raw = this.getRawState(partyId) || {
+      partyId,
+      partyName: 'Encuentro en Vivo',
+      status: 'InProgress' as LiveCombatStatus,
+      currentRound: 1,
+      currentTurnIndex: 0,
+      combatants: [],
+    };
+
+    const existingIdx = raw.combatants.findIndex(
+      (c) => c.assignedPlayerUserId === partyMemberUserId || c.name.toLowerCase() === memberName.toLowerCase()
+    );
+
+    if (existingIdx < 0) {
+      const newCombatant: RawCombatant = {
+        id: `char-${Date.now()}`,
+        name: memberName,
+        initiative: null,
+        maxHp: hp,
+        currentHp: hp,
+        armorClass: ac,
+        isPlayerCharacter: true,
+        isVisibleToPlayers: true,
+        assignedPlayerUserId: partyMemberUserId,
+        conditions: null,
+      };
+      raw.combatants.push(newCombatant);
+      this.saveRawState(partyId, raw);
+      this.broadcastFallbackUpdate(partyId);
     }
   }
 

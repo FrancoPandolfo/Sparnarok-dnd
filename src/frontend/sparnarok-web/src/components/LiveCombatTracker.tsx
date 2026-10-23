@@ -26,7 +26,6 @@ import type {
   PartyRole,
 } from '../types/liveCombat';
 import type { PartyResponseDto } from '../types/partyEncounter';
-import type { CombatInviteNotificationDto } from '../services/liveCombatHubService';
 
 export interface LiveCombatTrackerProps {
   partyId?: string | null;
@@ -34,8 +33,6 @@ export interface LiveCombatTrackerProps {
   role: PartyRole;
   combatState: LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null;
   currentUserId?: string | null;
-  pendingInvite?: CombatInviteNotificationDto | null;
-  onClearInvite?: () => void;
 }
 
 interface SortableCombatantRowProps {
@@ -284,8 +281,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   role,
   combatState,
   currentUserId,
-  pendingInvite,
-  onClearInvite,
 }) => {
   const effectivePartyId = partyId || 'quick-session';
   const { t } = useTranslation();
@@ -333,12 +328,10 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   const [quickInitiative, setQuickInitiative] = useState<number | string>('');
   const [quickError, setQuickError] = useState<string | null>(null);
 
-  // Estado para el panel de miembros de party e invitaciones (DM)
+  // Estado para el panel de miembros de party (DM)
   const [isPartyMembersOpen, setIsPartyMembersOpen] = useState(false);
-  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
 
-  // Estado para invitaciones recibidas y modal de unirse al combate (Jugador)
-  const [localInvite, setLocalInvite] = useState<CombatInviteNotificationDto | null>(pendingInvite || null);
+  // Estado para modal de unirse al combate manualmente (Jugador)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [joinCharName, setJoinCharName] = useState('');
   const [joinCharHp, setJoinCharHp] = useState<number | string>(20);
@@ -355,24 +348,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
       return null;
     }
   })();
-
-  useEffect(() => {
-    setLocalInvite(pendingInvite || null);
-  }, [pendingInvite]);
-
-  useEffect(() => {
-    const handleLocalInvite = (e: any) => {
-      if (e.detail && !isDm) {
-        if (!e.detail.targetUserId || !effectiveUserId || e.detail.targetUserId === effectiveUserId) {
-          setLocalInvite(e.detail);
-        }
-      }
-    };
-    window.addEventListener('sparnarok_combat_invite_local', handleLocalInvite);
-    return () => {
-      window.removeEventListener('sparnarok_combat_invite_local', handleLocalInvite);
-    };
-  }, [isDm, effectiveUserId]);
 
   const currentMember = party?.partyMembers?.find(
     (m) => effectiveUserId && m.userId === effectiveUserId
@@ -432,12 +407,11 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     }
   }
 
-  const handleInvitePlayer = async (targetUserId: string) => {
+  const handleForceAddPartyMember = async (targetUserId: string) => {
     try {
-      await liveCombatHubService.invitePlayerToEncounter(effectivePartyId, targetUserId);
-      setInvitedUserIds((prev) => [...prev, targetUserId]);
+      await liveCombatHubService.forceAddPartyMemberToCombat(effectivePartyId, targetUserId);
     } catch (err) {
-      console.error('[LiveCombatTracker] Error inviting player:', err);
+      console.error('[LiveCombatTracker] Error adding party member to combat:', err);
     }
   };
 
@@ -476,13 +450,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     try {
       await liveCombatHubService.joinEncounter(effectivePartyId, playerDto);
       setIsJoinModalOpen(false);
-      setLocalInvite(null);
-      try {
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem('sparnarok_combat_invite');
-        }
-      } catch {}
-      onClearInvite?.();
     } catch (err) {
       console.error('[LiveCombatTracker] Error joining encounter:', err);
       setJoinError('Error al unirse al combate');
@@ -743,104 +710,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     );
   };
 
-  const renderInviteModal = () => {
-    if (isDm || !localInvite) return null;
-    if (localInvite.targetUserId && effectiveUserId && localInvite.targetUserId !== effectiveUserId) {
-      return null;
-    }
-    return (
-      <div
-        className="modal-backdrop combat-invite-backdrop"
-        id="combat-invite-modal"
-        style={{ zIndex: 1100 }}
-      >
-        <div
-          className="modal-content combat-invite-dialog"
-          style={{
-            maxWidth: '450px',
-            textAlign: 'center',
-            padding: '24px',
-            borderRadius: '8px',
-          }}
-        >
-          <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>⚔️</div>
-          <h3 style={{ marginBottom: '8px', color: 'var(--color-gold, #c8aa6e)' }}>
-            {t('liveCombat.inviteTitle', '¡Invitación a Combate!')}
-          </h3>
-          <p
-            style={{
-              marginBottom: '16px',
-              fontSize: '1rem',
-              lineHeight: '1.4',
-              color: 'var(--color-text-primary, #f0e6d2)',
-            }}
-          >
-            {t(
-              'liveCombat.inviteMessage',
-              'El Dungeon Master te invita a unirte al combate actual'
-            )}
-          </p>
-
-          <div
-            className="form-group"
-            style={{ marginBottom: '20px', textAlign: 'left' }}
-          >
-            <label
-              htmlFor="invite-initiative-input"
-              style={{ fontSize: '0.875rem', fontWeight: 600 }}
-            >
-              {t('liveCombat.inviteInitiativeLabel', 'Tu Iniciativa (opcional):')}
-            </label>
-            <input
-              type="number"
-              id="invite-initiative-input"
-              className="form-input"
-              min={1}
-              max={40}
-              value={joinInitiative}
-              onChange={(e) =>
-                setJoinInitiative(e.target.value === '' ? '' : Number(e.target.value))
-              }
-              placeholder="10"
-            />
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '12px',
-            }}
-          >
-            <button
-              type="button"
-              id="reject-combat-invite-btn"
-              className="btn btn-secondary"
-              onClick={() => {
-                setLocalInvite(null);
-                try {
-                  if (typeof window !== 'undefined') {
-                    window.localStorage.removeItem('sparnarok_combat_invite');
-                  }
-                } catch {}
-                onClearInvite?.();
-              }}
-            >
-              ✕ {t('liveCombat.rejectInvite', 'Rechazar')}
-            </button>
-            <button
-              type="button"
-              id="accept-combat-invite-btn"
-              className="btn btn-primary primary-gold"
-              onClick={() => handleExecuteJoin(joinInitiative)}
-            >
-              ✓ {t('liveCombat.acceptInvite', 'Aceptar')}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderPlayerJoinModal = () => {
     if (!isJoinModalOpen) return null;
@@ -1017,7 +886,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
             }}
           >
             {unjoinedMembers.map((member) => {
-              const isInvited = invitedUserIds.includes(member.userId);
               return (
                 <li
                   key={member.userId}
@@ -1037,13 +905,13 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
                   </span>
                   <button
                     type="button"
-                    id={`invite-member-btn-${member.userId}`}
-                    className={`btn btn-xs ${isInvited ? 'btn-secondary' : 'btn-primary primary-gold'}`}
-                    disabled={isInvited}
-                    onClick={() => handleInvitePlayer(member.userId)}
+                    id={`force-add-member-btn-${member.userId}`}
+                    data-testid={`force-add-member-btn-${member.userId}`}
+                    className="btn btn-xs btn-primary primary-gold"
+                    onClick={() => handleForceAddPartyMember(member.userId)}
                     style={{ fontSize: '0.75rem', padding: '2px 8px' }}
                   >
-                    {isInvited ? '✓ Invitado' : '✉️ Invitar'}
+                    {t('liveCombat.forceAddMemberBtn', '+ Añadir al Combate')}
                   </button>
                 </li>
               );
@@ -1106,7 +974,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
             </button>
           </div>
         </div>
-        {renderInviteModal()}
         {renderPlayerJoinModal()}
       </div>
     );
@@ -1158,7 +1025,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
             </div>
           )}
         </div>
-        {renderInviteModal()}
         {renderPlayerJoinModal()}
         {renderQuickCombatantModal()}
       </div>
@@ -1375,7 +1241,6 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
           </table>
         </DndContext>
       </div>
-      {renderInviteModal()}
       {renderPlayerJoinModal()}
       {renderQuickCombatantModal()}
     </div>

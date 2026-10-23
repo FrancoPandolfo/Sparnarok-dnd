@@ -280,6 +280,7 @@
     "overrideInitiativeBtn": "Set",
     "overrideInitiativeTitle": "Override initiative (DM/AFK)",
     "addQuickCombatantBtn": "Add Quick Combatant",
+    "forceAddMemberBtn": "+ Add to Combat",
     "quickCombatantModalTitle": "Add Quick Combatant",
     "quickCombatantName": "Combatant Name",
     "quickCombatantHp": "Hit Points (HP)",

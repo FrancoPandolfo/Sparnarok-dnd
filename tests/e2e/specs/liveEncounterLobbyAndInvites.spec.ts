@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Live Encounter Lobby, Combat Invites, and Session Notes Persistence Suite', () => {
-  test('DM starts encounter without player; Player enters lobby; DM invites Player; Player accepts and joins initiative in real time; Notes persist across reload (F5)', async ({
+test.describe('Live Encounter Lobby, Combat Force-Add, and Session Notes Persistence Suite', () => {
+  test('DM starts encounter without player; Player enters lobby; DM force-adds Player directly; Player appears in initiative in real time; Notes persist across reload (F5)', async ({
     browser,
   }) => {
     const partyId = 'party-lobby-e2e';
@@ -112,9 +112,6 @@ test.describe('Live Encounter Lobby, Combat Invites, and Session Notes Persisten
               window.dispatchEvent(
                 new CustomEvent('sparnarok_combat_external_update', { detail: { partyId: payload.partyId } })
               );
-            } else if (type === 'invite') {
-              window.localStorage.setItem('sparnarok_combat_invite', JSON.stringify(payload));
-              window.dispatchEvent(new CustomEvent('sparnarok_combat_invite_local', { detail: payload }));
             }
           } finally {
             (window as any).__isSyncing = false;
@@ -149,9 +146,7 @@ test.describe('Live Encounter Lobby, Combat Invites, and Session Notes Persisten
         orig(key, val);
         if ((window as any).__isSyncing) return;
         try {
-          if (key === 'sparnarok_combat_invite') {
-            (window as any).__forwardToPlayer?.('invite', JSON.parse(val));
-          } else if (key.startsWith('sparnarok_combat_')) {
+          if (key.startsWith('sparnarok_combat_')) {
             const pId = key.replace('sparnarok_combat_', '');
             (window as any).__forwardToPlayer?.('combat', { partyId: pId, state: JSON.parse(val) });
           }
@@ -210,27 +205,12 @@ test.describe('Live Encounter Lobby, Combat Invites, and Session Notes Persisten
     await expect(membersPanel).toBeVisible();
     await expect(membersPanel).toContainText('Legolas');
 
-    const inviteLegolasBtn = dmPage.locator(`#invite-member-btn-${playerUserId}`);
-    await expect(inviteLegolasBtn).toBeVisible();
-    await inviteLegolasBtn.click();
+    const addLegolasBtn = dmPage.locator(`#force-add-member-btn-${playerUserId}`);
+    await expect(addLegolasBtn).toBeVisible();
+    await expect(addLegolasBtn).toContainText('+ Añadir al Combate');
+    await addLegolasBtn.click();
 
-    // Feedback en la UI del DM
-    await expect(inviteLegolasBtn).toContainText('Invitado');
-
-    // 5. En la vista del Jugador:
-    // Aparece el modal de invitación a combate
-    const inviteModal = playerPage.locator('#combat-invite-modal');
-    await expect(inviteModal).toBeVisible();
-    await expect(inviteModal).toContainText('El Dungeon Master te invita a unirte al combate actual');
-
-    const acceptInviteBtn = playerPage.locator('#accept-combat-invite-btn');
-    await expect(acceptInviteBtn).toBeVisible();
-    await acceptInviteBtn.click();
-
-    // El modal de invitación se cierra
-    await expect(inviteModal).not.toBeVisible();
-
-    // 6. El Jugador aparece instantáneamente en la lista de iniciativa de AMBOS navegadores
+    // 5. El Jugador aparece instantáneamente en la lista de iniciativa de AMBOS navegadores sin requerir confirmación
     const dmInitiativeTable = dmPage.locator('#initiative-order-table');
     const playerInitiativeTable = playerPage.locator('#initiative-order-table');
 

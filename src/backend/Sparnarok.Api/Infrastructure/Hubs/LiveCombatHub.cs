@@ -254,26 +254,73 @@ public class LiveCombatHub : Hub
     }
 
     /// <summary>
-    /// Envía una invitación directa al jugador especificado de la Party para sumarse al encuentro en curso.
-    /// Emite el evento 'CombatInviteReceived' exclusivamente a la conexión de ese targetUserId (Clients.User).
+    /// Permite al Dungeon Master incorporar directamente a un miembro de la Party al combate activo
+    /// sin requerir confirmación previa ni invitación.
+    /// Busca los datos del jugador (HP, CA, Nombre) en la base de datos de la Party,
+    /// asigna una iniciativa nula (null), y lo agrega al estado en memoria al final de la lista con su SortOrder correspondiente.
+    /// Finalmente, emite el broadcast estándar 'CombatStateUpdated' a todos los clientes de ese PartyId.
     /// </summary>
-    public async Task InvitePlayerToEncounter(string? partyId, string targetUserId)
+    public async Task ForceAddPartyMemberToCombat(string? partyId, string partyMemberUserId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
-        if (string.IsNullOrWhiteSpace(targetUserId)) return;
+        if (string.IsNullOrWhiteSpace(partyMemberUserId)) return;
 
-        var state = _combatManager.GetState(id);
-        var partyName = state?.PartyName ?? "Encuentro en Vivo";
+        Guid.TryParse(partyMemberUserId.Trim(), out var memberUserId);
 
-        var invitePayload = new
+        string name = "Héroe";
+        int maxHp = 20;
+        int currentHp = 20;
+        int armorClass = 14;
+
+        if (_scopeFactory != null && id != QuickSessionGuid)
         {
-            PartyId = id.ToString(),
-            PartyName = partyName,
-            TargetUserId = targetUserId.Trim(),
-            InvitedAt = DateTime.UtcNow
-        };
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var partyRepo = scope.ServiceProvider.GetRequiredService<IPartyRepository>();
+                var party = await partyRepo.GetByIdAsync(id);
+                if (party != null)
+                {
+                    var partyMember = party.PartyMembers.FirstOrDefault(pm =>
+                        (memberUserId != Guid.Empty && (pm.UserId == memberUserId || pm.Id == memberUserId)) ||
+                        pm.UserId.ToString().Equals(partyMemberUserId.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                        pm.Id.ToString().Equals(partyMemberUserId.Trim(), StringComparison.OrdinalIgnoreCase));
 
-        await Clients.User(targetUserId.Trim()).SendAsync("CombatInviteReceived", invitePayload);
+                    if (partyMember != null)
+                    {
+                        name = !string.IsNullOrWhiteSpace(partyMember.InGameName) ? partyMember.InGameName.Trim() : name;
+
+                        var creature = party.Members.FirstOrDefault(m =>
+                            m.Name.Equals(partyMember.InGameName, StringComparison.OrdinalIgnoreCase) ||
+                            (partyMember.Id != Guid.Empty && m.Id == partyMember.Id));
+
+                        if (creature != null)
+                        {
+                            name = creature.Name;
+                            maxHp = creature.HitPoints.Max;
+                            currentHp = creature.HitPoints.Current;
+                            armorClass = creature.EffectiveArmorClass;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudieron obtener los datos de la Party desde la base de datos para el miembro {PartyMemberUserId}", partyMemberUserId);
+            }
+        }
+
+        _combatManager.ForceAddPartyMember(
+            id,
+            memberUserId != Guid.Empty ? memberUserId : null,
+            name,
+            maxHp,
+            armorClass,
+            currentHp
+        );
+
+        await PersistCombatStateAsync(id);
+        await BroadcastCombatStateAsync(id);
     }
 
     /// <summary>

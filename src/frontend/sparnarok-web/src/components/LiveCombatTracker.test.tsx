@@ -20,7 +20,7 @@ vi.mock('../services/liveCombatHubService', () => ({
     toggleVisibility: vi.fn(),
     endCombat: vi.fn(),
     addQuickCombatant: vi.fn(),
-    invitePlayerToEncounter: vi.fn(),
+    forceAddPartyMemberToCombat: vi.fn(),
     joinEncounter: vi.fn(),
   },
 }));
@@ -342,40 +342,7 @@ describe('LiveCombatTracker Component Suite', () => {
     );
   });
 
-  it('Player Invite Modal: shows invite modal and accepting triggers joinEncounter', () => {
-    const invite = {
-      partyId: 'party-1',
-      partyName: 'La Compañía del Dragón',
-      targetUserId: 'player-user-99',
-      invitedAt: new Date().toISOString(),
-    };
-
-    render(
-      <LiveCombatTracker
-        partyId="party-1"
-        role="Player"
-        combatState={null}
-        currentUserId="player-user-99"
-        pendingInvite={invite}
-      />
-    );
-
-    expect(
-      screen.getByText(/El Dungeon Master te invita a unirte al combate actual/i)
-    ).toBeInTheDocument();
-    const acceptBtn = screen.getByRole('button', { name: /Aceptar/i });
-    expect(acceptBtn).toBeInTheDocument();
-
-    fireEvent.click(acceptBtn);
-    expect(liveCombatHubService.joinEncounter).toHaveBeenCalledWith(
-      'party-1',
-      expect.objectContaining({
-        assignedPlayerUserId: 'player-user-99',
-      })
-    );
-  });
-
-  it('DM Party Members Panel: lists unjoined members and clicking "Invitar" calls invitePlayerToEncounter', () => {
+  it('DM Party Members Panel: lists unjoined members and clicking "+ Añadir al Combate" calls forceAddPartyMemberToCombat', () => {
     const mockParty = {
       id: 'party-1',
       name: 'La Compañía del Dragón',
@@ -418,12 +385,12 @@ describe('LiveCombatTracker Component Suite', () => {
 
     // Player Thorin is listed as unjoined
     expect(screen.getByText(/Thorin/i)).toBeInTheDocument();
-    const inviteBtn = screen.getByRole('button', { name: /Invitar/i });
-    expect(inviteBtn).toBeInTheDocument();
+    const addBtn = screen.getByRole('button', { name: /\+ Añadir al Combate/i });
+    expect(addBtn).toBeInTheDocument();
 
-    // Click invite
-    fireEvent.click(inviteBtn);
-    expect(liveCombatHubService.invitePlayerToEncounter).toHaveBeenCalledWith(
+    // Click force add
+    fireEvent.click(addBtn);
+    expect(liveCombatHubService.forceAddPartyMemberToCombat).toHaveBeenCalledWith(
       'party-1',
       'player-user-2'
     );

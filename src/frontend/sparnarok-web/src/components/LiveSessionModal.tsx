@@ -60,7 +60,6 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   const [combatState, setCombatState] = useState<
     LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null
   >(null);
-  const [pendingInvite, setPendingInvite] = useState<any>(null);
   const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
 
   const isQuickMode = selectedPartyId === 'quick-session';
@@ -139,11 +138,6 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
         onCombatStateUpdated: (state) => {
           if (!isCancelled) {
             setCombatState(state);
-          }
-        },
-        onCombatInviteReceived: (invite) => {
-          if (!isCancelled && role !== 'DungeonMaster' && (!invite.targetUserId || invite.targetUserId === resolvedUserId)) {
-            setPendingInvite(invite);
           }
         },
       });
@@ -363,8 +357,6 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 role={role}
                 combatState={combatState}
                 currentUserId={resolvedUserId}
-                pendingInvite={pendingInvite}
-                onClearInvite={() => setPendingInvite(null)}
               />
             </div>
           ) : (
