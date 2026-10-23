@@ -220,7 +220,7 @@ if (enableSwagger)
     });
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseCors("AllowRenderFrontend");
 
