@@ -89,40 +89,31 @@ class LiveCombatHubService {
     return this.currentRole;
   }
 
+  getHubConnection(): HubConnection | null {
+    return this.connection;
+  }
+
   /**
    * Inicia o actualiza la conexión con el LiveCombatHub y se suscribe al grupo correspondiente.
    */
   async startConnection(
-    partyId: string,
+    partyId: string | null | undefined,
     role: PartyRole,
     callbacks: LiveCombatHubCallbacks
   ): Promise<void> {
+    const resolvedPartyId = partyId || 'quick-session';
+
+    // Asegurar desconexión limpia previa si ya existía una conexión
+    if (this.connection) {
+      await this.stopConnection();
+    }
+
     this.callbacks = callbacks;
     this.currentRole = role;
-    this.currentPartyId = partyId;
+    this.currentPartyId = resolvedPartyId;
 
     // Emitir inmediatamente la proyección local / caché para respuesta instantánea (cero latencia)
     this.emitFallbackProjection();
-
-    // Si ya existe una conexión activa
-    if (this.connection && this.connection.state === HubConnectionState.Connected) {
-      try {
-        await this.connection.invoke('JoinCombat', partyId, role);
-      } catch (err) {
-        console.warn('[LiveCombatHub] Error al unirse a nuevo combate:', err);
-        callbacks.onError?.(err);
-      }
-      return;
-    }
-
-    if (this.connection) {
-      try {
-        await this.connection.stop();
-      } catch {
-        // no-op
-      }
-      this.connection = null;
-    }
 
     const connection = new HubConnectionBuilder()
       .withUrl('/hubs/live-combat', {
@@ -141,7 +132,7 @@ class LiveCombatHubService {
 
     try {
       await connection.start();
-      await connection.invoke('JoinCombat', partyId, role);
+      await connection.invoke('JoinCombat', resolvedPartyId, role);
       this.connection = connection;
     } catch {
       // Si la conexión al backend no responde, se mantiene la proyección local activa
@@ -150,23 +141,24 @@ class LiveCombatHubService {
   }
 
   /**
-   * Abandona el canal de combate y cierra la conexión.
+   * Abandona el canal de combate y cierra la conexión invocando hubConnection.stop().
    */
   async stopConnection(): Promise<void> {
     if (this.connection) {
-      if (this.currentPartyId && this.connection.state === HubConnectionState.Connected) {
+      const conn = this.connection;
+      this.connection = null;
+      if (this.currentPartyId && conn.state === HubConnectionState.Connected) {
         try {
-          await this.connection.invoke('LeaveCombat', this.currentPartyId);
+          await conn.invoke('LeaveCombat', this.currentPartyId);
         } catch {
           // no-op
         }
       }
       try {
-        await this.connection.stop();
+        await conn.stop();
       } catch {
         // no-op
       }
-      this.connection = null;
       this.currentPartyId = null;
     }
   }

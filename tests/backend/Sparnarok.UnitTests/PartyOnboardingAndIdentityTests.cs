@@ -165,4 +165,55 @@ public class PartyOnboardingAndIdentityTests
         playerMember.InGameName.Should().Be("Elendur");
         await partyRepoMock.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task PartiesController_JoinByToken_WhenUserAlreadyMember_Returns409Conflict()
+    {
+        // Arrange
+        var partyRepoMock = Substitute.For<IPartyRepository>();
+        var creatureRepoMock = Substitute.For<ICreatureRepository>();
+        var validator = new CreatePartyRequestValidator();
+        var stashValidator = Substitute.For<FluentValidation.IValidator<CreateStashItemRequest>>();
+        var fundsValidator = Substitute.For<FluentValidation.IValidator<UpdatePartyFundsRequest>>();
+        var craftingValidator = Substitute.For<FluentValidation.IValidator<QueueCraftingItemRequest>>();
+        var notifService = Substitute.For<IStashNotificationService>();
+
+        var existingUserId = Guid.NewGuid();
+        var existingParty = new Party(Guid.NewGuid(), "La Hermandad del Anillo", Guid.NewGuid());
+        existingParty.AddPartyMember(new PartyMember(Guid.NewGuid(), existingParty.Id, existingUserId, "Player", "Frodo"));
+
+        partyRepoMock.GetByInviteTokenAsync(existingParty.InviteToken, Arg.Any<CancellationToken>())
+            .Returns(existingParty);
+
+        var controller = new PartiesController(
+            partyRepoMock,
+            creatureRepoMock,
+            validator,
+            stashValidator,
+            fundsValidator,
+            craftingValidator,
+            notifService);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, existingUserId.ToString()),
+            new Claim(ClaimTypes.Name, "Frodo")
+        };
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var joinRequest = new JoinPartyRequestDto("Player", "Frodo Baggins");
+
+        // Act
+        var result = await controller.JoinByToken(existingParty.InviteToken, joinRequest, CancellationToken.None);
+
+        // Assert
+        var conflictResult = result.Result.Should().BeOfType<ConflictObjectResult>().Subject;
+        var problem = conflictResult.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Status.Should().Be(StatusCodes.Status409Conflict);
+        problem.Detail.Should().Contain("ya es miembro");
+        await partyRepoMock.DidNotReceive().AddPartyMemberAsync(Arg.Any<PartyMember>(), Arg.Any<CancellationToken>());
+    }
 }

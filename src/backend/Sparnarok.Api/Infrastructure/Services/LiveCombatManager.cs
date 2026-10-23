@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Application.Interfaces;
 using Sparnarok.Api.Domain.Models;
@@ -321,5 +323,52 @@ public class LiveCombatManager : ILiveCombatManager
             activeName,
             playerCombatants
         );
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public string? SerializeState(Guid partyId)
+    {
+        if (!_states.TryGetValue(partyId, out var state))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Serialize(state, JsonOptions);
+    }
+
+    public LiveCombatState? RehydrateState(Guid partyId, string stateJson)
+    {
+        if (string.IsNullOrWhiteSpace(stateJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            var state = JsonSerializer.Deserialize<LiveCombatState>(stateJson, JsonOptions);
+            if (state == null)
+            {
+                return null;
+            }
+
+            state.PartyId = partyId;
+            _states[partyId] = state;
+            return state;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public void ClearState(Guid partyId)
+    {
+        _states.TryRemove(partyId, out _);
     }
 }

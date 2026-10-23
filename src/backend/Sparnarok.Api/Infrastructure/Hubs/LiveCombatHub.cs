@@ -11,18 +11,27 @@ namespace Sparnarok.Api.Infrastructure.Hubs;
 /// </summary>
 public class LiveCombatHub : Hub
 {
-    private readonly ILiveCombatManager _combatManager;
+    public static readonly Guid QuickSessionGuid = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
-    public LiveCombatHub(ILiveCombatManager combatManager)
+    private readonly ILiveCombatManager _combatManager;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly ILogger<LiveCombatHub> _logger;
+
+    public LiveCombatHub(
+        ILiveCombatManager combatManager,
+        IServiceScopeFactory? scopeFactory = null,
+        ILogger<LiveCombatHub>? logger = null)
     {
         _combatManager = combatManager;
+        _scopeFactory = scopeFactory;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<LiveCombatHub>.Instance;
     }
 
     /// <summary>
     /// Une la conexión a los canales correspondientes según su rol ('DungeonMaster' o 'Player')
     /// y le envía inmediatamente el estado proyectado.
     /// </summary>
-    public async Task JoinCombat(string partyId, string role)
+    public async Task JoinCombat(string? partyId, string role)
     {
         if (!TryResolvePartyId(partyId, out var id))
         {
@@ -30,6 +39,17 @@ public class LiveCombatHub : Hub
         }
 
         Context.Items["PartyId"] = id;
+
+        // Intentar restaurar (rehidratar) el estado desde la base de datos si la memoria está vacía
+        if (id != QuickSessionGuid)
+        {
+            var currentState = _combatManager.GetState(id);
+            if (currentState == null || currentState.Status == LiveCombatStatus.NotStarted)
+            {
+                await TryRehydrateFromDatabaseAsync(id);
+            }
+        }
+
         var isDm = string.Equals(role, "DungeonMaster", StringComparison.OrdinalIgnoreCase);
 
         if (isDm)
@@ -49,7 +69,7 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Remueve la conexión de los canales de combate de la Party.
     /// </summary>
-    public async Task LeaveCombat(string partyId)
+    public async Task LeaveCombat(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id))
         {
@@ -63,7 +83,7 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Inicializa un combate con la lista de combatientes provista (Acción del DM).
     /// </summary>
-    public async Task InitializeCombat(string partyId, InitializeLiveCombatRequest request)
+    public async Task InitializeCombat(string? partyId, InitializeLiveCombatRequest request)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
@@ -79,18 +99,20 @@ public class LiveCombatHub : Hub
         )).ToList();
 
         _combatManager.InitializeCombat(id, request.PartyName, combatants);
+        await PersistCombatStateAsync(id);
         await BroadcastCombatStateAsync(id);
     }
 
     /// <summary>
     /// Registra la iniciativa ingresada por un Jugador o por el DM (opcional, puede ser nula).
     /// </summary>
-    public async Task SubmitInitiative(string partyId, Guid combatantId, decimal? initiative)
+    public async Task SubmitInitiative(string? partyId, Guid combatantId, decimal? initiative)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetInitiative(id, combatantId, initiative))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -98,12 +120,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Permite al DM forzar/sobreescribir la iniciativa de cualquier combatiente.
     /// </summary>
-    public async Task OverrideInitiative(string partyId, Guid combatantId, decimal? initiative)
+    public async Task OverrideInitiative(string? partyId, Guid combatantId, decimal? initiative)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetInitiative(id, combatantId, initiative))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -131,6 +154,7 @@ public class LiveCombatHub : Hub
         {
             if (_combatManager.ReorderCombatant(partyId.Value, cId, newIndex))
             {
+                await PersistCombatStateAsync(partyId.Value);
                 await BroadcastCombatStateAsync(partyId.Value);
             }
         }
@@ -139,7 +163,7 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Reordena un combatiente especificando explícitamente el identificador de la Party (Acción exclusiva del DM).
     /// </summary>
-    public async Task ReorderCombatantInParty(string partyId, string combatantId, int newIndex)
+    public async Task ReorderCombatantInParty(string? partyId, string combatantId, int newIndex)
     {
         if (!TryResolvePartyId(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
         {
@@ -148,6 +172,7 @@ public class LiveCombatHub : Hub
 
         if (_combatManager.ReorderCombatant(pId, cId, newIndex))
         {
+            await PersistCombatStateAsync(pId);
             await BroadcastCombatStateAsync(pId);
         }
     }
@@ -156,7 +181,7 @@ public class LiveCombatHub : Hub
     /// Añade un nuevo combatiente rápido en caliente directamente al combate activo (Acción del DM).
     /// No requiere persistencia previa en la base de datos ni pertenencia a una Party formal.
     /// </summary>
-    public async Task AddQuickCombatant(string partyId, AddQuickCombatantRequest request)
+    public async Task AddQuickCombatant(string? partyId, AddQuickCombatantRequest request)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
         if (request is null || string.IsNullOrWhiteSpace(request.Name)) return;
@@ -173,29 +198,32 @@ public class LiveCombatHub : Hub
         );
 
         _combatManager.AddCombatant(id, combatant);
+        await PersistCombatStateAsync(id);
         await BroadcastCombatStateAsync(id);
     }
 
     /// <summary>
     /// Tira automáticamente la iniciativa para todos los monstruos/NPCs del combate (Acción del DM).
     /// </summary>
-    public async Task AutoRollMonsters(string partyId)
+    public async Task AutoRollMonsters(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         _combatManager.AutoRollMonsters(id);
+        await PersistCombatStateAsync(id);
         await BroadcastCombatStateAsync(id);
     }
 
     /// <summary>
     /// Inicia formalmente el combate, ordenando los combatientes por iniciativa y fijando la ronda 1 (Acción del DM).
     /// </summary>
-    public async Task StartCombat(string partyId)
+    public async Task StartCombat(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.StartCombat(id))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -203,12 +231,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Avanza al siguiente turno de combate (Acción del DM).
     /// </summary>
-    public async Task NextTurn(string partyId)
+    public async Task NextTurn(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.NextTurn(id))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -216,12 +245,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Retrocede al turno de combate anterior (Acción del DM).
     /// </summary>
-    public async Task PreviousTurn(string partyId)
+    public async Task PreviousTurn(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.PreviousTurn(id))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -229,12 +259,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Modifica los puntos de golpe (HP) de un combatiente mediante un delta (Acción del DM).
     /// </summary>
-    public async Task ModifyHp(string partyId, Guid combatantId, int deltaHp)
+    public async Task ModifyHp(string? partyId, Guid combatantId, int deltaHp)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.ModifyCombatantHp(id, combatantId, deltaHp))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -242,12 +273,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Conmuta la visibilidad de un combatiente ante los jugadores (Acción del DM).
     /// </summary>
-    public async Task ToggleVisibility(string partyId, Guid combatantId, bool isVisible)
+    public async Task ToggleVisibility(string? partyId, Guid combatantId, bool isVisible)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.SetCombatantVisibility(id, combatantId, isVisible))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -255,12 +287,13 @@ public class LiveCombatHub : Hub
     /// <summary>
     /// Finaliza el combate activo (Acción del DM).
     /// </summary>
-    public async Task EndCombat(string partyId)
+    public async Task EndCombat(string? partyId)
     {
         if (!TryResolvePartyId(partyId, out var id)) return;
 
         if (_combatManager.EndCombat(id))
         {
+            await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
         }
     }
@@ -284,24 +317,76 @@ public class LiveCombatHub : Hub
     public static string GetPlayerGroupName(Guid partyId) => $"combat_{partyId}_player";
 
     /// <summary>
-    /// Resuelve de forma determinística identificadores alfanuméricos ("quick-session") a un GUID válido para SignalR y el CombatManager.
+    /// Intenta restaurar el estado de combate persistido en la base de datos de la Party.
     /// </summary>
-    private static bool TryResolvePartyId(string? partyId, out Guid id)
+    private async Task TryRehydrateFromDatabaseAsync(Guid partyId)
     {
-        if (string.IsNullOrWhiteSpace(partyId))
+        if (_scopeFactory == null || partyId == Guid.Empty || partyId == QuickSessionGuid)
         {
-            id = Guid.Empty;
-            return false;
+            return;
         }
 
-        if (Guid.TryParse(partyId, out id))
+        try
         {
+            using var scope = _scopeFactory.CreateScope();
+            var partyRepo = scope.ServiceProvider.GetRequiredService<IPartyRepository>();
+            var party = await partyRepo.GetByIdAsync(partyId);
+            if (party != null && !string.IsNullOrWhiteSpace(party.CurrentCombatState))
+            {
+                _combatManager.RehydrateState(partyId, party.CurrentCombatState);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al rehidratar el estado de combate para la Party {PartyId}", partyId);
+        }
+    }
+
+    /// <summary>
+    /// Serializa y guarda el estado actual del combate en la entidad Party si no es una sala efímera.
+    /// </summary>
+    private async Task PersistCombatStateAsync(Guid partyId)
+    {
+        if (_scopeFactory == null || partyId == Guid.Empty || partyId == QuickSessionGuid)
+        {
+            return;
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var partyRepo = scope.ServiceProvider.GetRequiredService<IPartyRepository>();
+            var party = await partyRepo.GetByIdAsync(partyId);
+            if (party != null)
+            {
+                var serialized = _combatManager.SerializeState(partyId);
+                party.SetCurrentCombatState(serialized);
+                await partyRepo.UpdateAsync(party);
+                await partyRepo.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al persistir el estado de combate para la Party {PartyId}", partyId);
+        }
+    }
+
+    /// <summary>
+    /// Resuelve de forma determinística identificadores alfanuméricos ("quick-session") a un GUID válido para SignalR y el CombatManager.
+    /// </summary>
+    public static bool TryResolvePartyId(string? partyId, out Guid id)
+    {
+        if (string.IsNullOrWhiteSpace(partyId) ||
+            string.Equals(partyId.Trim(), "null", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(partyId.Trim(), "undefined", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(partyId.Trim(), "quick-session", StringComparison.OrdinalIgnoreCase))
+        {
+            id = QuickSessionGuid;
             return true;
         }
 
-        if (string.Equals(partyId.Trim(), "quick-session", StringComparison.OrdinalIgnoreCase))
+        if (Guid.TryParse(partyId.Trim(), out id))
         {
-            id = Guid.Parse("00000000-0000-0000-0000-000000000099");
             return true;
         }
 

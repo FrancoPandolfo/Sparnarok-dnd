@@ -258,6 +258,7 @@ export function AppContent() {
         parties={parties}
         activePartyId={liveSessionPartyId}
         currentUserId={user?.id}
+        onPartyChange={(newId) => setLiveSessionPartyId(newId)}
         onClose={() => setIsLiveSessionOpen(false)}
       />
 

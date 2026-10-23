@@ -16,8 +16,8 @@ public record CreatePartyRequestDto(
 /// Solicitud para unirse a una Party existente mediante enlace o token de invitación (Fase 3.7).
 /// </summary>
 public record JoinPartyRequestDto(
-    string Role,
-    string InGameName
+    string? Role = "Player",
+    string InGameName = ""
 );
 
 /// <summary>

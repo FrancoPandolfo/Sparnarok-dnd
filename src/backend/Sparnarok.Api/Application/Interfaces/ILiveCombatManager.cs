@@ -83,4 +83,19 @@ public interface ILiveCombatManager
     /// Genera la proyección censurada del estado para los Jugadores (sin monstruos ocultos ni CA/HP exactos).
     /// </summary>
     LiveCombatPlayerProjectionDto CreatePlayerProjection(Guid partyId);
+
+    /// <summary>
+    /// Serializa el estado de combate activo a formato JSON para su persistencia en la entidad Party.
+    /// </summary>
+    string? SerializeState(Guid partyId);
+
+    /// <summary>
+    /// Rehidrata el estado de combate en memoria a partir de una representación serializada en JSON.
+    /// </summary>
+    LiveCombatState? RehydrateState(Guid partyId, string stateJson);
+
+    /// <summary>
+    /// Limpia el estado de combate en memoria para la Party especificada.
+    /// </summary>
+    void ClearState(Guid partyId);
 }

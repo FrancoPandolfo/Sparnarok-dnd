@@ -6,7 +6,10 @@ import type { PartyResponseDto } from '../types/partyEncounter';
 vi.mock('../services/liveCombatHubService', () => ({
   liveCombatHubService: {
     startConnection: vi.fn(),
-    stopConnection: vi.fn(),
+    stopConnection: vi.fn().mockResolvedValue(undefined),
+    getHubConnection: vi.fn(() => ({
+      stop: vi.fn().mockResolvedValue(undefined),
+    })),
     initializeCombat: vi.fn(),
     addQuickCombatant: vi.fn(),
   },

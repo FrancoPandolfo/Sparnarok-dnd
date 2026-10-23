@@ -4,7 +4,7 @@ import { apiClient } from '../services/apiClient';
 import type { SessionNoteResponseDto } from '../types/liveCombat';
 
 export interface SessionNotesEditorProps {
-  partyId: string;
+  partyId?: string | null;
 }
 
 /**
@@ -13,6 +13,8 @@ export interface SessionNotesEditorProps {
  */
 export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId }) => {
   const { t } = useTranslation();
+
+  const isQuickMode = !partyId || partyId === 'quick-session';
 
   const [notes, setNotes] = useState<SessionNoteResponseDto[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -25,19 +27,35 @@ export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId 
   const loadNotes = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await apiClient.getSessionNotes(partyId);
-      setNotes(data);
-      if (data.length > 0 && !selectedNoteId) {
-        setSelectedNoteId(data[0].id);
-        setTitle(data[0].title);
-        setContent(data[0].content);
+      if (isQuickMode) {
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem('sparnarok_session_notes_quick');
+          const localNotes: SessionNoteResponseDto[] = raw ? JSON.parse(raw) : [];
+          setNotes(localNotes);
+          if (localNotes.length > 0 && !selectedNoteId) {
+            setSelectedNoteId(localNotes[0].id);
+            setTitle(localNotes[0].title);
+            setContent(localNotes[0].content);
+          }
+        }
+        return;
+      }
+
+      if (partyId) {
+        const data = await apiClient.getSessionNotes(partyId);
+        setNotes(data);
+        if (data.length > 0 && !selectedNoteId) {
+          setSelectedNoteId(data[0].id);
+          setTitle(data[0].title);
+          setContent(data[0].content);
+        }
       }
     } catch (err) {
       console.error('[SessionNotes] Error cargando notas:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [partyId, selectedNoteId]);
+  }, [partyId, selectedNoteId, isQuickMode]);
 
   useEffect(() => {
     loadNotes();
@@ -63,6 +81,35 @@ export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId 
 
     setIsLoading(true);
     try {
+      if (isQuickMode) {
+        const now = new Date().toISOString();
+        if (selectedNoteId) {
+          const updated = notes.map((n) =>
+            n.id === selectedNoteId ? { ...n, title: title.trim(), content: content.trim(), updatedAt: now } : n
+          );
+          setNotes(updated);
+          window.localStorage.setItem('sparnarok_session_notes_quick', JSON.stringify(updated));
+        } else {
+          const newNote: SessionNoteResponseDto = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`,
+            partyId: 'quick-session',
+            ownerUserId: 'local',
+            title: title.trim(),
+            content: content.trim(),
+            createdAt: now,
+            updatedAt: now,
+          };
+          const updated = [newNote, ...notes];
+          setNotes(updated);
+          setSelectedNoteId(newNote.id);
+          window.localStorage.setItem('sparnarok_session_notes_quick', JSON.stringify(updated));
+        }
+        setStatusMessage(t('liveCombat.savedSuccess', '¡Nota guardada exitosamente!'));
+        return;
+      }
+
+      if (!partyId) return;
+
       if (selectedNoteId) {
         const updated = await apiClient.updateSessionNote(partyId, selectedNoteId, {
           title: title.trim(),
@@ -92,6 +139,22 @@ export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId 
     }
 
     try {
+      if (isQuickMode) {
+        const remaining = notes.filter((n) => n.id !== noteId);
+        setNotes(remaining);
+        window.localStorage.setItem('sparnarok_session_notes_quick', JSON.stringify(remaining));
+        if (remaining.length > 0) {
+          setSelectedNoteId(remaining[0].id);
+          setTitle(remaining[0].title);
+          setContent(remaining[0].content);
+        } else {
+          handleNewNote();
+        }
+        return;
+      }
+
+      if (!partyId) return;
+
       await apiClient.deleteSessionNote(partyId, noteId);
       const remaining = notes.filter((n) => n.id !== noteId);
       setNotes(remaining);
@@ -146,7 +209,9 @@ export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId 
         <div className="notes-sidebar-header">
           <div className="notes-title-group">
             <span className="notes-sidebar-title">{t('liveCombat.notesTitle', 'Mis Notas')}</span>
-            <span className="notes-privacy-tag" title="Estas notas son privadas y solo tú puedes leerlas">🔒 Privadas</span>
+            <span className="notes-privacy-tag" title={isQuickMode ? 'Guardado localmente en este dispositivo' : 'Estas notas son privadas y solo tú puedes leerlas'}>
+              {isQuickMode ? '⚡ Local' : '🔒 Privadas'}
+            </span>
           </div>
           <button
             type="button"

@@ -27,7 +27,7 @@ import type {
 } from '../types/liveCombat';
 
 export interface LiveCombatTrackerProps {
-  partyId: string;
+  partyId?: string | null;
   role: PartyRole;
   combatState: LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null;
   currentUserId?: string | null;
@@ -278,6 +278,7 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
   role,
   combatState,
 }) => {
+  const effectivePartyId = partyId || 'quick-session';
   const { t } = useTranslation();
 
   // Estado local para actualización optimista del ordenamiento
@@ -285,12 +286,14 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     (LiveCombatantDmDto | LiveCombatantPlayerDto)[]
   >(combatState?.combatants ?? []);
 
-  // Sincronizar estado local cuando SignalR actualiza el estado del servidor
+  // Sincronizar estado local cuando SignalR actualiza el estado del servidor o se cambia de Party
   useEffect(() => {
     if (combatState?.combatants) {
       setLocalCombatants(combatState.combatants);
+    } else {
+      setLocalCombatants([]);
     }
-  }, [combatState?.combatants]);
+  }, [combatState?.combatants, partyId]);
 
   // Sensores de DnD Kit
   const sensors = useSensors(
@@ -337,7 +340,7 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
 
       // 2. Notificación en tiempo real vía SignalR
       try {
-        await liveCombatHubService.reorderCombatant(partyId, String(active.id), newIndex);
+        await liveCombatHubService.reorderCombatant(effectivePartyId, String(active.id), newIndex);
       } catch (err) {
         console.error('[LiveCombatTracker] Error al sincronizar reordenamiento:', err);
       }
@@ -351,41 +354,41 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
 
     const numericInit =
       playerInitiativeValue === '' ? null : Number(playerInitiativeValue);
-    await liveCombatHubService.submitInitiative(partyId, targetHeroId, numericInit);
+    await liveCombatHubService.submitInitiative(effectivePartyId, targetHeroId, numericInit);
   };
 
   const handleDmOverrideInitiative = async (combatantId: string) => {
     const numericInit = overrideValue === '' ? null : Number(overrideValue);
-    await liveCombatHubService.overrideInitiative(partyId, combatantId, numericInit);
+    await liveCombatHubService.overrideInitiative(effectivePartyId, combatantId, numericInit);
     setOverrideCombatantId(null);
   };
 
   const handleAutoRollMonsters = async () => {
-    await liveCombatHubService.autoRollMonsters(partyId);
+    await liveCombatHubService.autoRollMonsters(effectivePartyId);
   };
 
   const handleStartCombat = async () => {
-    await liveCombatHubService.startCombat(partyId);
+    await liveCombatHubService.startCombat(effectivePartyId);
   };
 
   const handleNextTurn = async () => {
-    await liveCombatHubService.nextTurn(partyId);
+    await liveCombatHubService.nextTurn(effectivePartyId);
   };
 
   const handlePreviousTurn = async () => {
-    await liveCombatHubService.previousTurn(partyId);
+    await liveCombatHubService.previousTurn(effectivePartyId);
   };
 
   const handleEndCombat = async () => {
-    await liveCombatHubService.endCombat(partyId);
+    await liveCombatHubService.endCombat(effectivePartyId);
   };
 
   const handleModifyHp = async (combatantId: string, delta: number) => {
-    await liveCombatHubService.modifyHp(partyId, combatantId, delta);
+    await liveCombatHubService.modifyHp(effectivePartyId, combatantId, delta);
   };
 
   const handleToggleVisibility = async (combatantId: string, currentVisibility: boolean) => {
-    await liveCombatHubService.toggleVisibility(partyId, combatantId, !currentVisibility);
+    await liveCombatHubService.toggleVisibility(effectivePartyId, combatantId, !currentVisibility);
   };
 
   const handleQuickCombatantSubmit = async (e: React.FormEvent) => {
@@ -428,7 +431,7 @@ export const LiveCombatTracker: React.FC<LiveCombatTrackerProps> = ({
     setQuickError(null);
 
     try {
-      await liveCombatHubService.addQuickCombatant(partyId, {
+      await liveCombatHubService.addQuickCombatant(effectivePartyId, {
         name: newDto.name,
         maxHp: newDto.maxHp,
         armorClass: newDto.armorClass,
