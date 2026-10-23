@@ -69,6 +69,11 @@ public class SparnarokDbContext : DbContext
     /// </summary>
     public DbSet<SessionNote> SessionNotes => Set<SessionNote>();
 
+    /// <summary>
+    /// Conjunto de datos para los miembros y roles de usuarios dentro de las Parties (Party Members, Fase 3.7).
+    /// </summary>
+    public DbSet<PartyMember> PartyMembers => Set<PartyMember>();
+
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.

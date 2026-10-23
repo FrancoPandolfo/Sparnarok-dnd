@@ -12,15 +12,36 @@ export interface UserProfileModalProps {
  * (Google OAuth2 + Contraseña convencional para login bidireccional).
  */
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
-  const { user, setPassword, linkGoogle, logout } = useAuth();
+  const { user, setPassword, linkGoogle, updateProfile, logout } = useAuth();
 
+  const [nicknameInput, setNicknameInput] = useState(user?.globalNickname || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  React.useEffect(() => {
+    if (user?.globalNickname) {
+      setNicknameInput(user.globalNickname);
+    }
+  }, [user?.globalNickname]);
+
   if (!isOpen || !user) return null;
+
+  const handleSaveNickname = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatusMessage(null);
+    setIsSubmitting(true);
+    try {
+      await updateProfile(nicknameInput.trim() || null);
+      setStatusMessage({ type: 'success', text: '¡Apodo global actualizado correctamente!' });
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Error al actualizar el apodo.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +124,40 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             {statusMessage.text}
           </div>
         )}
+
+        {/* Sección de Mi Perfil (Identidad Global) */}
+        <div className="profile-section" id="my-profile-section">
+          <h3 className="section-title">👤 Mi Perfil (Identidad Global)</h3>
+          <p className="section-description">
+            Configura tu apodo global visible para las parties y compañeros de mesa.
+          </p>
+          <form onSubmit={handleSaveNickname} id="profile-nickname-form" className="profile-nickname-form">
+            <div className="form-group">
+              <label htmlFor="global-nickname-input" className="form-label">
+                Apodo Global:
+              </label>
+              <input
+                type="text"
+                id="global-nickname-input"
+                className="form-input"
+                placeholder="Ej: GandalfElGris, Valeros..."
+                value={nicknameInput}
+                onChange={(e) => setNicknameInput(e.target.value)}
+                maxLength={50}
+              />
+            </div>
+            <div className="form-actions-row">
+              <button
+                type="submit"
+                id="save-global-nickname-btn"
+                className="action-btn primary-gold"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Guardar Apodo'}
+              </button>
+            </div>
+          </form>
+        </div>
 
         {/* Sección de Vinculación de Cuentas */}
         <div className="profile-section">

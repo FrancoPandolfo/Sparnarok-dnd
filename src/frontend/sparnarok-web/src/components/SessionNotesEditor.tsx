@@ -144,7 +144,10 @@ export const SessionNotesEditor: React.FC<SessionNotesEditorProps> = ({ partyId 
     <div className="session-notes-container" id="session-notes-editor-panel">
       <div className="session-notes-sidebar">
         <div className="notes-sidebar-header">
-          <span className="notes-sidebar-title">{t('liveCombat.notesTitle', 'Notas de Campaña')}</span>
+          <div className="notes-title-group">
+            <span className="notes-sidebar-title">{t('liveCombat.notesTitle', 'Mis Notas')}</span>
+            <span className="notes-privacy-tag" title="Estas notas son privadas y solo tú puedes leerlas">🔒 Privadas</span>
+          </div>
           <button
             type="button"
             id="new-session-note-btn"

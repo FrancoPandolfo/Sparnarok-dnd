@@ -18,6 +18,11 @@ public interface ISessionNoteRepository
     Task<IReadOnlyList<SessionNote>> GetAllByPartyIdAsync(Guid partyId, CancellationToken ct = default);
 
     /// <summary>
+    /// Obtiene todas las notas privadas asociadas a una Party pertenecientes a un usuario específico (Fase 3.7).
+    /// </summary>
+    Task<IReadOnlyList<SessionNote>> GetAllByPartyAndOwnerAsync(Guid partyId, Guid ownerUserId, CancellationToken ct = default);
+
+    /// <summary>
     /// Agrega una nueva nota de sesión.
     /// </summary>
     Task AddAsync(SessionNote note, CancellationToken ct = default);

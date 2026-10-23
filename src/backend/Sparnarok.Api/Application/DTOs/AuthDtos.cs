@@ -44,6 +44,7 @@ public record SetPasswordRequestDto(
 /// <param name="AvatarUrl">URL de la foto de perfil del usuario (opcional).</param>
 /// <param name="HasPassword">Indica si la cuenta cuenta con contraseña para login convencional.</param>
 /// <param name="HasGoogleLinked">Indica si la cuenta está vinculada a Google OAuth2.</param>
+/// <param name="GlobalNickname">Apodo o alias global del usuario en el ecosistema Sparnarok (Fase 3.7).</param>
 public record AuthResponseDto(
     string Token,
     Guid UserId,
@@ -51,7 +52,27 @@ public record AuthResponseDto(
     string DisplayName,
     string? AvatarUrl,
     bool HasPassword = false,
-    bool HasGoogleLinked = false);
+    bool HasGoogleLinked = false,
+    string? GlobalNickname = null);
+
+/// <summary>
+/// Solicitud de actualización del perfil global del usuario (Fase 3.7).
+/// </summary>
+/// <param name="GlobalNickname">Nuevo apodo o alias global en Sparnarok.</param>
+public record UpdateUserProfileRequestDto(
+    string? GlobalNickname);
+
+/// <summary>
+/// Respuesta detallada con la información del perfil del usuario (Fase 3.7).
+/// </summary>
+public record UserProfileResponseDto(
+    Guid UserId,
+    string Email,
+    string DisplayName,
+    string? GlobalNickname,
+    string? AvatarUrl,
+    bool HasPassword,
+    bool HasGoogleLinked);
 
 /// <summary>
 /// Carga útil (Payload) extraída y verificada criptográficamente desde un token ID de Google.

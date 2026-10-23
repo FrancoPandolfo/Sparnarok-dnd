@@ -12,6 +12,7 @@ export interface AuthContextType {
   registerConventional: (email: string, password: string, displayName: string) => Promise<AuthResponseDto>;
   setPassword: (newPassword: string) => Promise<AuthResponseDto>;
   linkGoogle: (idToken: string) => Promise<AuthResponseDto>;
+  updateProfile: (globalNickname: string | null) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,6 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       id: response.userId,
       email: response.email,
       displayName: response.displayName,
+      globalNickname: response.globalNickname ?? null,
       avatarUrl: response.avatarUrl ?? null,
       token: response.token,
       hasPassword: response.hasPassword,
@@ -56,6 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             id: parsed.id || (parsed as any).userId,
             email: parsed.email || '',
             displayName: parsed.displayName || 'Aventurero',
+            globalNickname: parsed.globalNickname ?? null,
             avatarUrl: parsed.avatarUrl ?? null,
             token: parsed.token,
             hasPassword: parsed.hasPassword ?? false,
@@ -151,6 +154,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   }, []);
 
+  /**
+   * Actualiza el apodo o alias global del usuario (Fase 3.7).
+   */
+  const updateProfile = useCallback(async (globalNickname: string | null): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const res = await apiClient.updateProfile({ globalNickname });
+      setUser((prev) => {
+        if (!prev) return null;
+        const updated: AuthUser = {
+          ...prev,
+          globalNickname: res.globalNickname ?? null,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const value: AuthContextType = {
     user,
     token: user?.token ?? null,
@@ -161,6 +185,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     registerConventional,
     setPassword,
     linkGoogle,
+    updateProfile,
     logout,
   };
 
@@ -223,6 +248,7 @@ export function useAuth(): AuthContextType {
         hasPassword: true,
         hasGoogleLinked: true,
       }),
+      updateProfile: async () => {},
       logout: () => {},
     };
   }

@@ -151,8 +151,8 @@ test.describe('Fase 3.6: Collaborative Live Play & Asymmetric Initiative Suite',
     }
     await expect(playerPage.locator('#user-party-role-badge')).toContainText('Jugador');
 
-    // Verificar que en la vista del Jugador NO aparece la pestaña de notas del DM
-    await expect(playerPage.locator('#tab-session-notes')).not.toBeVisible();
+    // Verificar que en la vista del Jugador la pestaña de notas ("📜 Mis Notas") esté visible
+    await expect(playerPage.locator('#tab-session-notes')).toBeVisible();
 
     // Verificar que el Jugador ve a Kaelen Paladin pero NO VE al Goblin Boss (anti-metagaming estricto)
     const playerTable = playerPage.locator('#initiative-order-table');

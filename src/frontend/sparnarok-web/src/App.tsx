@@ -15,6 +15,7 @@ import { BestiaryView } from './components/BestiaryView';
 import { CombatSimulatorView } from './components/CombatSimulatorView';
 import { WeaponIngestionModal } from './components/WeaponIngestionModal';
 import { LiveSessionModal } from './components/LiveSessionModal';
+import { PartyOnboardingModal } from './components/PartyOnboardingModal';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -44,6 +45,18 @@ export function AppContent() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isIngestionModalOpen, setIsIngestionModalOpen] = useState<boolean>(false);
   const [isLiveSessionOpen, setIsLiveSessionOpen] = useState<boolean>(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
+
+  // Detección reactiva de invitación en la URL (?inviteToken=... o ?joinToken=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('inviteToken') || params.get('joinToken');
+    if (token) {
+      setInviteToken(token);
+      setIsOnboardingModalOpen(true);
+    }
+  }, []);
 
   // Carga inicial de criaturas, catálogo de maestrías, armas y partys
   useEffect(() => {
@@ -241,6 +254,23 @@ export function AppContent() {
         parties={parties}
         currentUserId={user?.id}
         onClose={() => setIsLiveSessionOpen(false)}
+      />
+
+      {/* Modal de Onboarding con Enlace de Invitación de Party */}
+      <PartyOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        inviteToken={inviteToken}
+        onClose={() => {
+          setIsOnboardingModalOpen(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('inviteToken');
+          url.searchParams.delete('joinToken');
+          window.history.replaceState({}, '', url.toString());
+        }}
+        onJoinedSuccess={(joinedParty) => {
+          setParties((prev) => [joinedParty, ...prev.filter((p) => p.id !== joinedParty.id)]);
+          setIsLiveSessionOpen(true);
+        }}
       />
     </div>
   );

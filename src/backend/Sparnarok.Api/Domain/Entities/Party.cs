@@ -13,6 +13,7 @@ public class Party
     private readonly List<CraftingQueueItem> _craftingQueue = [];
     private readonly List<StashActivityLog> _activityLogs = [];
     private readonly List<SessionNote> _sessionNotes = [];
+    private readonly List<PartyMember> _partyMembers = [];
 
     /// <summary>Identificador único de la Party.</summary>
     public Guid Id { get; private set; }
@@ -22,6 +23,9 @@ public class Party
 
     /// <summary>Identificador del usuario propietario y creador de la Party.</summary>
     public Guid OwnerUserId { get; private set; }
+
+    /// <summary>Token único para invitación y enlace de onboarding a la Party (Fase 3.7).</summary>
+    public string InviteToken { get; private set; } = Guid.NewGuid().ToString("N");
 
     /// <summary>Fecha y hora UTC de creación de la Party.</summary>
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
@@ -59,8 +63,11 @@ public class Party
     /// <summary>Historial de transacciones y auditoría del alijo y fondos.</summary>
     public IReadOnlyCollection<StashActivityLog> ActivityLogs => _activityLogs.AsReadOnly();
 
-    /// <summary>Notas de sesión y apuntes de campaña exclusivos del Dungeon Master.</summary>
+    /// <summary>Notas de sesión y apuntes de campaña de los integrantes de la Party (Fase 3.7).</summary>
     public IReadOnlyCollection<SessionNote> SessionNotes => _sessionNotes.AsReadOnly();
+
+    /// <summary>Colección de miembros y jugadores registrados con sus roles y nombres en partida (Fase 3.7).</summary>
+    public IReadOnlyCollection<PartyMember> PartyMembers => _partyMembers.AsReadOnly();
 
     /// <summary>Peso total acumulado en libras (lbs) de todos los objetos en el alijo de la Party.</summary>
     public decimal TotalStashWeight => _stashItems.Sum(i => i.Weight * i.Quantity);
@@ -71,12 +78,47 @@ public class Party
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="Party"/>.
     /// </summary>
-    public Party(Guid id, string name, Guid ownerUserId)
+    public Party(Guid id, string name, Guid ownerUserId, string? inviteToken = null)
     {
         Id = id;
         SetName(name);
         OwnerUserId = ownerUserId;
+        InviteToken = string.IsNullOrWhiteSpace(inviteToken) ? Guid.NewGuid().ToString("N") : inviteToken.Trim();
         CreatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Incorpora o actualiza un integrante en la Party con su rol y nombre en partida.
+    /// </summary>
+    public void AddPartyMember(PartyMember member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var existing = _partyMembers.FirstOrDefault(m => m.UserId == member.UserId);
+        if (existing != null)
+        {
+            existing.SetRole(member.Role);
+            existing.SetInGameName(member.InGameName);
+        }
+        else
+        {
+            _partyMembers.Add(member);
+        }
+    }
+
+    /// <summary>
+    /// Remueve un integrante de la membresía de la Party por su identificador de usuario.
+    /// </summary>
+    public void RemovePartyMember(Guid userId)
+    {
+        _partyMembers.RemoveAll(m => m.UserId == userId);
+    }
+
+    /// <summary>
+    /// Regenera el token de invitación para invalidar enlaces compartidos previamente.
+    /// </summary>
+    public void RegenerateInviteToken()
+    {
+        InviteToken = Guid.NewGuid().ToString("N");
     }
 
     /// <summary>

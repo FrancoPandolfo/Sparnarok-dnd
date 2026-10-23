@@ -18,12 +18,16 @@ import type {
   RegisterRequestDto,
   LoginRequestDto,
   SetPasswordRequestDto,
+  UpdateUserProfileRequestDto,
+  UserProfileResponseDto,
 } from '../types/auth';
 import type {
   CreatePartyRequestDto,
   PartyResponseDto,
   CreateEncounterRequestDto,
   EncounterResponseDto,
+  JoinPartyRequestDto,
+  PartyInviteDetailsDto,
 } from '../types/partyEncounter';
 import type {
   ReferenceItemSummaryDto,
@@ -1616,6 +1620,20 @@ export const apiClient = {
     } catch {
       // Fallback
     }
+
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('sparnarok_parties');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            inMemoryParties = parsed;
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
     return inMemoryParties;
   },
 
@@ -1655,6 +1673,14 @@ export const apiClient = {
       // Fallback
     }
 
+    const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
+    let currentUserId = 'mock-user-id';
+    if (authStr) {
+      try {
+        currentUserId = JSON.parse(authStr).id || currentUserId;
+      } catch {}
+    }
+
     const members = request.memberCreatureIds
       .map((id) => inMemoryCreatures.find((c) => c.id === id))
       .filter(Boolean) as CreatureResponseDto[];
@@ -1662,11 +1688,27 @@ export const apiClient = {
     const newParty: PartyResponseDto = {
       id: `party-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       name: request.name,
-      ownerUserId: 'mock-user-id',
+      ownerUserId: currentUserId,
+      inviteToken: `token-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       createdAt: new Date().toISOString(),
       members,
+      partyMembers: [
+        {
+          id: `pm-${Date.now()}`,
+          partyId: 'temp',
+          userId: currentUserId,
+          role: request.role || 'DungeonMaster',
+          inGameName: request.inGameName || 'Dungeon Master',
+          joinedAt: new Date().toISOString(),
+        },
+      ],
     };
+    newParty.partyMembers![0].partyId = newParty.id;
+
     inMemoryParties = [newParty, ...inMemoryParties];
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('sparnarok_parties', JSON.stringify(inMemoryParties));
+    }
     return newParty;
   },
 
@@ -2277,7 +2319,7 @@ export const apiClient = {
   },
 
   /**
-   * Obtiene todas las notas de sesión de una Party (DM Only).
+   * Obtiene todas las notas de sesión privadas del usuario para una Party (RLS lógico).
    */
   async getSessionNotes(partyId: string, signal?: AbortSignal): Promise<SessionNoteResponseDto[]> {
     try {
@@ -2292,11 +2334,22 @@ export const apiClient = {
     } catch {
       // Fallback local
     }
-    return inMemorySessionNotes.filter((n) => n.partyId === partyId);
+
+    const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
+    let currentUserId: string | null = null;
+    if (authStr) {
+      try {
+        currentUserId = JSON.parse(authStr).id;
+      } catch {}
+    }
+
+    return inMemorySessionNotes.filter(
+      (n) => n.partyId === partyId && (!currentUserId || !n.ownerUserId || n.ownerUserId === currentUserId)
+    );
   },
 
   /**
-   * Crea una nueva nota de sesión para la Party (DM Only).
+   * Crea una nueva nota de sesión privada para la Party.
    */
   async createSessionNote(partyId: string, request: CreateSessionNoteRequest): Promise<SessionNoteResponseDto> {
     try {
@@ -2314,9 +2367,18 @@ export const apiClient = {
       // Fallback local
     }
 
+    const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
+    let currentUserId = 'mock-user-id';
+    if (authStr) {
+      try {
+        currentUserId = JSON.parse(authStr).id || currentUserId;
+      } catch {}
+    }
+
     const newNote: SessionNoteResponseDto = {
       id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       partyId,
+      ownerUserId: currentUserId,
       title: request.title,
       content: request.content,
       createdAt: new Date().toISOString(),
@@ -2386,6 +2448,129 @@ export const apiClient = {
       // Fallback local
     }
     inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
+  },
+
+  /**
+   * Actualiza el perfil global del usuario (Fase 3.7).
+   */
+  async updateProfile(data: UpdateUserProfileRequestDto): Promise<UserProfileResponseDto> {
+    try {
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+    return {
+      userId: 'mock-user-id',
+      email: 'user@sparnarok.dnd',
+      displayName: 'Aventurero',
+      globalNickname: data.globalNickname,
+      avatarUrl: null,
+      hasPassword: true,
+      hasGoogleLinked: false,
+    };
+  },
+
+  /**
+   * Obtiene los detalles de invitación a una Party mediante su token único (Fase 3.7 Onboarding).
+   */
+  async getPartyInviteDetails(token: string): Promise<PartyInviteDetailsDto> {
+    try {
+      const response = await fetch(`/api/parties/join/${token}`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+
+    let partiesList = inMemoryParties;
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('sparnarok_parties');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) partiesList = parsed;
+        } catch {}
+      }
+    }
+
+    const found = partiesList.find((p) => p.inviteToken === token || p.id === token);
+    return {
+      partyId: found?.id || 'party-fortaleza-sombria',
+      partyName: found?.name || 'La Fortaleza Sombría',
+      inviteToken: token,
+      memberCount: found?.members?.length || 1,
+    };
+  },
+
+  /**
+   * Une al usuario a una Party mediante su token de invitación con rol y nombre en partida (Fase 3.7 Onboarding).
+   */
+  async joinPartyByToken(token: string, request: JoinPartyRequestDto): Promise<PartyResponseDto> {
+    try {
+      const response = await fetch(`/api/parties/join/${token}`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemoryParties = [data, ...inMemoryParties.filter((p) => p.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
+    let currentUserId = 'player-user-id';
+    if (authStr) {
+      try {
+        currentUserId = JSON.parse(authStr).id || currentUserId;
+      } catch {}
+    }
+
+    let partiesList = inMemoryParties;
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('sparnarok_parties');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) partiesList = parsed;
+        } catch {}
+      }
+    }
+
+    const found = partiesList.find((p) => p.inviteToken === token || p.id === token) || partiesList[0];
+    const joinedParty: PartyResponseDto = {
+      ...found,
+      partyMembers: [
+        ...(found.partyMembers || []),
+        {
+          id: `pm-${Date.now()}`,
+          partyId: found.id,
+          userId: currentUserId,
+          role: request.role,
+          inGameName: request.inGameName,
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    inMemoryParties = [joinedParty, ...inMemoryParties.filter((p) => p.id !== joinedParty.id)];
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('sparnarok_parties', JSON.stringify(inMemoryParties));
+    }
+    return joinedParty;
   },
 };
 

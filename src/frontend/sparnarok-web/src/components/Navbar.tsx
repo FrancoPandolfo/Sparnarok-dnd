@@ -127,8 +127,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
               <span id="user-display-name" className="user-display-name">
-                {user.displayName}
+                {user.globalNickname ? `${user.globalNickname} (${user.displayName})` : user.displayName}
               </span>
+              <button
+                type="button"
+                id="open-profile-btn"
+                className="action-btn profile-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsProfileModalOpen(true);
+                }}
+                title="Mi Perfil"
+              >
+                👤 Mi Perfil
+              </button>
               <button
                 type="button"
                 id="logout-btn"

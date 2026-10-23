@@ -11,6 +11,7 @@ import type { PartyResponseDto, EncounterResponseDto } from '../types/partyEncou
 import { CustomHeroModal } from './CustomHeroModal';
 import { PartyStashModal } from './PartyStashModal';
 import { LiveSessionModal } from './LiveSessionModal';
+import { PartyOnboardingModal } from './PartyOnboardingModal';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -74,6 +75,8 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   // Modales de guardado
   const [isSavePartyModalOpen, setIsSavePartyModalOpen] = useState(false);
   const [partyNameInput, setPartyNameInput] = useState('');
+  const [creatorRole, setCreatorRole] = useState<'DungeonMaster' | 'Player'>('DungeonMaster');
+  const [creatorInGameName, setCreatorInGameName] = useState<string>('');
   const [isSavingParty, setIsSavingParty] = useState(false);
 
   const [isSaveEncounterModalOpen, setIsSaveEncounterModalOpen] = useState(false);
@@ -84,6 +87,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
   const [isPartyStashModalOpen, setIsPartyStashModalOpen] = useState<boolean>(false);
   const [isLiveSessionModalOpen, setIsLiveSessionModalOpen] = useState<boolean>(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
 
   const [targetingStrategy, setTargetingStrategy] = useState<TargetingStrategy>('LowestHp');
   const [iterations, setIterations] = useState<number>(10000);
@@ -113,6 +117,12 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
       isMounted = false;
     };
   }, [isAuthed]);
+
+  useEffect(() => {
+    if (auth.user && !creatorInGameName) {
+      setCreatorInGameName(auth.user.globalNickname || auth.user.displayName || '');
+    }
+  }, [auth.user, creatorInGameName]);
 
   // Catálogo unificado que incluye criaturas del bestiario y miembros cargados de partys/encuentros
   const allCreatures = React.useMemo(() => {
@@ -362,6 +372,8 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
       const created = await apiClient.createParty({
         name: partyNameInput.trim(),
         memberCreatureIds,
+        role: creatorRole,
+        inGameName: creatorInGameName.trim() || undefined,
       });
 
       setParties((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
@@ -518,6 +530,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                 title={t('simulation.saveTeamAAsParty')}
               >
                 💾 {t('simulation.saveTeamAAsParty')}
+              </button>
+              <button
+                type="button"
+                id="open-join-party-btn"
+                className="btn btn-outline btn-sm"
+                onClick={() => setIsOnboardingModalOpen(true)}
+                disabled={isSimulating}
+                title="Unirse a una Party con Token de Invitación"
+              >
+                🔗 Unirse a Party
               </button>
               <button
                 type="button"
@@ -1084,6 +1106,35 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                   autoFocus
                 />
               </div>
+
+              <div className="field-group">
+                <label htmlFor="party-creator-role" className="field-label">
+                  Tu Rol Inicial:
+                </label>
+                <select
+                  id="party-creator-role"
+                  className="input-text"
+                  value={creatorRole}
+                  onChange={(e) => setCreatorRole(e.target.value as 'DungeonMaster' | 'Player')}
+                >
+                  <option value="DungeonMaster">👑 Dungeon Master (DM)</option>
+                  <option value="Player">🛡️ Jugador (Player)</option>
+                </select>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="party-creator-ingame-name" className="field-label">
+                  Nombre en Partida (InGame Name):
+                </label>
+                <input
+                  id="party-creator-ingame-name"
+                  type="text"
+                  className="input-text"
+                  value={creatorInGameName}
+                  onChange={(e) => setCreatorInGameName(e.target.value)}
+                  placeholder="Tu apodo de DM o nombre de personaje (opcional)..."
+                />
+              </div>
               <p className="modal-info-text">
                 Se guardarán los {teamA.length} combatientes de la party.
               </p>
@@ -1201,6 +1252,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         activeEncounter={encounters.find((e) => e.id === selectedEncounterId) || null}
         currentUserId={auth.user?.id}
         onClose={() => setIsLiveSessionModalOpen(false)}
+      />
+
+      {/* Modal de Onboarding a Party por Token */}
+      <PartyOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        onJoinedSuccess={(newParty) => {
+          setParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
+          setSelectedPartyId(newParty.id);
+        }}
       />
     </div>
   );

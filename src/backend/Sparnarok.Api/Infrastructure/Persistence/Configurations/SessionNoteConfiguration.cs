@@ -18,6 +18,9 @@ public class SessionNoteConfiguration : IEntityTypeConfiguration<SessionNote>
         builder.Property(n => n.PartyId)
             .IsRequired();
 
+        builder.Property(n => n.OwnerUserId)
+            .IsRequired();
+
         builder.Property(n => n.Title)
             .IsRequired()
             .HasMaxLength(200);
@@ -32,6 +35,13 @@ public class SessionNoteConfiguration : IEntityTypeConfiguration<SessionNote>
             .IsRequired();
 
         builder.HasIndex(n => n.PartyId);
+        builder.HasIndex(n => n.OwnerUserId);
+        builder.HasIndex(n => new { n.PartyId, n.OwnerUserId });
         builder.HasIndex(n => new { n.PartyId, n.CreatedAt });
+
+        builder.HasOne(n => n.OwnerUser)
+            .WithMany()
+            .HasForeignKey(n => n.OwnerUserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

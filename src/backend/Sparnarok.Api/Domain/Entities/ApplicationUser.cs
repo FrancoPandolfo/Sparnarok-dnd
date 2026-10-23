@@ -18,6 +18,9 @@ public class ApplicationUser
     /// <summary>Nombre completo o de pantalla del usuario.</summary>
     public string DisplayName { get; private set; } = string.Empty;
 
+    /// <summary>Apodo o alias global del usuario en el ecosistema Sparnarok (Fase 3.7).</summary>
+    public string? GlobalNickname { get; private set; }
+
     /// <summary>Hash criptográfico de la contraseña para inicio de sesión convencional (nulo si solo usa Google).</summary>
     public string? PasswordHash { get; private set; }
 
@@ -169,6 +172,15 @@ public class ApplicationUser
         }
 
         LastLoginAtUtc = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Establece o actualiza el apodo global del usuario (Fase 3.7).
+    /// </summary>
+    /// <param name="nickname">Nuevo apodo o null para desvincular.</param>
+    public void SetGlobalNickname(string? nickname)
+    {
+        GlobalNickname = string.IsNullOrWhiteSpace(nickname) ? null : nickname.Trim();
     }
 
     /// <summary>
