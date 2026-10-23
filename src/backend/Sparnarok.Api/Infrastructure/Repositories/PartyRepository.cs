@@ -125,6 +125,7 @@ public class PartyRepository : IPartyRepository
             .Include(p => p.StashItems)
             .Include(p => p.CraftingQueue)
             .Include(p => p.ActivityLogs)
+            .Include(p => p.PartyMembers)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 

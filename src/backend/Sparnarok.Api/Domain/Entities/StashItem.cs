@@ -39,6 +39,9 @@ public class StashItem
     /// <summary>Identificador opcional del personaje de la Party al que está asignado o sintonizado el objeto.</summary>
     public Guid? AssignedCreatureId { get; private set; }
 
+    /// <summary>Indica si el objeto ha sido identificado por el Dungeon Master (revela propiedades mágicas completas).</summary>
+    public bool IsIdentified { get; private set; } = true;
+
     /// <summary>Fecha y hora UTC de adición del objeto al alijo.</summary>
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
@@ -59,7 +62,8 @@ public class StashItem
         string itemType = "Adventuring Gear",
         bool isOfficialSrd = false,
         string? referenceIndex = null,
-        Guid? assignedCreatureId = null)
+        Guid? assignedCreatureId = null,
+        bool isIdentified = true)
     {
         Id = id;
         PartyId = partyId;
@@ -72,6 +76,7 @@ public class StashItem
         IsOfficialSrd = isOfficialSrd;
         ReferenceIndex = referenceIndex?.Trim();
         AssignedCreatureId = assignedCreatureId;
+        IsIdentified = isIdentified;
         CreatedAt = DateTime.UtcNow;
     }
 
@@ -133,5 +138,21 @@ public class StashItem
     public void AssignToCreature(Guid? creatureId)
     {
         AssignedCreatureId = creatureId;
+    }
+
+    /// <summary>
+    /// Identifica el objeto mágico o desconocido. Acción exclusiva del Dungeon Master.
+    /// </summary>
+    public void Identify()
+    {
+        IsIdentified = true;
+    }
+
+    /// <summary>
+    /// Establece explícitamente el estado de identificación del objeto.
+    /// </summary>
+    public void SetIdentified(bool isIdentified)
+    {
+        IsIdentified = isIdentified;
     }
 }

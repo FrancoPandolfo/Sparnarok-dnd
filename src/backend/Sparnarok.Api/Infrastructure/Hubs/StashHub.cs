@@ -20,6 +20,14 @@ public class StashHub : Hub
     }
 
     /// <summary>
+    /// Alias de compatibilidad para unirse al grupo de Stash de la Party.
+    /// </summary>
+    public async Task JoinPartyStash(string partyId)
+    {
+        await JoinPartyGroup(partyId);
+    }
+
+    /// <summary>
     /// Remueve la conexión actual del grupo exclusivo de la Party.
     /// </summary>
     public async Task LeavePartyGroup(string partyId)
@@ -28,6 +36,14 @@ public class StashHub : Hub
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetGroupName(id));
         }
+    }
+
+    /// <summary>
+    /// Alias de compatibilidad para abandonar el grupo de Stash de la Party.
+    /// </summary>
+    public async Task LeavePartyStash(string partyId)
+    {
+        await LeavePartyGroup(partyId);
     }
 
     /// <summary>

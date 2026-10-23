@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveCombatTracker } from './LiveCombatTracker';
 import { SessionNotesEditor } from './SessionNotesEditor';
+import { PartyStashModal } from './PartyStashModal';
 import { liveCombatHubService } from '../services/liveCombatHubService';
 import type { PartyResponseDto, EncounterResponseDto } from '../types/partyEncounter';
 import type {
@@ -55,7 +56,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   const [selectedPartyId, setSelectedPartyId] = useState<string>(
     activePartyId || effectiveParties[0].id
   );
-  const [activeTab, setActiveTab] = useState<'tracker' | 'notes'>('tracker');
+  const [activeTab, setActiveTab] = useState<'tracker' | 'notes' | 'stash'>('tracker');
   const [role, setRole] = useState<PartyRole>(initialRole || 'DungeonMaster');
   const [combatState, setCombatState] = useState<
     LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null
@@ -327,6 +328,17 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
           >
             {t('liveCombat.notesTab', '📜 Mis Notas Privadas')}
           </button>
+
+          <button
+            type="button"
+            id="tab-session-stash"
+            role="tab"
+            aria-selected={activeTab === 'stash'}
+            className={`modal-tab-btn ${activeTab === 'stash' ? 'active' : ''}`}
+            onClick={() => setActiveTab('stash')}
+          >
+            {t('liveCombat.stashTab', '🪙 Botín de Grupo')}
+          </button>
         </div>
 
         {/* Cuerpo del Modal */}
@@ -359,9 +371,19 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 currentUserId={resolvedUserId}
               />
             </div>
-          ) : (
+          ) : activeTab === 'notes' ? (
             <div className="notes-tab-content">
               <SessionNotesEditor partyId={selectedPartyId} />
+            </div>
+          ) : (
+            <div className="stash-tab-content" id="pane-session-stash">
+              <PartyStashModal
+                isOpen={true}
+                isEmbedded={true}
+                partyId={selectedPartyId}
+                partyName={currentParty?.name || 'Party'}
+                onClose={() => setActiveTab('tracker')}
+              />
             </div>
           )}
         </div>

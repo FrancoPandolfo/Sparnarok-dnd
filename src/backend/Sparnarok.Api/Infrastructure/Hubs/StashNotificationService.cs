@@ -33,8 +33,9 @@ public class StashNotificationService : IStashNotificationService
 
     public async Task NotifyFundsUpdatedAsync(Guid partyId, PartyFundDto funds, CancellationToken cancellationToken = default)
     {
-        await _hubContext.Clients.Group(Group(partyId))
-            .SendAsync("FundsUpdated", funds, cancellationToken);
+        var group = _hubContext.Clients.Group(Group(partyId));
+        await group.SendAsync("FundsUpdated", funds, cancellationToken);
+        await group.SendAsync("FundChanged", funds, cancellationToken);
     }
 
     public async Task NotifyCraftingQueueUpdatedAsync(Guid partyId, IReadOnlyList<CraftingQueueItemDto> queue, CancellationToken cancellationToken = default)

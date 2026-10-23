@@ -3963,6 +3963,78 @@ button:disabled {
   padding: 1.25rem;
 }
 
+/* Stash Navbar Button */
+.stash-nav-btn {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(202, 138, 4, 0.25) 100%);
+  border: 1px solid rgba(234, 179, 8, 0.5);
+  color: #fef08a;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.stash-nav-btn:hover {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.35) 0%, rgba(202, 138, 4, 0.45) 100%);
+  border-color: #facc15;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.25);
+}
+
+/* Embedded Stash in Live Combat Session Modal */
+.embedded-stash-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.embedded-stash-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0.5rem 0 !important;
+}
+
+/* Stash Item Identification */
+.unidentified-badge {
+  display: inline-block;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+}
+
+.btn-identify-icon {
+  background: rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 0.4rem;
+  transition: all 0.2s;
+}
+
+.btn-identify-icon:hover {
+  background: rgba(168, 85, 247, 0.4);
+  border-color: #c084fc;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.stash-party-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 
 
 

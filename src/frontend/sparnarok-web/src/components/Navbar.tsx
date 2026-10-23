@@ -11,6 +11,7 @@ export interface NavbarProps {
   onOpenIngestionModal: () => void;
   onOpenLiveSession?: () => void;
   onOpenPartiesModal?: () => void;
+  onOpenStashModal?: () => void;
 }
 
 /**
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenIngestionModal,
   onOpenLiveSession,
   onOpenPartiesModal,
+  onOpenStashModal,
 }) => {
   const { t, i18n } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
@@ -86,6 +88,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               title={t('parties.myPartiesTitle', 'Gestionar mis Partys de juego')}
             >
               🛡️ {t('parties.myPartiesBtn', 'Mis Partys')}
+            </button>
+          )}
+          {onOpenStashModal && (
+            <button
+              type="button"
+              id="open-stash-btn"
+              className="action-btn stash-nav-btn primary-gold"
+              onClick={onOpenStashModal}
+              title={t('stash.navTitle', 'Botín de Grupo (Stash y Tesoro Común)')}
+            >
+              🪙 {t('stash.navBtn', 'Botín de Grupo (Stash)')}
             </button>
           )}
           {activeTab === 'bestiary' && (
