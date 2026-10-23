@@ -34,6 +34,7 @@ builder.Services.AddScoped<ICreatureRepository, CreatureRepository>();
 builder.Services.AddScoped<IWeaponMasteryRepository, WeaponMasteryRepository>();
 builder.Services.AddScoped<IPartyRepository, PartyRepository>();
 builder.Services.AddScoped<IEncounterRepository, EncounterRepository>();
+builder.Services.AddScoped<ISessionNoteRepository, SessionNoteRepository>();
 
 // 4. Servicios de Ingestión de Datos (CSV & Streaming)
 builder.Services.AddScoped<ICsvParserService, Sparnarok.Api.Infrastructure.Services.CsvParserService>();
@@ -115,6 +116,7 @@ builder.Services.AddAuthorization();
 // 5.2 Tiempo Real (SignalR) para Alijo Colaborativo y Sesiones en Vivo
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IStashNotificationService, Sparnarok.Api.Infrastructure.Hubs.StashNotificationService>();
+builder.Services.AddSingleton<ILiveCombatManager, Sparnarok.Api.Infrastructure.Services.LiveCombatManager>();
 
 // 6. Validadores de Aplicación (FluentValidation)
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCreatureRequestValidator>();
@@ -190,6 +192,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<Sparnarok.Api.Infrastructure.Hubs.StashHub>("/hubs/stash");
+app.MapHub<Sparnarok.Api.Infrastructure.Hubs.LiveCombatHub>("/hubs/live-combat");
 
 app.Run();
 

@@ -64,6 +64,11 @@ public class SparnarokDbContext : DbContext
     /// </summary>
     public DbSet<StashActivityLog> StashActivityLogs => Set<StashActivityLog>();
 
+    /// <summary>
+    /// Conjunto de datos para las notas de sesión y apuntes de campaña de las Parties (Session Notes).
+    /// </summary>
+    public DbSet<SessionNote> SessionNotes => Set<SessionNote>();
+
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="SparnarokDbContext"/>.

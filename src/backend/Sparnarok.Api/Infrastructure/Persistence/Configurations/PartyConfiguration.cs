@@ -87,5 +87,14 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
 
         builder.Navigation(p => p.ActivityLogs)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Relación One-to-Many con SessionNote
+        builder.HasMany(p => p.SessionNotes)
+            .WithOne(n => n.Party)
+            .HasForeignKey(n => n.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(p => p.SessionNotes)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

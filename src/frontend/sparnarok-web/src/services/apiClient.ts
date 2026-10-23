@@ -33,10 +33,16 @@ import type {
   DowntimeAdvanceResultDto,
   PartyStashDto,
 } from '../types/stash';
+import type {
+  SessionNoteResponseDto,
+  CreateSessionNoteRequest,
+  UpdateSessionNoteRequest,
+} from '../types/liveCombat';
 
 const API_BASE_URL = '/api/v1';
 
 let currentAuthToken: string | null = null;
+let inMemorySessionNotes: SessionNoteResponseDto[] = [];
 
 function getAuthHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = { ...additionalHeaders };
@@ -1843,6 +1849,118 @@ export const apiClient = {
     }
 
     return inMemoryActivityLogs.filter((l) => l.partyId === partyId).slice(0, limit);
+  },
+
+  /**
+   * Obtiene todas las notas de sesión de una Party (DM Only).
+   */
+  async getSessionNotes(partyId: string, signal?: AbortSignal): Promise<SessionNoteResponseDto[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes`, {
+        method: 'GET',
+        headers: getAuthHeaders({ 'Accept': 'application/json' }),
+        signal,
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback local
+    }
+    return inMemorySessionNotes.filter((n) => n.partyId === partyId);
+  },
+
+  /**
+   * Crea una nueva nota de sesión para la Party (DM Only).
+   */
+  async createSessionNote(partyId: string, request: CreateSessionNoteRequest): Promise<SessionNoteResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemorySessionNotes = [data, ...inMemorySessionNotes.filter((n) => n.id !== data.id)];
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const newNote: SessionNoteResponseDto = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      partyId,
+      title: request.title,
+      content: request.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemorySessionNotes = [newNote, ...inMemorySessionNotes];
+    return newNote;
+  },
+
+  /**
+   * Actualiza una nota de sesión existente (DM Only).
+   */
+  async updateSessionNote(partyId: string, noteId: string, request: UpdateSessionNoteRequest): Promise<SessionNoteResponseDto> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes/${noteId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(request),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        inMemorySessionNotes = inMemorySessionNotes.map((n) => (n.id === noteId ? data : n));
+        return data;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    let updatedNote: SessionNoteResponseDto | null = null;
+    inMemorySessionNotes = inMemorySessionNotes.map((n) => {
+      if (n.id === noteId) {
+        updatedNote = {
+          ...n,
+          title: request.title,
+          content: request.content,
+          updatedAt: new Date().toISOString(),
+        };
+        return updatedNote;
+      }
+      return n;
+    });
+
+    return updatedNote || {
+      id: noteId,
+      partyId,
+      title: request.title,
+      content: request.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  /**
+   * Elimina una nota de sesión por ID (DM Only).
+   */
+  async deleteSessionNote(partyId: string, noteId: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/parties/${partyId}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
+        return;
+      }
+    } catch {
+      // Fallback local
+    }
+    inMemorySessionNotes = inMemorySessionNotes.filter((n) => n.id !== noteId);
   },
 };
 

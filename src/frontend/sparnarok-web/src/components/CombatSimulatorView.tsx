@@ -10,6 +10,7 @@ import type {
 import type { PartyResponseDto, EncounterResponseDto } from '../types/partyEncounter';
 import { CustomHeroModal } from './CustomHeroModal';
 import { PartyStashModal } from './PartyStashModal';
+import { LiveSessionModal } from './LiveSessionModal';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
 
@@ -82,6 +83,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
 
   const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
   const [isPartyStashModalOpen, setIsPartyStashModalOpen] = useState<boolean>(false);
+  const [isLiveSessionModalOpen, setIsLiveSessionModalOpen] = useState<boolean>(false);
 
   const [targetingStrategy, setTargetingStrategy] = useState<TargetingStrategy>('LowestHp');
   const [iterations, setIterations] = useState<number>(10000);
@@ -526,6 +528,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                 title={t('stash.openStashBtn', 'Abrir Alijo de la Party (Stash)')}
               >
                 🎒 {t('stash.openStashBtn', 'Party Stash')}
+              </button>
+              <button
+                type="button"
+                id="open-live-session-btn"
+                className="btn btn-primary btn-sm primary-gold"
+                onClick={() => setIsLiveSessionModalOpen(true)}
+                disabled={isSimulating}
+                title={t('liveCombat.openLiveSessionBtn', 'Modo Partida (Iniciativa & Notas)')}
+              >
+                ⚔️ {t('liveCombat.openLiveSessionBtn', 'Modo Partida')}
               </button>
               <button
                 type="button"
@@ -1179,6 +1191,16 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
           (parties.length > 0 ? parties[0].name : t('simulation.partyTitle', 'La Party'))
         }
         onClose={() => setIsPartyStashModalOpen(false)}
+      />
+
+      {/* Modal de Modo Partida Colaborativo (Live Initiative & Session Notes) */}
+      <LiveSessionModal
+        isOpen={isLiveSessionModalOpen}
+        parties={parties}
+        activePartyId={selectedPartyId || (parties.length > 0 ? parties[0].id : '')}
+        activeEncounter={encounters.find((e) => e.id === selectedEncounterId) || null}
+        currentUserId={auth.user?.id}
+        onClose={() => setIsLiveSessionModalOpen(false)}
       />
     </div>
   );

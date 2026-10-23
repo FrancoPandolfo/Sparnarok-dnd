@@ -405,6 +405,31 @@ Optimización de la experiencia en vivo durante sesiones de juego mediante sincr
    - Encolado de objetos con deducción automática de oro del Party Fund y asignación de "Días Restantes".
    - Acción exclusiva del DM: "👑 Avanzar 1 día de Downtime", reduciendo contadores de proyectos activos y transfiriendo automáticamente al alijo principal al llegar a 0 días restantes.
 
+### 3.6.10 Modo Partida Colaborativo: Live Initiative Tracker & DM Session Notes [Completado]
+
+Orquestación táctica de combates en vivo con proyección de estado asimétrica en SignalR (anti-metagaming estricto) y gestión confidencial de notas de campaña en Markdown:
+1. **Notas de Sesión (Session Notes):**
+   - Entidad de dominio `SessionNote` (`Id`, `PartyId`, `Title`, `Content`, `CreatedAt`, `UpdatedAt`), mapeo Fluent API con borrado en cascada y migración `20261022233718_AddSessionNotes.cs`.
+   - Endpoints CRUD en `SessionNotesController` (`/api/v1/parties/{partyId}/notes`) con autorización exclusiva para el rol de `DungeonMaster` (`party.OwnerUserId == User.GetUserId()`), retornando `403 Forbidden` ante jugadores.
+   - Editor React `SessionNotesEditor` con textarea Markdown, alternancia de vista previa estructurada y guardado reactivo.
+2. **Gestor de Estado de Combate y Hub de SignalR (`LiveCombatHub`):**
+   - Hub en `/hubs/live-combat` y servicio en memoria concurrente `ILiveCombatManager`.
+   - Manejo de flujo de combate: `WaitingForInitiative` (pausa esperando tiradas), `InProgress` (combate activo por rondas y turnos) y `Ended`.
+   - **Proyecciones Asimétricas por Rol (Zero-Trust Anti-Metagaming):**
+     - DM recibe `LiveCombatDmProjectionDto`: todos los monstruos, CA real, HP numérico exacto y control de visibilidad.
+     - Jugadores reciben `LiveCombatPlayerProjectionDto`: monstruos con `IsVisibleToPlayers == false` se omiten completamente del array; se oculta la propiedad CA; para monstruos visibles los HP exactos son `null` y solo se expone estado cualitativo (`Healthy`, `Bloodied`, `Down`); si el turno activo pertenece a un enemigo oculto, se proyecta `"Turno del Enemigo"` con ID nulo.
+   - Acciones del DM: `AutoRollMonsters`, `StartCombat`, `NextTurn`, `PreviousTurn`, `ModifyHp` (botones rápidos -5/-1/+1/+5), `ToggleVisibility` y sobreescritura de iniciativa para jugadores AFK.
+   - Acción del Jugador: `SubmitInitiative` con input numérico directo.
+3. **Interfaz de Usuario React (`LiveCombatTracker` y `LiveSessionModal`):**
+   - Modal unificado con selector de Party, indicador de rol (`👑 Dungeon Master` vs `🛡️ Jugador`) y pestañas dinámicas (Notas exclusivas para el DM).
+   - Tabla interactiva con resaltado de turno activo, badges de héroes/monstruos y sincronización automática vía SignalR.
+4. **Verificación de Calidad y DoD:**
+   - [ADR-0017](file:///docs/adrs/0017-live-initiative-tracker-role-based-projections-and-session-notes.md): Documentación del patrón de proyección de estado asimétrica.
+   - Tests Unitarios Backend: `LiveCombatHubTests.cs` (validación de censura JSON sin monstruos ni CA en proyección de jugador) y `SessionNotesTests.cs` (invariantes y autorización 403 Forbidden).
+   - Tests de Integración Backend: `SessionNotesIntegrationTests.cs` con Testcontainers PostgreSQL.
+   - Tests Frontend (Vitest): `LiveCombatTracker.test.tsx` y `SessionNotesEditor.test.tsx`.
+   - Test E2E Multi-Contexto (Playwright): `tests/e2e/specs/liveSession.spec.ts` con dos contextos de navegador concurrentes (DM y Jugador), validando que el jugador envía iniciativa y la ve reflejada, pero no puede ver al monstruo "Goblin Boss".
+
 ---
 
 ## Fases Futuras (Visión de Proyecto)
@@ -412,5 +437,6 @@ Optimización de la experiencia en vivo durante sesiones de juego mediante sincr
 ### Fase 4: Telemetría, Optimización y Exportación
 - Exportación de métricas matemáticas en PDF / Markdown / JSON.
 - Panel de analítica de combate en tiempo real.
+
 
 
