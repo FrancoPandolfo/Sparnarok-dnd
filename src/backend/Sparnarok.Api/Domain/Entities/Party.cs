@@ -72,6 +72,11 @@ public class Party
     /// <summary>Peso total acumulado en libras (lbs) de todos los objetos en el alijo de la Party.</summary>
     public decimal TotalStashWeight => _stashItems.Sum(i => i.Weight * i.Quantity);
 
+    /// <summary>
+    /// Estado serializado en JSON del combate activo de la Party para persistencia y rehidratación (Fase 3.8+).
+    /// </summary>
+    public string? CurrentCombatState { get; private set; }
+
     /// <summary>Constructor protegido para Entity Framework Core.</summary>
     protected Party() { }
 
@@ -257,5 +262,14 @@ public class Party
     {
         ArgumentNullException.ThrowIfNull(log);
         _activityLogs.Add(log);
+    }
+
+    /// <summary>
+    /// Actualiza el estado serializado del combate táctico activo de la Party.
+    /// </summary>
+    /// <param name="stateJson">Cadena JSON del estado completo o null para despejar.</param>
+    public void SetCurrentCombatState(string? stateJson)
+    {
+        CurrentCombatState = stateJson;
     }
 }

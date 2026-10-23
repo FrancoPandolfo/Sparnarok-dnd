@@ -145,10 +145,10 @@ public class PartiesController : ControllerBase
 
         var party = new Party(Guid.NewGuid(), request.Name, userId.Value);
 
-        // Registrar membresía inicial del creador de la Party (Fase 3.7)
-        var creatorRole = string.IsNullOrWhiteSpace(request.Role) ? "DungeonMaster" : request.Role.Trim();
+        // Registrar membresía inicial del creador de la Party con rol exclusivo de DungeonMaster
+        const string creatorRole = "DungeonMaster";
         var creatorName = string.IsNullOrWhiteSpace(request.InGameName)
-            ? User.GetDisplayName()
+            ? (User.GetDisplayName() ?? "Dungeon Master")
             : request.InGameName.Trim();
         party.AddPartyMember(new PartyMember(Guid.NewGuid(), party.Id, userId.Value, creatorRole, creatorName));
 
@@ -241,6 +241,7 @@ public class PartiesController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<PartyResponseDto>> JoinByToken(
         string token,
         [FromBody] JoinPartyRequestDto request,
@@ -252,11 +253,6 @@ public class PartiesController : ControllerBase
         if (request is null)
         {
             return BadRequest(new ProblemDetails { Title = "Solicitud inválida", Status = StatusCodes.Status400BadRequest });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Role) || (request.Role != "DungeonMaster" && request.Role != "Player"))
-        {
-            ModelState.AddModelError(nameof(request.Role), "El rol es obligatorio y debe ser 'DungeonMaster' o 'Player'.");
         }
 
         if (string.IsNullOrWhiteSpace(request.InGameName))
@@ -280,24 +276,29 @@ public class PartiesController : ControllerBase
             });
         }
 
+        // Asegurar que un usuario no pueda unirse dos veces a la misma party
         var existingMember = party.PartyMembers.FirstOrDefault(m => m.UserId == userId.Value);
         if (existingMember != null)
         {
-            existingMember.SetRole(request.Role.Trim());
-            existingMember.SetInGameName(request.InGameName.Trim());
+            return Conflict(new ProblemDetails
+            {
+                Title = "Usuario ya registrado",
+                Status = StatusCodes.Status409Conflict,
+                Detail = "El usuario ya es miembro de esta Party."
+            });
         }
-        else
-        {
-            var newMember = new PartyMember(
-                Guid.NewGuid(),
-                party.Id,
-                userId.Value,
-                request.Role.Trim(),
-                request.InGameName.Trim()
-            );
-            party.AddPartyMember(newMember);
-            await _partyRepository.AddPartyMemberAsync(newMember, ct);
-        }
+
+        // El rol asignado a miembros invitados por token es siempre 'Player'
+        const string assignedRole = "Player";
+        var newMember = new PartyMember(
+            Guid.NewGuid(),
+            party.Id,
+            userId.Value,
+            assignedRole,
+            request.InGameName.Trim()
+        );
+        party.AddPartyMember(newMember);
+        await _partyRepository.AddPartyMemberAsync(newMember, ct);
 
         await _partyRepository.SaveChangesAsync(ct);
         return Ok(PartyResponseDto.FromEntity(party));

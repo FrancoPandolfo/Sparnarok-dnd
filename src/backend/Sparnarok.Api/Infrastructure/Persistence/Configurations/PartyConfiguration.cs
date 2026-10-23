@@ -35,6 +35,9 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
+        builder.Property(p => p.CurrentCombatState)
+            .IsRequired(false);
+
         // Fondos de la Party (Party Fund)
         builder.Property(p => p.CopperPieces)
             .HasPrecision(18, 2)

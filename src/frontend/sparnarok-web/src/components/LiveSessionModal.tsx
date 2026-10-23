@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveCombatTracker } from './LiveCombatTracker';
 import { SessionNotesEditor } from './SessionNotesEditor';
@@ -19,6 +19,7 @@ export interface LiveSessionModalProps {
   activeEncounter?: EncounterResponseDto | null;
   currentUserId?: string | null;
   initialRole?: PartyRole;
+  onPartyChange?: (partyId: string) => void;
 }
 
 /**
@@ -34,6 +35,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   activeEncounter,
   currentUserId,
   initialRole,
+  onPartyChange,
 }) => {
   const { t } = useTranslation();
 
@@ -71,8 +73,15 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
       }
     : effectiveParties.find((p) => p.id === selectedPartyId);
 
+  const prevActivePartyIdRef = useRef(activePartyId);
+  const prevIsOpenRef = useRef(isOpen);
+
   useEffect(() => {
-    if (activePartyId) {
+    if (isOpen && !prevIsOpenRef.current) {
+      // Al abrir el modal por primera vez, inicializar con activePartyId o primera party disponible
+      setSelectedPartyId(activePartyId || effectiveParties[0]?.id || 'quick-session');
+    } else if (activePartyId && activePartyId !== prevActivePartyIdRef.current) {
+      // Si el componente padre actualiza explícitamente activePartyId, sincronizarlo
       setSelectedPartyId(activePartyId);
     } else if (
       selectedPartyId !== 'quick-session' &&
@@ -81,7 +90,9 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
     ) {
       setSelectedPartyId(effectiveParties[0].id);
     }
-  }, [activePartyId, effectiveParties, selectedPartyId]);
+    prevIsOpenRef.current = isOpen;
+    prevActivePartyIdRef.current = activePartyId;
+  }, [isOpen, activePartyId, effectiveParties, selectedPartyId]);
 
   // Determinar rol por defecto basado en la autoría de la Party seleccionada
   useEffect(() => {
@@ -101,29 +112,48 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
     }
   }, [selectedPartyId, effectiveParties, currentUserId, initialRole]);
 
-  // Sincronización SignalR
-  const connectSignalR = useCallback(async () => {
-    if (!selectedPartyId || !isOpen) return;
-
-    await liveCombatHubService.startConnection(selectedPartyId, role, {
-      onCombatStateUpdated: (state) => {
-        setCombatState(state);
-      },
-    });
-  }, [selectedPartyId, role, isOpen]);
-
+  // Sincronización SignalR con teardown explícito antes de reconectar a nueva Party
   useEffect(() => {
+    let isCancelled = false;
+
+    // Resetear inmediatamente el estado del tracker al cambiar de Party o cerrar
+    setCombatState(null);
+
+    const initConnection = async () => {
+      // Detener limpiamente conexión previa antes de conectar al nuevo PartyId
+      await liveCombatHubService.stopConnection();
+
+      if (isCancelled || !isOpen || !selectedPartyId) return;
+
+      await liveCombatHubService.startConnection(selectedPartyId, role, {
+        onCombatStateUpdated: (state) => {
+          if (!isCancelled) {
+            setCombatState(state);
+          }
+        },
+      });
+    };
+
     if (isOpen && selectedPartyId) {
-      connectSignalR();
+      initConnection();
     } else {
       liveCombatHubService.stopConnection();
-      setCombatState(null);
     }
 
     return () => {
-      liveCombatHubService.stopConnection();
+      isCancelled = true;
+      // Invocación explícita de hubConnection.stop() en la función de limpieza
+      if (typeof liveCombatHubService.getHubConnection === 'function') {
+        const hubConn = liveCombatHubService.getHubConnection();
+        if (hubConn && typeof hubConn.stop === 'function') {
+          hubConn.stop().catch(() => {});
+        }
+      }
+      if (typeof liveCombatHubService.stopConnection === 'function') {
+        liveCombatHubService.stopConnection().catch?.(() => {});
+      }
     };
-  }, [isOpen, selectedPartyId, role, connectSignalR]);
+  }, [isOpen, selectedPartyId, role]);
 
   const handleInitializeCombat = async () => {
     if (selectedPartyId === 'quick-session') {
@@ -134,7 +164,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
       return;
     }
 
-    const party = parties.find((p) => p.id === selectedPartyId);
+    const party = effectiveParties.find((p) => p.id === selectedPartyId);
     if (!party) return;
 
     const combatants: InitializeLiveCombatantRequest[] = [];
@@ -205,7 +235,9 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 value={selectedPartyId}
                 onChange={(e) => {
                   const val = e.target.value;
+                  setCombatState(null);
                   setSelectedPartyId(val);
+                  onPartyChange?.(val);
                   if (val === 'quick-session') {
                     setRole('DungeonMaster');
                   }
@@ -242,7 +274,16 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 className="btn btn-outline btn-xs"
                 onClick={() => {
                   const url = `${window.location.origin}${window.location.pathname}?inviteToken=${currentParty.inviteToken}`;
-                  navigator.clipboard?.writeText(url);
+                  if (navigator.clipboard?.writeText) {
+                    try {
+                      const res = navigator.clipboard.writeText(url);
+                      if (res && typeof res.catch === 'function') {
+                        res.catch(() => {});
+                      }
+                    } catch {
+                      // no-op
+                    }
+                  }
                   setCopyFeedback(true);
                   setTimeout(() => setCopyFeedback(false), 3000);
                 }}

@@ -1251,6 +1251,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         activePartyId={selectedPartyId || (parties.length > 0 ? parties[0].id : '')}
         activeEncounter={encounters.find((e) => e.id === selectedEncounterId) || null}
         currentUserId={auth.user?.id}
+        onPartyChange={(newPartyId) => setSelectedPartyId(newPartyId)}
         onClose={() => setIsLiveSessionModalOpen(false)}
       />
 
