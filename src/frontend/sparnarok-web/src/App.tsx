@@ -63,11 +63,16 @@ export function AppContent() {
     return () => controller.abort();
   }, []);
 
+  const [lastQuickRoll, setLastQuickRoll] = useState<string | null>(null);
+
   /**
-   * Incrementa el contador de simulaciones de combate ejecutadas.
+   * Incrementa el contador de simulaciones y ejecuta una tirada táctica d20 de demostración rápida.
    */
   const handleIncrementSimulation = useCallback(() => {
     setSimulationCount((prev) => prev + 1);
+    const d20 = Math.floor(Math.random() * 20) + 1;
+    const badge = d20 === 20 ? `🎯 ¡d20 = 20! ¡Impacto Crítico!` : d20 === 1 ? `💀 ¡d20 = 1! ¡Fallo Crítico!` : `🎲 Tirada d20: ${d20}`;
+    setLastQuickRoll(badge);
   }, []);
 
   /**
@@ -138,9 +143,15 @@ export function AppContent() {
           id="simulation-counter-btn"
           onClick={handleIncrementSimulation}
           aria-label={t('app.counterButton', { count: simulationCount })}
+          title="Contador de tiradas rápidas de prueba (Fase 1). Para simulaciones masivas con Monte Carlo, accede a la pestaña Simulador."
         >
           🎲 {t('app.counterButton', { count: simulationCount })}
         </button>
+        {lastQuickRoll && (
+          <span className="quick-roll-badge fade-in" style={{ marginLeft: '12px', fontSize: '0.9rem', color: 'var(--color-gold)' }}>
+            {lastQuickRoll}
+          </span>
+        )}
       </div>
 
       {/* Vista Activa: Bestiario o Simulador */}

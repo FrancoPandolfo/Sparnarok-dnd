@@ -7,6 +7,8 @@ export interface AuthUser {
   displayName: string;
   avatarUrl?: string | null;
   token: string;
+  hasPassword?: boolean;
+  hasGoogleLinked?: boolean;
 }
 
 /**
@@ -17,7 +19,31 @@ export interface GoogleLoginRequestDto {
 }
 
 /**
- * Respuesta del backend tras autenticación social exitosa con Google OAuth2.
+ * Solicitud de registro convencional de cuenta nueva con Email y Contraseña.
+ */
+export interface RegisterRequestDto {
+  email: string;
+  password: string;
+  displayName: string;
+}
+
+/**
+ * Solicitud de inicio de sesión convencional con Email y Contraseña.
+ */
+export interface LoginRequestDto {
+  email: string;
+  password: string;
+}
+
+/**
+ * Solicitud para configurar o actualizar la contraseña convencional.
+ */
+export interface SetPasswordRequestDto {
+  newPassword: string;
+}
+
+/**
+ * Respuesta del backend tras autenticación exitosa (Google o Convencional).
  */
 export interface AuthResponseDto {
   token: string;
@@ -25,4 +51,6 @@ export interface AuthResponseDto {
   email: string;
   displayName: string;
   avatarUrl?: string | null;
+  hasPassword?: boolean;
+  hasGoogleLinked?: boolean;
 }

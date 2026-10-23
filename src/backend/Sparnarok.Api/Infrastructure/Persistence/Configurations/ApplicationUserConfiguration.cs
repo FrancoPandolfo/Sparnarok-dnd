@@ -18,20 +18,26 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 
         builder.Property(u => u.GoogleSubjectId)
             .HasMaxLength(150)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.HasIndex(u => u.GoogleSubjectId)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"GoogleSubjectId\" IS NOT NULL");
 
         builder.Property(u => u.Email)
             .HasMaxLength(256)
             .IsRequired();
 
-        builder.HasIndex(u => u.Email);
+        builder.HasIndex(u => u.Email)
+            .IsUnique();
 
         builder.Property(u => u.DisplayName)
             .HasMaxLength(150)
             .IsRequired();
+
+        builder.Property(u => u.PasswordHash)
+            .HasMaxLength(500)
+            .IsRequired(false);
 
         builder.Property(u => u.AvatarUrl)
             .HasMaxLength(1000)

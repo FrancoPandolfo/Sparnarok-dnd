@@ -35,6 +35,10 @@ describe('Navbar Component Suite', () => {
       isAuthenticated: false,
       isLoading: false,
       loginWithGoogle: vi.fn(),
+      loginConventional: vi.fn(),
+      registerConventional: vi.fn(),
+      setPassword: vi.fn(),
+      linkGoogle: vi.fn(),
       logout: vi.fn(),
     };
 
@@ -59,6 +63,10 @@ describe('Navbar Component Suite', () => {
       isAuthenticated: true,
       isLoading: false,
       loginWithGoogle: vi.fn(),
+      loginConventional: vi.fn(),
+      registerConventional: vi.fn(),
+      setPassword: vi.fn(),
+      linkGoogle: vi.fn(),
       logout: mockLogout,
     };
 

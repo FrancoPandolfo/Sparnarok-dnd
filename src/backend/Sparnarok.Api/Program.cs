@@ -65,9 +65,10 @@ builder.Services.AddSingleton<IDprBaselineService, Sparnarok.Api.Infrastructure.
 builder.Services.AddScoped<ICombatSimulatorService, Sparnarok.Api.Infrastructure.Services.CombatSimulatorService>();
 builder.Services.AddScoped<IMontecarloSimulationService, Sparnarok.Api.Infrastructure.Services.MontecarloSimulationService>();
 
-// 5.1 Identidad y Autenticación Federada (Google OAuth2 & JWT)
+// 5.1 Identidad y Autenticación Federada (Google OAuth2 & JWT) & Convencional
 builder.Services.AddSingleton<IJwtTokenService, Sparnarok.Api.Infrastructure.Services.JwtTokenService>();
 builder.Services.AddScoped<IGoogleAuthService, Sparnarok.Api.Infrastructure.Services.GoogleAuthService>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<Sparnarok.Api.Domain.Entities.ApplicationUser>, Microsoft.AspNetCore.Identity.PasswordHasher<Sparnarok.Api.Domain.Entities.ApplicationUser>>();
 
 var jwtKey = builder.Configuration["Authentication:Jwt:Key"]
     ?? Sparnarok.Api.Infrastructure.Services.JwtTokenService.DefaultDevKey;
@@ -177,6 +178,21 @@ app.UseRequestLocalization(localizationOptions);
 // 4. Configuración del Entorno de Desarrollo y Swagger UI
 if (app.Environment.IsDevelopment())
 {
+    using (var scope = app.Services.CreateScope())
+    {
+        try
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            db.Database.Migrate();
+            Sparnarok.Api.Infrastructure.Persistence.DataSeeder.SeedInitialData(db);
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "No se pudo migrar o sembrar la base de datos automáticamente en inicio de desarrollo.");
+        }
+    }
+
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {

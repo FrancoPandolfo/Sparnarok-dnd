@@ -8,6 +8,10 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithGoogle: (idToken: string) => Promise<AuthResponseDto>;
+  loginConventional: (email: string, password: string) => Promise<AuthResponseDto>;
+  registerConventional: (email: string, password: string, displayName: string) => Promise<AuthResponseDto>;
+  setPassword: (newPassword: string) => Promise<AuthResponseDto>;
+  linkGoogle: (idToken: string) => Promise<AuthResponseDto>;
   logout: () => void;
 }
 
@@ -20,11 +24,26 @@ export interface AuthProviderProps {
 }
 
 /**
- * Proveedor global de contexto de autenticación e identidad de usuario (Google OAuth2 + JWT).
+ * Proveedor global de contexto de autenticación e identidad de usuario (Google OAuth2 + Convencional).
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const saveAuthSession = useCallback((response: AuthResponseDto) => {
+    const authUser: AuthUser = {
+      id: response.userId,
+      email: response.email,
+      displayName: response.displayName,
+      avatarUrl: response.avatarUrl ?? null,
+      token: response.token,
+      hasPassword: response.hasPassword,
+      hasGoogleLinked: response.hasGoogleLinked,
+    };
+    apiClient.setAuthToken(response.token);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+    setUser(authUser);
+  }, []);
 
   // Restauración de sesión persistida en almacenamiento local
   useEffect(() => {
@@ -39,6 +58,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             displayName: parsed.displayName || 'Aventurero',
             avatarUrl: parsed.avatarUrl ?? null,
             token: parsed.token,
+            hasPassword: parsed.hasPassword ?? false,
+            hasGoogleLinked: parsed.hasGoogleLinked ?? false,
           };
           apiClient.setAuthToken(normalizedUser.token);
           setUser(normalizedUser);
@@ -52,27 +73,74 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Intercambia el idToken de Google por un JWT de Sparnarok y persiste la sesión.
+   * Inicia sesión o registra mediante Google OAuth2.
    */
   const loginWithGoogle = useCallback(async (idToken: string): Promise<AuthResponseDto> => {
     setIsLoading(true);
     try {
       const response = await apiClient.loginWithGoogle(idToken);
-      const authUser: AuthUser = {
-        id: response.userId,
-        email: response.email,
-        displayName: response.displayName,
-        avatarUrl: response.avatarUrl ?? null,
-        token: response.token,
-      };
-      apiClient.setAuthToken(response.token);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-      setUser(authUser);
+      saveAuthSession(response);
       return response;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [saveAuthSession]);
+
+  /**
+   * Inicia sesión con credenciales convencionales (email y contraseña).
+   */
+  const loginConventional = useCallback(async (email: string, password: string): Promise<AuthResponseDto> => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.loginConventional({ email, password });
+      saveAuthSession(response);
+      return response;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [saveAuthSession]);
+
+  /**
+   * Registra una nueva cuenta convencional con email y contraseña.
+   */
+  const registerConventional = useCallback(async (email: string, password: string, displayName: string): Promise<AuthResponseDto> => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.registerConventional({ email, password, displayName });
+      saveAuthSession(response);
+      return response;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [saveAuthSession]);
+
+  /**
+   * Configura o actualiza la contraseña del usuario logueado.
+   */
+  const setPassword = useCallback(async (newPassword: string): Promise<AuthResponseDto> => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.setPassword({ newPassword });
+      saveAuthSession(response);
+      return response;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [saveAuthSession]);
+
+  /**
+   * Vincula la cuenta de Google al usuario autenticado.
+   */
+  const linkGoogle = useCallback(async (idToken: string): Promise<AuthResponseDto> => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.linkGoogle(idToken);
+      saveAuthSession(response);
+      return response;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [saveAuthSession]);
 
   /**
    * Cierra la sesión activa y purga las credenciales del almacenamiento local.
@@ -89,6 +157,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: Boolean(user && user.token),
     isLoading,
     loginWithGoogle,
+    loginConventional,
+    registerConventional,
+    setPassword,
+    linkGoogle,
     logout,
   };
 
@@ -112,10 +184,47 @@ export function useAuth(): AuthContextType {
         email: 'mock@sparnarok.dnd',
         displayName: 'Aventurero del Códice',
         avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: false,
+      }),
+      loginConventional: async () => ({
+        token: 'mock-token',
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'mock@sparnarok.dnd',
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: false,
+      }),
+      registerConventional: async () => ({
+        token: 'mock-token',
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'mock@sparnarok.dnd',
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: false,
+      }),
+      setPassword: async () => ({
+        token: 'mock-token',
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'mock@sparnarok.dnd',
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: true,
+      }),
+      linkGoogle: async () => ({
+        token: 'mock-token',
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'mock@sparnarok.dnd',
+        displayName: 'Aventurero del Códice',
+        avatarUrl: null,
+        hasPassword: true,
+        hasGoogleLinked: true,
       }),
       logout: () => {},
     };
   }
   return context;
 }
-

@@ -678,8 +678,12 @@ test.describe('Sparnarok Codex Smoke Suite', () => {
     const runBtn = page.locator('#run-montecarlo-btn');
     await expect(runBtn).toBeDisabled();
 
-    // Click Google Login button to trigger OAuth exchange intercepted by network mock
+    // Click Google Login button to open Auth modal and trigger OAuth exchange
     await googleLoginBtn.click();
+    const devBtn = page.locator('#dev-login-btn');
+    if (await devBtn.isVisible()) {
+      await devBtn.click();
+    }
 
     // Verify API was intercepted
     expect(authRouteCalled).toBe(true);
