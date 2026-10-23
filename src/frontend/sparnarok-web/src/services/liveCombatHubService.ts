@@ -280,7 +280,7 @@ class LiveCombatHubService {
     newIndex: number
   ): Promise<void> {
     if (this.connection && this.connection.state === HubConnectionState.Connected) {
-      await this.connection.invoke('ReorderCombatant', partyId, combatantId, newIndex);
+      await this.connection.invoke('ReorderCombatant', combatantId, newIndex);
       return;
     }
 

@@ -110,22 +110,7 @@ public class LiveCombatHub : Hub
 
     /// <summary>
     /// Reordena un combatiente en la lista posicional mediante Drag and Drop (Acción exclusiva del DM).
-    /// </summary>
-    public async Task ReorderCombatant(string partyId, string combatantId, int newIndex)
-    {
-        if (!Guid.TryParse(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
-        {
-            return;
-        }
-
-        if (_combatManager.ReorderCombatant(pId, cId, newIndex))
-        {
-            await BroadcastCombatStateAsync(pId);
-        }
-    }
-
-    /// <summary>
-    /// Sobrecarga que infiere la Party desde el contexto de conexión activo.
+    /// Infiere la Party desde el contexto de conexión activo asignado en JoinCombat.
     /// </summary>
     public async Task ReorderCombatant(string combatantId, int newIndex)
     {
@@ -148,6 +133,22 @@ public class LiveCombatHub : Hub
             {
                 await BroadcastCombatStateAsync(partyId.Value);
             }
+        }
+    }
+
+    /// <summary>
+    /// Reordena un combatiente especificando explícitamente el identificador de la Party (Acción exclusiva del DM).
+    /// </summary>
+    public async Task ReorderCombatantInParty(string partyId, string combatantId, int newIndex)
+    {
+        if (!Guid.TryParse(partyId, out var pId) || !Guid.TryParse(combatantId, out var cId))
+        {
+            return;
+        }
+
+        if (_combatManager.ReorderCombatant(pId, cId, newIndex))
+        {
+            await BroadcastCombatStateAsync(pId);
         }
     }
 
