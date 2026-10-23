@@ -164,4 +164,72 @@ public class SessionNotesIntegrationTests : IClassFixture<CustomWebApplicationFa
         var dmDeleteResponse = await _client.SendAsync(dmDeleteReq);
         dmDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
+
+    [Fact]
+    public async Task SessionNotes_CreateModifyAndQueryDatabase_PersistsModifiedContentSuccessfully()
+    {
+        // 1. Crear y autenticar usuario
+        var user = await AuthenticateUserAsync("note_persister");
+
+        // 2. Crear Party
+        var party = await CreatePartyAsync("Party Crónicas de la Persistencia", user.Token, "DungeonMaster", "El Escriba");
+
+        // 3. Crear una nota privada inicial
+        var createRequest = new CreateSessionNoteRequest(
+            "Sesión 1: Llegada a Phandalin",
+            "Los aventureros llegaron al pueblo y hablaron con Barthen.");
+
+        using var postReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/parties/{party.Id}/notes");
+        postReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        postReq.Content = JsonContent.Create(createRequest);
+
+        var postResponse = await _client.SendAsync(postReq);
+        postResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var createdNote = await postResponse.Content.ReadFromJsonAsync<SessionNoteResponseDto>(_jsonOptions);
+        createdNote.Should().NotBeNull();
+        createdNote!.Title.Should().Be(createRequest.Title);
+        createdNote.Content.Should().Be(createRequest.Content);
+
+        // 4. Modificar el contenido de la nota
+        var updateRequest = new UpdateSessionNoteRequest(
+            "Sesión 1: Llegada a Phandalin (Actualizado)",
+            "Los aventureros descubrieron que los Redbrands custodian la mansión Tresendar. Recompensa: 100 PO.");
+
+        using var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/parties/{party.Id}/notes/{createdNote.Id}");
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        putReq.Content = JsonContent.Create(updateRequest);
+
+        var putResponse = await _client.SendAsync(putReq);
+        putResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedNote = await putResponse.Content.ReadFromJsonAsync<SessionNoteResponseDto>(_jsonOptions);
+        updatedNote.Should().NotBeNull();
+        updatedNote!.Title.Should().Be(updateRequest.Title);
+        updatedNote.Content.Should().Be(updateRequest.Content);
+
+        // 5. Consultar directamente la base de datos PostgreSQL mediante un nuevo DbContext scope
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<SparnarokDbContext>();
+            var noteInDb = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.SessionNotes, n => n.Id == createdNote.Id);
+
+            noteInDb.Should().NotBeNull();
+            noteInDb!.PartyId.Should().Be(party.Id);
+            noteInDb.OwnerUserId.Should().Be(user.UserId);
+            noteInDb.Title.Should().Be("Sesión 1: Llegada a Phandalin (Actualizado)");
+            noteInDb.Content.Should().Be("Los aventureros descubrieron que los Redbrands custodian la mansión Tresendar. Recompensa: 100 PO.");
+            noteInDb.UpdatedAt.Should().BeOnOrAfter(noteInDb.CreatedAt);
+        }
+
+        // 6. Consultar mediante el endpoint GET /notes/{id}
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/parties/{party.Id}/notes/{createdNote.Id}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.Token);
+        var getResponse = await _client.SendAsync(getReq);
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var retrievedNote = await getResponse.Content.ReadFromJsonAsync<SessionNoteResponseDto>(_jsonOptions);
+        retrievedNote.Should().NotBeNull();
+        retrievedNote!.Title.Should().Be("Sesión 1: Llegada a Phandalin (Actualizado)");
+        retrievedNote.Content.Should().Be("Los aventureros descubrieron que los Redbrands custodian la mansión Tresendar. Recompensa: 100 PO.");
+    }
 }

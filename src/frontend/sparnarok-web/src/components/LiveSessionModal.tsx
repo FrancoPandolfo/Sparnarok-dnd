@@ -60,6 +60,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
   const [combatState, setCombatState] = useState<
     LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto | null
   >(null);
+  const [pendingInvite, setPendingInvite] = useState<any>(null);
   const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
 
   const isQuickMode = selectedPartyId === 'quick-session';
@@ -94,6 +95,15 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
     prevActivePartyIdRef.current = activePartyId;
   }, [isOpen, activePartyId, effectiveParties, selectedPartyId]);
 
+  const resolvedUserId = currentUserId || (() => {
+    try {
+      const authStr = typeof window !== 'undefined' ? window.localStorage.getItem('sparnarok_auth') : null;
+      return authStr ? JSON.parse(authStr).id : null;
+    } catch {
+      return null;
+    }
+  })();
+
   // Determinar rol por defecto basado en la autoría de la Party seleccionada
   useEffect(() => {
     if (initialRole) {
@@ -105,12 +115,12 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
       return;
     }
     const currentParty = effectiveParties.find((p) => p.id === selectedPartyId);
-    if (currentParty && currentUserId && currentParty.ownerUserId === currentUserId) {
+    if (currentParty && resolvedUserId && currentParty.ownerUserId === resolvedUserId) {
       setRole('DungeonMaster');
-    } else if (currentParty && currentUserId && currentParty.ownerUserId !== currentUserId) {
+    } else if (currentParty && resolvedUserId && currentParty.ownerUserId !== resolvedUserId) {
       setRole('Player');
     }
-  }, [selectedPartyId, effectiveParties, currentUserId, initialRole]);
+  }, [selectedPartyId, effectiveParties, resolvedUserId, initialRole]);
 
   // Sincronización SignalR con teardown explícito antes de reconectar a nueva Party
   useEffect(() => {
@@ -129,6 +139,11 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
         onCombatStateUpdated: (state) => {
           if (!isCancelled) {
             setCombatState(state);
+          }
+        },
+        onCombatInviteReceived: (invite) => {
+          if (!isCancelled && role !== 'DungeonMaster' && (!invite.targetUserId || invite.targetUserId === resolvedUserId)) {
+            setPendingInvite(invite);
           }
         },
       });
@@ -169,19 +184,7 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
 
     const combatants: InitializeLiveCombatantRequest[] = [];
 
-    // Añadir Héroes de la Party
-    for (const member of party.members) {
-      combatants.push({
-        id: member.id,
-        name: member.name,
-        maxHp: member.hitPoints.max,
-        armorClass: member.effectiveArmorClass || member.armorClass.base,
-        isPlayerCharacter: true,
-        isVisibleToPlayers: true,
-      });
-    }
-
-    // Añadir Monstruos del Encuentro si existe
+    // Añadir Monstruos del Encuentro si existe (los jugadores no se agregan automáticamente para permitir el Lobby y división de party)
     if (activeEncounter && activeEncounter.creatures) {
       for (const monster of activeEncounter.creatures) {
         combatants.push({
@@ -235,11 +238,13 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
                 value={selectedPartyId}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setCombatState(null);
-                  setSelectedPartyId(val);
-                  onPartyChange?.(val);
-                  if (val === 'quick-session') {
-                    setRole('DungeonMaster');
+                  if (val !== selectedPartyId) {
+                    setCombatState(null);
+                    setSelectedPartyId(val);
+                    onPartyChange?.(val);
+                    if (val === 'quick-session') {
+                      setRole('DungeonMaster');
+                    }
                   }
                 }}
               >
@@ -354,9 +359,12 @@ export const LiveSessionModal: React.FC<LiveSessionModalProps> = ({
               )}
               <LiveCombatTracker
                 partyId={selectedPartyId}
+                party={currentParty}
                 role={role}
                 combatState={combatState}
-                currentUserId={currentUserId}
+                currentUserId={resolvedUserId}
+                pendingInvite={pendingInvite}
+                onClearInvite={() => setPendingInvite(null)}
               />
             </div>
           ) : (

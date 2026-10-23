@@ -11,6 +11,19 @@ import type {
   AddQuickCombatantRequest,
 } from '../types/liveCombat';
 
+export interface CombatInviteNotificationDto {
+  partyId: string;
+  partyName: string;
+  targetUserId: string;
+  invitedAt: string;
+}
+
+export interface EncounterStartedNotificationDto {
+  partyId: string;
+  partyName: string;
+  startedAt: string;
+}
+
 /**
  * Callbacks para eventos emitidos en tiempo real por LiveCombatHub.
  */
@@ -18,6 +31,8 @@ export interface LiveCombatHubCallbacks {
   onCombatStateUpdated?: (
     state: LiveCombatDmProjectionDto | LiveCombatPlayerProjectionDto
   ) => void;
+  onCombatInviteReceived?: (invite: CombatInviteNotificationDto) => void;
+  onEncounterStarted?: (encounter: EncounterStartedNotificationDto) => void;
   onError?: (err: unknown) => void;
 }
 
@@ -61,7 +76,11 @@ class LiveCombatHubService {
         try {
           this.broadcastChannel = new BroadcastChannel('sparnarok_live_combat_channel');
           this.broadcastChannel.onmessage = (event) => {
-            if (event.data?.partyId === this.currentPartyId) {
+            if (event.data?.type === 'CombatInviteReceived') {
+              this.callbacks?.onCombatInviteReceived?.(event.data.invite);
+            } else if (event.data?.type === 'EncounterStarted') {
+              this.callbacks?.onEncounterStarted?.(event.data.encounter);
+            } else if (event.data?.partyId === this.currentPartyId) {
               this.emitFallbackProjection();
             }
           };
@@ -77,8 +96,25 @@ class LiveCombatHubService {
         }
       });
 
+      window.addEventListener('sparnarok_combat_invite_local', (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail) {
+          this.callbacks?.onCombatInviteReceived?.(customEvent.detail);
+        }
+      });
+
       window.addEventListener('storage', (e: StorageEvent) => {
-        if (e.key?.startsWith('sparnarok_combat_')) {
+        if (e.key === 'sparnarok_combat_invite' && e.newValue) {
+          try {
+            const invite = JSON.parse(e.newValue);
+            this.callbacks?.onCombatInviteReceived?.(invite);
+          } catch {}
+        } else if (e.key === 'sparnarok_encounter_started' && e.newValue) {
+          try {
+            const enc = JSON.parse(e.newValue);
+            this.callbacks?.onEncounterStarted?.(enc);
+          } catch {}
+        } else if (e.key?.startsWith('sparnarok_combat_')) {
           this.emitFallbackProjection();
         }
       });
@@ -129,6 +165,14 @@ class LiveCombatHubService {
         this.callbacks?.onCombatStateUpdated?.(state);
       }
     );
+
+    connection.on('CombatInviteReceived', (invite: CombatInviteNotificationDto) => {
+      this.callbacks?.onCombatInviteReceived?.(invite);
+    });
+
+    connection.on('EncounterStarted', (enc: EncounterStartedNotificationDto) => {
+      this.callbacks?.onEncounterStarted?.(enc);
+    });
 
     try {
       await connection.start();
@@ -340,6 +384,90 @@ class LiveCombatHubService {
   }
 
   /**
+   * Invita a un jugador específico a sumarse al combate en vivo (Acción del DM).
+   */
+  async invitePlayerToEncounter(partyId: string, targetUserId: string): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      try {
+        await this.connection.invoke('InvitePlayerToEncounter', partyId, targetUserId);
+        return;
+      } catch (err) {
+        console.warn('[LiveCombatHub] Error al invocar InvitePlayerToEncounter vía SignalR, usando fallback local:', err);
+      }
+    }
+
+    // Fallback local y broadcast entre contextos/pestañas
+    const raw = this.getRawState(partyId);
+    const invite: CombatInviteNotificationDto = {
+      partyId,
+      partyName: raw?.partyName || 'Encuentro en Vivo',
+      targetUserId,
+      invitedAt: new Date().toISOString(),
+    };
+
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({ type: 'CombatInviteReceived', invite });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('sparnarok_combat_invite', JSON.stringify(invite));
+        window.dispatchEvent(new CustomEvent('sparnarok_combat_invite_local', { detail: invite }));
+      } catch {}
+    }
+  }
+
+  /**
+   * Permite que un jugador se incorpore activamente a la lista de iniciativa (Lobby).
+   */
+  async joinEncounter(partyId: string, playerStats: LiveCombatantPlayerDto): Promise<void> {
+    if (this.connection && this.connection.state === HubConnectionState.Connected) {
+      try {
+        await this.connection.invoke('JoinEncounter', partyId, playerStats);
+        return;
+      } catch (err) {
+        console.warn('[LiveCombatHub] Error al invocar JoinEncounter vía SignalR, usando fallback local:', err);
+      }
+    }
+
+    // Fallback local
+    const raw = this.getRawState(partyId) || {
+      partyId,
+      partyName: 'Encuentro en Vivo',
+      status: 'InProgress' as LiveCombatStatus,
+      currentRound: 1,
+      currentTurnIndex: 0,
+      combatants: [],
+    };
+
+    const newCombatant: RawCombatant = {
+      id: playerStats.id || `char-${Date.now()}`,
+      name: playerStats.name,
+      initiative: playerStats.initiative ?? null,
+      maxHp: playerStats.maxHp ?? 10,
+      currentHp: playerStats.currentHp ?? playerStats.maxHp ?? 10,
+      armorClass: 14,
+      isPlayerCharacter: true,
+      isVisibleToPlayers: true,
+      assignedPlayerUserId: playerStats.assignedPlayerUserId ?? null,
+      conditions: playerStats.conditions ?? null,
+    };
+
+    const existingIdx = raw.combatants.findIndex(
+      (c) => c.id === newCombatant.id || (newCombatant.assignedPlayerUserId && c.assignedPlayerUserId === newCombatant.assignedPlayerUserId)
+    );
+    if (existingIdx >= 0) {
+      raw.combatants[existingIdx] = { ...raw.combatants[existingIdx], ...newCombatant };
+    } else {
+      raw.combatants.push(newCombatant);
+    }
+
+    this.saveRawState(partyId, raw);
+    this.broadcastFallbackUpdate(partyId);
+  }
+
+  /**
    * Inicia el combate formalmente respetando el orden posicional establecido (DM).
    */
   async startCombat(partyId: string): Promise<void> {
@@ -358,6 +486,23 @@ class LiveCombatHubService {
 
     this.saveRawState(partyId, state);
     this.broadcastFallbackUpdate(partyId);
+
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'EncounterStarted',
+          encounter: { partyId, partyName: state.partyName, startedAt: new Date().toISOString() },
+        });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          'sparnarok_encounter_started',
+          JSON.stringify({ partyId, partyName: state.partyName, startedAt: new Date().toISOString() })
+        );
+      } catch {}
+    }
   }
 
   /**
@@ -562,6 +707,7 @@ class LiveCombatHubService {
             currentHp: hp,
             maxHp: maxHp,
             healthStatus,
+            assignedPlayerUserId: c.assignedPlayerUserId ?? null,
             conditions: c.conditions,
           };
         });

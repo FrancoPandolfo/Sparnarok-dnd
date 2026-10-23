@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Sparnarok.Api.Application.DTOs;
+using Sparnarok.Api.Application.Extensions;
 using Sparnarok.Api.Application.Interfaces;
 using Sparnarok.Api.Domain.Models;
 
@@ -50,6 +51,8 @@ public class LiveCombatHub : Hub
             }
         }
 
+        await Groups.AddToGroupAsync(Context.ConnectionId, GetPartyGroupName(id));
+
         var isDm = string.Equals(role, "DungeonMaster", StringComparison.OrdinalIgnoreCase);
 
         if (isDm)
@@ -78,6 +81,7 @@ public class LiveCombatHub : Hub
 
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetDmGroupName(id));
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetPlayerGroupName(id));
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetPartyGroupName(id));
     }
 
     /// <summary>
@@ -101,6 +105,16 @@ public class LiveCombatHub : Hub
         _combatManager.InitializeCombat(id, request.PartyName, combatants);
         await PersistCombatStateAsync(id);
         await BroadcastCombatStateAsync(id);
+
+        var encounterStartedPayload = new
+        {
+            PartyId = id.ToString(),
+            PartyName = request.PartyName,
+            StartedAt = DateTime.UtcNow
+        };
+        await Clients.Group(GetPartyGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
+        await Clients.Group(GetPlayerGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
+        await Clients.Group(GetDmGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
     }
 
     /// <summary>
@@ -225,7 +239,87 @@ public class LiveCombatHub : Hub
         {
             await PersistCombatStateAsync(id);
             await BroadcastCombatStateAsync(id);
+
+            var state = _combatManager.GetState(id);
+            var encounterStartedPayload = new
+            {
+                PartyId = id.ToString(),
+                PartyName = state?.PartyName ?? "Encuentro en Vivo",
+                StartedAt = DateTime.UtcNow
+            };
+            await Clients.Group(GetPartyGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
+            await Clients.Group(GetPlayerGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
+            await Clients.Group(GetDmGroupName(id)).SendAsync("EncounterStarted", encounterStartedPayload);
         }
+    }
+
+    /// <summary>
+    /// Envía una invitación directa al jugador especificado de la Party para sumarse al encuentro en curso.
+    /// Emite el evento 'CombatInviteReceived' exclusivamente a la conexión de ese targetUserId (Clients.User).
+    /// </summary>
+    public async Task InvitePlayerToEncounter(string? partyId, string targetUserId)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+        if (string.IsNullOrWhiteSpace(targetUserId)) return;
+
+        var state = _combatManager.GetState(id);
+        var partyName = state?.PartyName ?? "Encuentro en Vivo";
+
+        var invitePayload = new
+        {
+            PartyId = id.ToString(),
+            PartyName = partyName,
+            TargetUserId = targetUserId.Trim(),
+            InvitedAt = DateTime.UtcNow
+        };
+
+        await Clients.User(targetUserId.Trim()).SendAsync("CombatInviteReceived", invitePayload);
+    }
+
+    /// <summary>
+    /// Permite que un Jugador se agregue voluntariamente a la lista de iniciativa del combate activo (Fase Lobby).
+    /// </summary>
+    public async Task JoinEncounter(string? partyId, LiveCombatantPlayerDto playerStats)
+    {
+        if (!TryResolvePartyId(partyId, out var id)) return;
+        if (playerStats == null) return;
+
+        var userId = Context.User?.GetUserId();
+        var displayName = Context.User?.GetDisplayName() ?? "Héroe";
+        var name = !string.IsNullOrWhiteSpace(playerStats.Name) ? playerStats.Name.Trim() : displayName;
+        var maxHp = playerStats.MaxHp ?? 10;
+        var currentHp = playerStats.CurrentHp ?? maxHp;
+
+        var combatant = new LiveCombatant(
+            playerStats.Id == Guid.Empty ? Guid.NewGuid() : playerStats.Id,
+            name,
+            maxHp,
+            10,
+            true,
+            true,
+            userId,
+            playerStats.Initiative
+        );
+        combatant.CurrentHp = Math.Clamp(currentHp, 0, combatant.MaxHp);
+
+        var state = _combatManager.GetState(id);
+        var existing = state?.Combatants.FirstOrDefault(c =>
+            (c.Id != Guid.Empty && c.Id == combatant.Id) ||
+            (userId.HasValue && c.AssignedPlayerUserId == userId.Value));
+
+        if (existing != null)
+        {
+            existing.Initiative = playerStats.Initiative ?? existing.Initiative;
+            existing.CurrentHp = Math.Clamp(currentHp, 0, existing.MaxHp);
+            existing.Name = name;
+        }
+        else
+        {
+            _combatManager.AddCombatant(id, combatant);
+        }
+
+        await PersistCombatStateAsync(id);
+        await BroadcastCombatStateAsync(id);
     }
 
     /// <summary>
@@ -315,6 +409,7 @@ public class LiveCombatHub : Hub
 
     public static string GetDmGroupName(Guid partyId) => $"combat_{partyId}_dm";
     public static string GetPlayerGroupName(Guid partyId) => $"combat_{partyId}_player";
+    public static string GetPartyGroupName(Guid partyId) => $"combat_{partyId}_party";
 
     /// <summary>
     /// Intenta restaurar el estado de combate persistido en la base de datos de la Party.

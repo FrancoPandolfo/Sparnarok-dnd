@@ -291,7 +291,8 @@ public class LiveCombatManager : ILiveCombatManager
                     maxHp,
                     healthStatus,
                     c.Conditions,
-                    c.SortOrder
+                    c.SortOrder,
+                    c.AssignedPlayerUserId
                 );
             }).ToList();
 
