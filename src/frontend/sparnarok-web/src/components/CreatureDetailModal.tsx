@@ -134,7 +134,7 @@ export const CreatureDetailModal: React.FC<CreatureDetailModalProps> = ({
             <button
               type="button"
               id="add-action-btn"
-              className="btn-small-gold"
+              className="btn btn-gold btn-xs btn-small-gold"
               onClick={() => onOpenAddAction(creature)}
             >
               + {t('bestiary.details.addAction')}

@@ -72,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               id="nav-open-live-session-btn"
-              className="action-btn live-session-nav-btn primary-gold"
+              className="btn btn-gold btn-sm live-session-nav-btn"
               onClick={onOpenLiveSession}
               title="Abrir Modo Partida en Vivo: Tracker de Iniciativa y Mis Notas Privadas"
             >
@@ -83,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               id="open-parties-modal-btn"
-              className="action-btn parties-nav-btn"
+              className="btn btn-secondary btn-sm parties-nav-btn"
               onClick={onOpenPartiesModal}
               title={t('parties.myPartiesTitle', 'Gestionar mis Partys de juego')}
             >
@@ -94,7 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               id="open-stash-btn"
-              className="action-btn stash-nav-btn primary-gold"
+              className="btn btn-gold btn-sm stash-nav-btn"
               onClick={onOpenStashModal}
               title={t('stash.navTitle', 'Botín de Grupo (Stash y Tesoro Común)')}
             >
@@ -105,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               id="create-creature-btn"
-              className="action-btn primary-gold"
+              className="btn btn-primary btn-sm"
               onClick={onOpenCreateModal}
             >
               {t('app.nav.newCreature')}
@@ -114,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             id="open-ingestion-btn"
-            className="action-btn ingestion-btn"
+            className="btn btn-secondary btn-sm ingestion-btn"
             onClick={onOpenIngestionModal}
             title={t('app.nav.ingestCsv')}
           >
@@ -123,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             id="lang-toggle-btn"
-            className="action-btn lang-toggle"
+            className="btn btn-outline btn-sm lang-toggle"
             onClick={handleToggleLanguage}
             aria-label={t('app.switchLanguage')}
           >
@@ -158,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 id="open-profile-btn"
-                className="action-btn profile-action-btn"
+                className="btn btn-outline btn-xs profile-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsProfileModalOpen(true);
@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 id="logout-btn"
-                className="action-btn logout-btn"
+                className="btn btn-danger btn-xs logout-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   logout();
@@ -185,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 id="google-login-btn"
-                className="action-btn google-login-btn"
+                className="btn btn-secondary btn-sm google-login-btn"
                 onClick={() => setIsAuthModalOpen(true)}
                 title="Iniciar sesión o registrarse con Google o correo electrónico"
               >

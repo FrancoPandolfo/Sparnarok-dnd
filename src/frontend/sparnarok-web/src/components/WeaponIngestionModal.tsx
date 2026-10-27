@@ -113,7 +113,7 @@ export const WeaponIngestionModal: React.FC<WeaponIngestionModalProps> = ({
           <footer className="form-actions-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn btn-secondary btn-cancel"
               onClick={handleClose}
               disabled={isUploading}
             >
@@ -122,7 +122,7 @@ export const WeaponIngestionModal: React.FC<WeaponIngestionModalProps> = ({
             <button
               type="submit"
               id="upload-csv-btn"
-              className="btn-submit-gold"
+              className="btn btn-primary btn-submit-gold"
               disabled={!selectedFile || isUploading}
             >
               {isUploading ? t('ingestion.uploading') : t('ingestion.uploadButton')}

@@ -331,7 +331,7 @@ export const CreatureFormModal: React.FC<CreatureFormModalProps> = ({
           <footer className="form-actions-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn btn-secondary btn-cancel"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -340,7 +340,7 @@ export const CreatureFormModal: React.FC<CreatureFormModalProps> = ({
             <button
               type="submit"
               id="submit-creature-btn"
-              className="btn-submit-gold"
+              className="btn btn-primary btn-submit-gold"
               disabled={isSubmitting}
             >
               {isSubmitting ? t('bestiary.form.saving') : t('bestiary.form.submit')}

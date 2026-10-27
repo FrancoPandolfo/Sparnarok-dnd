@@ -150,7 +150,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               <button
                 type="submit"
                 id="save-global-nickname-btn"
-                className="action-btn primary-gold"
+                className="btn btn-primary primary-gold"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Guardando...' : 'Guardar Apodo'}
@@ -204,7 +204,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               {!isEditingPassword ? (
                 <button
                   type="button"
-                  className="action-btn secondary-btn"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => setIsEditingPassword(true)}
                 >
                   {user.hasPassword ? 'Cambiar Contraseña' : 'Crear Contraseña'}
@@ -230,14 +230,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   <div className="form-actions-row">
                     <button
                       type="submit"
-                      className="action-btn primary-gold"
+                      className="btn btn-primary primary-gold"
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? 'Guardando...' : 'Guardar Contraseña'}
                     </button>
                     <button
                       type="button"
-                      className="action-btn cancel-btn"
+                      className="btn btn-secondary cancel-btn"
                       onClick={() => {
                         setIsEditingPassword(false);
                         setNewPassword('');
@@ -257,7 +257,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           <button
             type="button"
             id="modal-logout-btn"
-            className="action-btn logout-btn"
+            className="btn btn-danger logout-btn"
             onClick={() => {
               logout();
               onClose();

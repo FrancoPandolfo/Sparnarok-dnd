@@ -1,0 +1,21 @@
+# Sparnarok: The Architect's Codex - Agent & Coding Rules
+
+## Regla de Oro
+> "Ningún feature puede ser commiteado sin tests completos (Unit, Integration, E2E), cobertura total, y sin la documentación correspondiente (Swagger, TSDoc, XML comments o ADRs)."
+
+## Responsividad y Sistema Visual Obligatorio (Frontend)
+> **"En cualquier desarrollo futuro de frontend, el agente debe obligatoriamente verificar que la vista sea 100% responsiva y utilice el sistema de botones estandarizado antes de dar la tarea por terminada."**
+
+### Directivas de Frontend y UI/UX:
+1. **Responsividad (Mobile-First):**
+   - Toda vista, modal, tabla y grilla debe adaptarse con fluidez a móvil (`< 640px`), tablet (`640px - 1024px`) y escritorio (`> 1024px`).
+   - Cero scroll horizontal o desbordamiento (overflow) no deseado.
+   - Las tablas de combate e iniciativa deben estar envueltas en `.combatants-table-container` con scroll táctil (`overflow-x: auto; -webkit-overflow-scrolling: touch;`) y `min-width: 640px`.
+2. **Sistema Canónico de Botones:**
+   - Prohibido crear clases aisladas o fragmentadas de botones.
+   - Utilizar exclusivamente el sistema `.btn` (`.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-gold`, `.btn-outline` con modificadores `.btn-xs`, `.btn-sm`, `.btn-lg`, `.btn-icon`, `.btn-block`).
+   - Todo botón debe soportar `:hover`, `:active`, `:disabled` y `:focus-visible` (WCAG compliance con halo dorado).
+3. **Flujo Lógico y Posicionamiento:**
+   - En footers de modales y formularios (`.modal-actions`, `.form-actions-footer`), botones de cancelación/secundarios a la izquierda y botones primarios/confirmación a la derecha. En pantallas móviles, colapsan invirtiéndose verticalmente (`column-reverse`).
+4. **Calidad de Código y Pre-Commit:**
+   - Ejecutar `npm run lint:css` en `src/frontend/sparnarok-web`. Husky y lint-staged bloquean automáticamente cualquier commit que rompa reglas de CSS o formato.
