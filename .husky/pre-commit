@@ -1,0 +1,1 @@
+npx --prefix src/frontend/sparnarok-web lint-staged

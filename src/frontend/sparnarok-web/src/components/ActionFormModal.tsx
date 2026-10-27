@@ -248,7 +248,7 @@ export const ActionFormModal: React.FC<ActionFormModalProps> = ({
           <footer className="form-actions-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn btn-secondary btn-cancel"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -257,7 +257,7 @@ export const ActionFormModal: React.FC<ActionFormModalProps> = ({
             <button
               type="submit"
               id="submit-action-btn"
-              className="btn-submit-gold"
+              className="btn btn-primary btn-submit-gold"
               disabled={isSubmitting}
             >
               {isSubmitting ? '...' : t('bestiary.actionForm.submit')}

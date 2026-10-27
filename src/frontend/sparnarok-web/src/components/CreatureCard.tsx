@@ -126,14 +126,14 @@ export const CreatureCard: React.FC<CreatureCardProps> = ({ creature, onSelect, 
       <footer className="card-footer">
         <button
           type="button"
-          className="btn-inspect"
+          className="btn btn-outline btn-sm btn-inspect"
           onClick={() => onSelect(creature)}
         >
           {t('bestiary.viewDetails')} &rarr;
         </button>
         <button
           type="button"
-          className="btn-delete"
+          className="btn btn-danger btn-sm btn-icon btn-delete"
           onClick={() => onDelete(creature.id, creature.name)}
           title={t('bestiary.delete')}
           aria-label={`${t('bestiary.delete')} ${creature.name}`}

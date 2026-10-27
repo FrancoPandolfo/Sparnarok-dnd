@@ -183,7 +183,7 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
             <button
               type="button"
               id="clear-filters-btn"
-              className="btn-clear-filters"
+              className="btn btn-outline btn-sm btn-clear-filters"
               onClick={handleClearFilters}
             >
               {t('bestiary.clearFilters')}

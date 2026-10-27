@@ -491,7 +491,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <button
               type="button"
               id="add-member-a-btn"
-              className="btn-add-member"
+              className="btn btn-secondary btn-sm btn-add-member"
               onClick={handleAddMemberA}
               disabled={isSimulating || creatures.length === 0}
             >
@@ -592,7 +592,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                         <button
                           type="button"
                           id={`remove-member-a-btn-${idx}`}
-                          className="remove-member-btn"
+                          className="btn btn-danger btn-xs remove-member-btn"
                           onClick={() => handleRemoveMemberA(idx)}
                           disabled={isSimulating}
                           title={t('simulation.removeMember')}
@@ -688,7 +688,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
             <button
               type="button"
               id="add-member-b-btn"
-              className="btn-add-member"
+              className="btn btn-secondary btn-sm btn-add-member"
               onClick={handleAddMemberB}
               disabled={isSimulating || creatures.length === 0}
             >
@@ -759,7 +759,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                         <button
                           type="button"
                           id={`remove-member-b-btn-${idx}`}
-                          className="remove-member-btn"
+                          className="btn btn-danger btn-xs remove-member-btn"
                           onClick={() => handleRemoveMemberB(idx)}
                           disabled={isSimulating}
                           title={t('simulation.removeMember')}
@@ -882,7 +882,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
         <button
           type="button"
           id="run-montecarlo-btn"
-          className="run-simulation-btn"
+          className="btn btn-primary btn-lg run-simulation-btn"
           onClick={handleRun}
           disabled={!isAuthed || isSimulating || teamA.length === 0 || teamB.length === 0}
           title={!isAuthed ? t('simulation.authRequiredTooltip') : undefined}

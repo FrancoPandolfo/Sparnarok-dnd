@@ -223,7 +223,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             id="auth-submit-btn"
-            className="action-btn primary-gold auth-submit-btn"
+            className="btn btn-primary btn-block auth-submit-btn primary-gold"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Procesando...' : activeTab === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
@@ -260,7 +260,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             id="dev-login-btn"
-            className="dev-login-bypass-btn"
+            className="btn btn-outline btn-sm btn-block dev-login-bypass-btn"
             onClick={handleDevMockLogin}
             title="Iniciar sesión de desarrollo sin pasar por Google Cloud"
           >
