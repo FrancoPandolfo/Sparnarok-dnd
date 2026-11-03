@@ -1034,6 +1034,54 @@ export const apiClient = {
   },
 
   /**
+   * Realiza una búsqueda dinámica de criaturas conectando con el endpoint de Lazy Ingestion (GET /api/v1/creatures?search={term}).
+   * Permite encontrar e ingerir de forma transparente e inmediata cualquier monstruo del SRD (Open5e).
+   * Si la API está offline, recurre al filtrado local en memoria.
+   *
+   * @param term Término de búsqueda (ej. 'dragon', 'beholder', 'goblin').
+   * @param signal AbortSignal opcional para cancelar peticiones desactualizadas por debounce.
+   */
+  async searchCreatures(term: string, signal?: AbortSignal): Promise<CreatureResponseDto[]> {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      return this.getCreatures(signal);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/creatures?search=${encodeURIComponent(trimmed)}`, {
+        headers: getAuthHeaders(),
+        signal,
+      });
+
+      if (response.ok) {
+        const data: CreatureResponseDto[] = await response.json();
+        if (Array.isArray(data)) {
+          // Fusionar las nuevas criaturas en memoria para que queden disponibles en toda la app
+          const existingIds = new Set(inMemoryCreatures.map((c) => c.id));
+          const newOnes = data.filter((c) => !existingIds.has(c.id));
+          if (newOnes.length > 0) {
+            inMemoryCreatures = [...inMemoryCreatures, ...newOnes];
+          }
+          return data;
+        }
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw err;
+      }
+      // Fallback local en caso de error de red o backend offline
+    }
+
+    const lower = trimmed.toLowerCase();
+    return inMemoryCreatures.filter(
+      (c) =>
+        c.name.toLowerCase().includes(lower) ||
+        c.type.toLowerCase().includes(lower) ||
+        c.actions?.some((a) => a.name.toLowerCase().includes(lower))
+    );
+  },
+
+  /**
    * Obtiene una criatura por su identificador.
    */
   async getCreatureById(id: string, signal?: AbortSignal): Promise<CreatureResponseDto> {

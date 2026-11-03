@@ -50,6 +50,7 @@ builder.Services.AddHttpClient<IOpen5eBestiaryClient, Sparnarok.Api.Infrastructu
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddScoped<IOpen5eSyncService, Sparnarok.Api.Infrastructure.Services.Open5eSyncService>();
+builder.Services.AddScoped<ICreatureSearchService, Sparnarok.Api.Infrastructure.Services.CreatureSearchService>();
 
 // 4.2 Cliente D&D 5e API (SRD 2024 Reference) & Equipment Proxy
 builder.Services.AddHttpClient<IDnd5eApiClient, Dnd5eApiClient>(client =>

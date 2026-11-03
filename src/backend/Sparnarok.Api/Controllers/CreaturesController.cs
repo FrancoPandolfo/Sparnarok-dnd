@@ -29,6 +29,7 @@ public class CreaturesController : ControllerBase
     private readonly IStringLocalizer<SharedResource> _localizer;
     private readonly Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? _context;
     private readonly IDprBaselineService _dprBaselineService;
+    private readonly ICreatureSearchService? _creatureSearchService;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="CreaturesController"/>.
@@ -41,7 +42,8 @@ public class CreaturesController : ControllerBase
         IValidator<CreateActionRequestDto> actionValidator,
         IStringLocalizer<SharedResource> localizer,
         Sparnarok.Api.Infrastructure.Persistence.SparnarokDbContext? context = null,
-        IDprBaselineService? dprBaselineService = null)
+        IDprBaselineService? dprBaselineService = null,
+        ICreatureSearchService? creatureSearchService = null)
     {
         _creatureRepository = creatureRepository;
         _masteryRepository = masteryRepository;
@@ -51,18 +53,30 @@ public class CreaturesController : ControllerBase
         _localizer = localizer;
         _context = context;
         _dprBaselineService = dprBaselineService ?? new Sparnarok.Api.Infrastructure.Services.DprBaselineService();
+        _creatureSearchService = creatureSearchService;
     }
 
 
     /// <summary>
-    /// Lista todas las criaturas registradas en el Códice junto a sus acciones y maestrías.
+    /// Lista todas las criaturas registradas en el Códice o ejecuta búsqueda bajo demanda con Lazy Ingestion desde Open5e.
     /// </summary>
-    /// <response code="200">Retorna la lista completa de criaturas.</response>
+    /// <param name="search">Término de búsqueda opcional (ej. 'dragon', 'goblin', 'beholder').</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <response code="200">Retorna la lista de criaturas.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<CreatureResponseDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<CreatureResponseDto>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<CreatureResponseDto>>> GetAll(
+        [FromQuery] string? search,
+        CancellationToken ct)
     {
         var currentUserId = User.GetUserId();
+
+        if (!string.IsNullOrWhiteSpace(search) && _creatureSearchService != null)
+        {
+            var searchResults = await _creatureSearchService.SearchCreaturesAsync(search, currentUserId, ct);
+            return Ok(searchResults);
+        }
+
         var creatures = await _creatureRepository.GetAllAsync(currentUserId, ct);
         var dtos = creatures.Select(CreatureResponseDto.FromEntity).ToList();
         return Ok(dtos);

@@ -53,10 +53,14 @@ public class Open5eSyncService : IOpen5eSyncService
         var updated = 0;
         var errors = new List<string>();
 
+        // Cargar maestrías disponibles de la base de datos
+        var masteries = await _context.WeaponMasteries.ToDictionaryAsync(m => m.Property, ct);
+
         // Cargar nombres de criaturas existentes en un diccionario para verificación eficiente
         var monsterNames = response.Results.Select(r => r.Name.Trim()).Distinct().ToList();
         var existingCreatures = await _context.Creatures
             .Include(c => c.Actions)
+            .Include(c => c.KnownMasteries)
             .Where(c => monsterNames.Contains(c.Name))
             .ToDictionaryAsync(c => c.Name, StringComparer.OrdinalIgnoreCase, ct);
 
@@ -98,16 +102,16 @@ public class Open5eSyncService : IOpen5eSyncService
                         hp,
                         ac);
 
-                    // Limpiar y re-asociar acciones
+                    // Limpiar y re-asociar acciones con maestrías
                     existing.ClearActions();
-                    AddActionsToCreature(existing, monsterDto.Actions);
+                    AddActionsToCreature(existing, monsterDto.Actions, masteries);
 
                     updated++;
                 }
                 else
                 {
                     // Dar de alta nueva criatura
-                    var newCreature = MapToCreature(monsterDto);
+                    var newCreature = MapToCreature(monsterDto, masteries);
                     _context.Creatures.Add(newCreature);
                     existingCreatures[creatureName] = newCreature;
                     inserted++;
@@ -129,6 +133,12 @@ public class Open5eSyncService : IOpen5eSyncService
 
     /// <inheritdoc />
     public Creature MapToCreature(Open5eMonsterDto dto)
+    {
+        return MapToCreature(dto, null);
+    }
+
+    /// <inheritdoc />
+    public Creature MapToCreature(Open5eMonsterDto dto, IReadOnlyDictionary<MasteryProperty, WeaponMastery>? masteries)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -166,11 +176,14 @@ public class Open5eSyncService : IOpen5eSyncService
             ac,
             isPlayerCharacter: false);
 
-        AddActionsToCreature(creature, dto.Actions);
+        AddActionsToCreature(creature, dto.Actions, masteries);
         return creature;
     }
 
-    private static void AddActionsToCreature(Creature creature, List<Open5eActionDto>? actions)
+    private static void AddActionsToCreature(
+        Creature creature,
+        List<Open5eActionDto>? actions,
+        IReadOnlyDictionary<MasteryProperty, WeaponMastery>? masteries = null)
     {
         if (actions == null || actions.Count == 0) return;
 
@@ -184,11 +197,27 @@ public class Open5eSyncService : IOpen5eSyncService
                            desc.Contains("Attack:", StringComparison.OrdinalIgnoreCase) ||
                            desc.Contains("Hit:", StringComparison.OrdinalIgnoreCase);
 
+            // 1. Extraer damageFormula aislando "2d6 + 3" o "2d6+3" del texto descriptivo
             var formula = act.DamageDice;
-            if (string.IsNullOrWhiteSpace(formula))
+            var match = Regex.Match(desc, @"\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)");
+            if (match.Success)
             {
-                var match = Regex.Match(desc, @"\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)");
-                formula = match.Success ? match.Groups[1].Value.Replace(" ", "") : "1d6";
+                formula = match.Groups[1].Value.Replace(" ", "");
+            }
+            else if (string.IsNullOrWhiteSpace(formula))
+            {
+                formula = "1d6";
+            }
+
+            // 2. Extraer DamageType de forma heurística
+            var damageType = DetermineDamageType(desc);
+
+            // 3. Asignar heurísticamente WeaponMasteries (reglas 2024)
+            var masteryProp = DetermineWeaponMastery(act.Name, desc);
+            WeaponMastery? associatedMastery = null;
+            if (masteryProp.HasValue && masteries != null && masteries.TryGetValue(masteryProp.Value, out var m))
+            {
+                associatedMastery = m;
             }
 
             var actionEntity = new Action(
@@ -199,11 +228,64 @@ public class Open5eSyncService : IOpen5eSyncService
                 isAttack: isAttack,
                 reachOrRangeFeet: 5,
                 damageFormula: formula,
-                damageType: DamageType.Slashing,
-                attackModifierAbility: AbilityScoreType.Strength);
+                damageType: damageType,
+                attackModifierAbility: AbilityScoreType.Strength,
+                associatedMastery: associatedMastery);
 
             creature.AddAction(actionEntity);
+
+            if (associatedMastery != null)
+            {
+                creature.LearnWeaponMastery(associatedMastery);
+            }
         }
+    }
+
+    /// <summary>
+    /// Determina heurísticamente el tipo de daño a partir de la descripción de la acción.
+    /// </summary>
+    public static DamageType DetermineDamageType(string desc)
+    {
+        var lower = desc.ToLowerInvariant();
+        if (lower.Contains("piercing")) return DamageType.Piercing;
+        if (lower.Contains("bludgeoning")) return DamageType.Bludgeoning;
+        if (lower.Contains("slashing")) return DamageType.Slashing;
+        if (lower.Contains("fire")) return DamageType.Fire;
+        if (lower.Contains("cold")) return DamageType.Cold;
+        if (lower.Contains("poison")) return DamageType.Poison;
+        if (lower.Contains("acid")) return DamageType.Acid;
+        if (lower.Contains("lightning")) return DamageType.Lightning;
+        if (lower.Contains("necrotic")) return DamageType.Necrotic;
+        if (lower.Contains("radiant")) return DamageType.Radiant;
+        if (lower.Contains("psychic")) return DamageType.Psychic;
+        if (lower.Contains("force")) return DamageType.Force;
+        if (lower.Contains("thunder")) return DamageType.Thunder;
+        return DamageType.Slashing;
+    }
+
+    /// <summary>
+    /// Determina heurísticamente la propiedad de Maestría de Armas 2024 según el arma o ataque táctico.
+    /// </summary>
+    public static MasteryProperty? DetermineWeaponMastery(string actionName, string description)
+    {
+        var text = $"{actionName} {description}".ToLowerInvariant();
+
+        // 1. Armas oficiales de D&D 5e (2024)
+        if (Regex.IsMatch(text, @"\b(greataxe|halberd)\b")) return MasteryProperty.Cleave;
+        if (Regex.IsMatch(text, @"\b(greatsword|glaive)\b")) return MasteryProperty.Graze;
+        if (Regex.IsMatch(text, @"\b(scimitar|dagger|light hammer|sickle)\b")) return MasteryProperty.Nick;
+        if (Regex.IsMatch(text, @"\b(greatclub|pike|warhammer|heavy crossbow)\b")) return MasteryProperty.Push;
+        if (Regex.IsMatch(text, @"\b(morningstar|longsword|mace|flail|war pick|spear)\b")) return MasteryProperty.Sap;
+        if (Regex.IsMatch(text, @"\b(club|javelin|light crossbow|longbow|musket|sling|whip)\b")) return MasteryProperty.Slow;
+        if (Regex.IsMatch(text, @"\b(battleaxe|lance|maul|quarterstaff|trident)\b")) return MasteryProperty.Topple;
+        if (Regex.IsMatch(text, @"\b(shortsword|rapier|handaxe|dart|shortbow|hand crossbow|blowgun|pistol)\b")) return MasteryProperty.Vex;
+
+        // 2. Ataques naturales y roles tácticos (reglas 2024)
+        if (Regex.IsMatch(text, @"\b(bite|gore|horns?|ram|tusk)\b")) return MasteryProperty.Topple;
+        if (Regex.IsMatch(text, @"\b(claws?|talons?|rend)\b")) return MasteryProperty.Vex;
+        if (Regex.IsMatch(text, @"\b(slam|tentacles?|tail|fist|smash|stomp)\b")) return MasteryProperty.Push;
+
+        return null;
     }
 
     public static CreatureSize MapToCreatureSize(string? sizeStr)

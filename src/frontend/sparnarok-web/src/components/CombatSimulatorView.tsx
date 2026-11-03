@@ -14,6 +14,7 @@ import { LiveSessionModal } from './LiveSessionModal';
 import { PartyOnboardingModal } from './PartyOnboardingModal';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
+import { useDebounce } from '../hooks/useDebounce';
 
 export interface CombatSimulatorViewProps {
   creatures: CreatureResponseDto[];
@@ -95,6 +96,72 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<MontecarloResultDto | null>(null);
 
+  // Estados para búsqueda dinámica de criaturas y Lazy Ingestion desde Open5e en el Simulador
+  const [ingestedMonsters, setIngestedMonsters] = useState<CreatureResponseDto[]>([]);
+  const [monsterSearchTerm, setMonsterSearchTerm] = useState<string>('');
+  const debouncedMonsterSearch = useDebounce(monsterSearchTerm, 300);
+  const [isSearchingMonsters, setIsSearchingMonsters] = useState<boolean>(false);
+  const [monsterSearchResults, setMonsterSearchResults] = useState<CreatureResponseDto[]>([]);
+
+  // Efecto reactivo de búsqueda en tiempo real con debounce
+  useEffect(() => {
+    const trimmed = debouncedMonsterSearch.trim();
+    if (!trimmed) {
+      setMonsterSearchResults([]);
+      setIsSearchingMonsters(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsSearchingMonsters(true);
+
+    apiClient
+      .searchCreatures(trimmed, controller.signal)
+      .then((results) => {
+        setMonsterSearchResults(results);
+        setIngestedMonsters((prev) => {
+          const map = new Map<string, CreatureResponseDto>();
+          prev.forEach((c) => map.set(c.id, c));
+          results.forEach((c) => map.set(c.id, c));
+          return Array.from(map.values());
+        });
+      })
+      .catch((err) => {
+        if (err?.name !== 'AbortError') {
+          console.error('Error buscando criaturas en simulador:', err);
+        }
+      })
+      .finally(() => {
+        setIsSearchingMonsters(false);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedMonsterSearch]);
+
+  const handleAddSearchedMonsterToTeamB = (creature: CreatureResponseDto) => {
+    const newMember: TeamMemberConfig = {
+      id: `member-b-${Date.now()}-${teamB.length}`,
+      creatureId: creature.id,
+      weaponId: creature.expectedDpr ? undefined : weapons[0]?.id || '',
+    };
+    setTeamB((prev) => [...prev, newMember]);
+    setMonsterSearchTerm('');
+    setMonsterSearchResults([]);
+  };
+
+  const handleAddSearchedMonsterToTeamA = (creature: CreatureResponseDto) => {
+    const newMember: TeamMemberConfig = {
+      id: `member-a-${Date.now()}-${teamA.length}`,
+      creatureId: creature.id,
+      weaponId: creature.expectedDpr ? undefined : weapons[0]?.id || '',
+    };
+    setTeamA((prev) => [...prev, newMember]);
+    setMonsterSearchTerm('');
+    setMonsterSearchResults([]);
+  };
+
   // Carga inicial y reactiva de Partys y Encuentros persistidos
   useEffect(() => {
     let isMounted = true;
@@ -124,10 +191,11 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
     }
   }, [auth.user, creatorInGameName]);
 
-  // Catálogo unificado que incluye criaturas del bestiario y miembros cargados de partys/encuentros
+  // Catálogo unificado que incluye criaturas del bestiario, importadas por búsqueda y miembros de partys/encuentros
   const allCreatures = React.useMemo(() => {
     const map = new Map<string, CreatureResponseDto>();
     creatures.forEach((c) => map.set(c.id, c));
+    ingestedMonsters.forEach((c) => map.set(c.id, c));
     parties.forEach((p) => {
       p.members?.forEach((m) => {
         if (!map.has(m.id)) map.set(m.id, m);
@@ -139,7 +207,7 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
       });
     });
     return Array.from(map.values());
-  }, [creatures, parties, encounters]);
+  }, [creatures, ingestedMonsters, parties, encounters]);
 
   // Sincronizar selección inicial cuando las criaturas o armas cargan asíncronamente
   React.useEffect(() => {
@@ -739,6 +807,91 @@ export const CombatSimulatorView: React.FC<CombatSimulatorViewProps> = ({
                 🗑️ {t('simulation.clearTeam')}
               </button>
             </div>
+          </div>
+
+          {/* Buscador Dinámico de Criaturas SRD con Lazy Ingestion y Debounce */}
+          <div className="simulator-creature-search-container">
+            <div className="search-bar-wrapper">
+              <span className="search-icon">🔍</span>
+              <input
+                id="simulator-monster-search-input"
+                type="text"
+                className="search-input"
+                placeholder="Buscar e importar monstruos del SRD (ej. Beholder, Adult Dragon)..."
+                value={monsterSearchTerm}
+                onChange={(e) => setMonsterSearchTerm(e.target.value)}
+                disabled={isSimulating}
+              />
+              {isSearchingMonsters && (
+                <span
+                  id="sim-monster-search-spinner"
+                  className="spinner-inline search-spinner"
+                  style={{ marginRight: '8px' }}
+                  title="Consultando Open5e SRD e importando..."
+                  aria-label="Buscando monstruos..."
+                />
+              )}
+              {monsterSearchTerm && !isSearchingMonsters && (
+                <button
+                  type="button"
+                  className="clear-search-btn"
+                  onClick={() => {
+                    setMonsterSearchTerm('');
+                    setMonsterSearchResults([]);
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Resultados y sugerencias de Lazy Ingestion */}
+            {monsterSearchResults.length > 0 && (
+              <div className="simulator-search-results-popover">
+                <div className="search-results-header">
+                  <span className="search-results-title">
+                    Monstruos encontrados ({monsterSearchResults.length}):
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    onClick={() => setMonsterSearchResults([])}
+                  >
+                    ✕ Cerrar
+                  </button>
+                </div>
+                <div className="search-results-list">
+                  {monsterSearchResults.map((m) => (
+                    <div key={`sim-result-${m.id}`} className="search-result-row">
+                      <div className="search-result-info">
+                        <strong className="result-name">{m.name}</strong>
+                        <span className="result-stats">
+                          (CR {m.challengeRating} | CA {m.effectiveArmorClass} | {m.hitPoints.max} HP)
+                        </span>
+                      </div>
+                      <div className="search-result-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs"
+                          onClick={() => handleAddSearchedMonsterToTeamB(m)}
+                          title="Añadir al Encuentro (Equipo B)"
+                        >
+                          + Equipo B
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs"
+                          onClick={() => handleAddSearchedMonsterToTeamA(m)}
+                          title="Añadir a la Party (Equipo A)"
+                        >
+                          + Equipo A
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="team-members-list">

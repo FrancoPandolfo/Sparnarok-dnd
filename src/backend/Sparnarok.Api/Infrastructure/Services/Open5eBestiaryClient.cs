@@ -44,4 +44,26 @@ public class Open5eBestiaryClient : IOpen5eBestiaryClient
             throw;
         }
     }
+
+    /// <inheritdoc />
+    public async Task<Open5eMonsterListResponse> SearchMonstersAsync(string search, int limit = 20, CancellationToken ct = default)
+    {
+        var encoded = Uri.EscapeDataString(search?.Trim() ?? string.Empty);
+        var url = $"monsters/?search={encoded}&limit={limit}";
+        _logger.LogInformation("Buscando en Open5e Bestiary con término '{Search}' en {Url}...", search, url);
+
+        try
+        {
+            var response = await _httpClient.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
+
+            var data = await response.Content.ReadFromJsonAsync<Open5eMonsterListResponse>(JsonOptions, ct);
+            return data ?? new Open5eMonsterListResponse();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al buscar monstruos en Open5e con término '{Search}'", search);
+            return new Open5eMonsterListResponse();
+        }
+    }
 }

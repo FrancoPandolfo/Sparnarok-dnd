@@ -1,5 +1,6 @@
 using Sparnarok.Api.Application.DTOs;
 using Sparnarok.Api.Domain.Entities;
+using Sparnarok.Api.Domain.Enums;
 
 namespace Sparnarok.Api.Application.Interfaces;
 
@@ -22,4 +23,12 @@ public interface IOpen5eSyncService
     /// <param name="dto">DTO crudo de Open5e.</param>
     /// <returns>Entidad agregada <see cref="Creature"/> completamente inicializada.</returns>
     Creature MapToCreature(Open5eMonsterDto dto);
+
+    /// <summary>
+    /// Mapea un DTO de monstruo asignando heurísticamente fórmulas de daño y Maestrías de Armas 2024.
+    /// </summary>
+    /// <param name="dto">DTO crudo de Open5e.</param>
+    /// <param name="masteries">Diccionario de entidades WeaponMastery disponibles para vinculación táctica.</param>
+    /// <returns>Entidad <see cref="Creature"/> completamente inicializada.</returns>
+    Creature MapToCreature(Open5eMonsterDto dto, IReadOnlyDictionary<MasteryProperty, WeaponMastery>? masteries);
 }
