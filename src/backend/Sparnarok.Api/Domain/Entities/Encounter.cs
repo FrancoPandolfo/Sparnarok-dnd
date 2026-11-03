@@ -11,6 +11,12 @@ public class Encounter
     /// <summary>Identificador único del Encuentro.</summary>
     public Guid Id { get; private set; }
 
+    /// <summary>Identificador de la Party a la que pertenece el Encuentro.</summary>
+    public Guid? PartyId { get; private set; }
+
+    /// <summary>Navegación EF Core hacia la Party propietaria.</summary>
+    public Party? Party { get; private set; }
+
     /// <summary>Nombre del encuentro (ej. 'Emboscada de Bugbears en el Bosque').</summary>
     public string Name { get; private set; } = string.Empty;
 
@@ -32,13 +38,22 @@ public class Encounter
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="Encounter"/>.
     /// </summary>
-    public Encounter(Guid id, string name, Guid ownerUserId, string? difficultyNotes = null)
+    public Encounter(Guid id, string name, Guid ownerUserId, string? difficultyNotes = null, Guid? partyId = null)
     {
         Id = id;
+        PartyId = partyId;
         SetName(name);
         OwnerUserId = ownerUserId;
         DifficultyNotes = difficultyNotes?.Trim();
         CreatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Asigna o modifica la Party a la que pertenece este Encuentro.
+    /// </summary>
+    public void SetPartyId(Guid partyId)
+    {
+        PartyId = partyId;
     }
 
     /// <summary>

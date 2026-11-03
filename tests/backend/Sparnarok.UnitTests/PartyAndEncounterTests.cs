@@ -205,4 +205,91 @@ public class PartyAndEncounterTests
 
         await partyRepo.DidNotReceive().AddAsync(Arg.Any<Party>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task EncountersController_GetByPartyId_ReturnsEncountersMatchingPartyId()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var partyId = Guid.NewGuid();
+        var otherPartyId = Guid.NewGuid();
+
+        var encounter1 = new Encounter(Guid.NewGuid(), "Asalto a la Fortaleza", userId, "Difícil", partyId);
+        var encounter2 = new Encounter(Guid.NewGuid(), "Caza en la Pradera", userId, "Fácil", otherPartyId);
+
+        var encounterRepo = Substitute.For<IEncounterRepository>();
+        encounterRepo.GetAllByUserIdAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(new List<Encounter> { encounter1, encounter2 });
+
+        var creatureRepo = Substitute.For<ICreatureRepository>();
+        var validator = new CreateEncounterRequestValidator();
+        var controller = new EncountersController(encounterRepo, creatureRepo, validator);
+
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
+
+        // Act
+        var result = await controller.GetByPartyId(partyId, CancellationToken.None);
+
+        // Assert
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.StatusCode.Should().Be(StatusCodes.Status200OK);
+
+        var list = okResult.Value as IReadOnlyList<EncounterResponseDto>;
+        list.Should().NotBeNull();
+        list!.Should().ContainSingle(e => e.Id == encounter1.Id);
+    }
+
+    [Fact]
+    public async Task EncountersController_CreateForParty_AssignsPartyIdCorrectly()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var partyId = Guid.NewGuid();
+        var request = new CreateEncounterRequestDto("Emboscada en el Pantano", "Peligro Alto", new List<Guid>());
+
+        var encounterRepo = Substitute.For<IEncounterRepository>();
+        var creatureRepo = Substitute.For<ICreatureRepository>();
+        var validator = new CreateEncounterRequestValidator();
+        var controller = new EncountersController(encounterRepo, creatureRepo, validator);
+
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
+
+        // Act
+        var result = await controller.CreateForParty(partyId, request, CancellationToken.None);
+
+        // Assert
+        var createdAtResult = result.Result as CreatedAtActionResult;
+        createdAtResult.Should().NotBeNull();
+        createdAtResult!.StatusCode.Should().Be(StatusCodes.Status201Created);
+
+        await encounterRepo.Received(1).AddAsync(
+            Arg.Is<Encounter>(e => e.PartyId == partyId && e.OwnerUserId == userId && e.Name == request.Name),
+            Arg.Any<CancellationToken>()
+        );
+        await encounterRepo.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void SessionNote_UserId_ReturnsOwnerUserIdCorrectly()
+    {
+        // Arrange & Act
+        var partyId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var note = new SessionNote(Guid.NewGuid(), partyId, ownerUserId, "Diario de Viaje", "Encontramos una cueva misteriosa.");
+
+        // Assert: UserId debe coincidir estrictamente con OwnerUserId
+        note.UserId.Should().Be(ownerUserId);
+        note.PartyId.Should().Be(partyId);
+    }
 }

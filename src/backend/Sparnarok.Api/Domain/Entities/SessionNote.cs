@@ -14,6 +14,9 @@ public class SessionNote
     /// <summary>Identificador del usuario propietario y autor de la nota de sesión privada (Fase 3.7).</summary>
     public Guid OwnerUserId { get; private set; }
 
+    /// <summary>Identificador del usuario propietario (alias contextual para persistencia).</summary>
+    public Guid UserId => OwnerUserId;
+
     /// <summary>Título descriptivo de la nota o sesión (ej. 'Sesión 4: El templo subterráneo').</summary>
     public string Title { get; private set; } = string.Empty;
 
@@ -31,6 +34,9 @@ public class SessionNote
 
     /// <summary>Navegación EF Core hacia el Usuario propietario.</summary>
     public ApplicationUser? OwnerUser { get; private set; }
+
+    /// <summary>Navegación EF Core hacia el Usuario propietario (alias contextual).</summary>
+    public ApplicationUser? User => OwnerUser;
 
     /// <summary>Constructor protegido para Entity Framework Core.</summary>
     protected SessionNote() { }

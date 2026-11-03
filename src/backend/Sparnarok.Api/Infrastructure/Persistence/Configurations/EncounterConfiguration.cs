@@ -25,6 +25,16 @@ public class EncounterConfiguration : IEntityTypeConfiguration<Encounter>
 
         builder.HasIndex(e => e.OwnerUserId);
 
+        builder.Property(e => e.PartyId)
+            .IsRequired(false);
+
+        builder.HasIndex(e => e.PartyId);
+
+        builder.HasOne(e => e.Party)
+            .WithMany()
+            .HasForeignKey(e => e.PartyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Property(e => e.DifficultyNotes)
             .HasMaxLength(500)
             .IsRequired(false);
