@@ -369,4 +369,79 @@ public class EncountersController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Lista los encuentros tácticos asociados a una Party específica.
+    /// </summary>
+    [HttpGet("/api/v1/parties/{partyId:guid}/encounters")]
+    [ProducesResponseType(typeof(IReadOnlyList<EncounterResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<EncounterResponseDto>>> GetByPartyId(Guid partyId, CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue) return Unauthorized();
+
+        var encounters = await _encounterRepository.GetAllByUserIdAsync(userId.Value, ct);
+        var filtered = encounters
+            .Where(e => e.PartyId == partyId || e.PartyId == null)
+            .Select(EncounterResponseDto.FromEntity)
+            .ToList();
+
+        return Ok(filtered);
+    }
+
+    /// <summary>
+    /// Crea un nuevo encuentro táctico asignado al contexto de una Party específica.
+    /// </summary>
+    [HttpPost("/api/v1/parties/{partyId:guid}/encounters")]
+    [ProducesResponseType(typeof(EncounterResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<EncounterResponseDto>> CreateForParty(
+        Guid partyId,
+        [FromBody] CreateEncounterRequestDto request,
+        CancellationToken ct)
+    {
+        var validationResult = await _encounterValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(validationResult.ToDictionary()));
+        }
+
+        var userId = User.GetUserId();
+        if (!userId.HasValue) return Unauthorized();
+
+        var encounter = new Encounter(Guid.NewGuid(), request.Name, userId.Value, request.DifficultyNotes, partyId);
+
+        if (request.CreatureIds != null && request.CreatureIds.Count > 0)
+        {
+            foreach (var creatureId in request.CreatureIds)
+            {
+                var creature = await _creatureRepository.GetByIdAsync(creatureId, userId, ct);
+                if (creature != null)
+                {
+                    encounter.AddCreature(creature);
+                }
+            }
+        }
+
+        await _encounterRepository.AddAsync(encounter, ct);
+        await _encounterRepository.SaveChangesAsync(ct);
+
+        return CreatedAtAction(nameof(GetById), new { id = encounter.Id }, EncounterResponseDto.FromEntity(encounter));
+    }
+
+    /// <summary>
+    /// Elimina un encuentro táctico perteneciente a una Party.
+    /// </summary>
+    [HttpDelete("/api/v1/parties/{partyId:guid}/encounters/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteForParty(Guid partyId, Guid id, CancellationToken ct)
+    {
+        return await Delete(id, ct);
+    }
 }
+

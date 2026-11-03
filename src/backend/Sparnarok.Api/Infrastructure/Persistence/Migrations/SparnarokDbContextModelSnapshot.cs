@@ -386,9 +386,14 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("PartyId");
 
                     b.ToTable("Encounters", (string)null);
                 });
@@ -972,6 +977,16 @@ namespace Sparnarok.Api.Infrastructure.Persistence.Migrations
 
                     b.Navigation("HitPoints")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sparnarok.Api.Domain.Entities.Encounter", b =>
+                {
+                    b.HasOne("Sparnarok.Api.Domain.Entities.Party", "Party")
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Party");
                 });
 
             modelBuilder.Entity("Sparnarok.Api.Domain.Entities.PartyMember", b =>
