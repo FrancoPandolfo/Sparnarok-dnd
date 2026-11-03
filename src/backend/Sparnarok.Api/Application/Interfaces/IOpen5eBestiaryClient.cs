@@ -15,4 +15,13 @@ public interface IOpen5eBestiaryClient
     /// <param name="ct">Token de cancelación.</param>
     /// <returns>Respuesta con total y colección de monstruos.</returns>
     Task<Open5eMonsterListResponse> GetMonstersAsync(int limit = 50, int page = 1, CancellationToken ct = default);
+
+    /// <summary>
+    /// Realiza una búsqueda por término en el Bestiario de Open5e (Lazy Ingestion proxy).
+    /// </summary>
+    /// <param name="search">Término de búsqueda (ej. 'dragon', 'goblin').</param>
+    /// <param name="limit">Cantidad máxima de resultados solicitados.</param>
+    /// <param name="ct">Token de cancelación.</param>
+    /// <returns>Colección de monstruos coincidentes devueltos por Open5e.</returns>
+    Task<Open5eMonsterListResponse> SearchMonstersAsync(string search, int limit = 20, CancellationToken ct = default);
 }

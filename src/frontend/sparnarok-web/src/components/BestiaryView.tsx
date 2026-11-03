@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   CreatureResponseDto,
@@ -12,6 +12,8 @@ import { CreatureCard } from './CreatureCard';
 import { CreatureDetailModal } from './CreatureDetailModal';
 import { CreatureFormModal } from './CreatureFormModal';
 import { ActionFormModal } from './ActionFormModal';
+import { useDebounce } from '../hooks/useDebounce';
+import { apiClient } from '../services/apiClient';
 
 export interface BestiaryViewProps {
   creatures: CreatureResponseDto[];
@@ -59,11 +61,46 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
   const { t } = useTranslation();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
 
+  const [searchResults, setSearchResults] = useState<CreatureResponseDto[] | null>(null);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+
   const [selectedCreature, setSelectedCreature] = useState<CreatureResponseDto | null>(null);
   const [actionModalCreature, setActionModalCreature] = useState<CreatureResponseDto | null>(null);
+
+  // Efecto reactivo de búsqueda asíncrona con Lazy Ingestion y debounce de ~300ms
+  useEffect(() => {
+    const trimmed = debouncedSearchTerm.trim();
+    if (!trimmed) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsSearching(true);
+
+    apiClient
+      .searchCreatures(trimmed, controller.signal)
+      .then((data) => {
+        setSearchResults(data);
+      })
+      .catch((err) => {
+        if (err?.name !== 'AbortError') {
+          console.error('Error buscando criaturas:', err);
+        }
+      })
+      .finally(() => {
+        setIsSearching(false);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedSearchTerm]);
 
   // Normalizador de texto tolerante a tildes y mayúsculas
   const normalize = (val: string | undefined | null) =>
@@ -73,13 +110,15 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
       .replace(/[\u0300-\u036f]/g, '')
       .trim();
 
-  // Filtrado reactivo en memoria multi-criterio (Nombre, Tipo, Alineamiento, Acciones)
+  // Filtrado reactivo conectando la respuesta de la API con los filtros de tamaño y tipo
   const filteredCreatures = useMemo(() => {
     const term = normalize(searchTerm);
     const targetSize = normalize(selectedSize);
     const targetType = normalize(selectedType);
 
-    return creatures.filter((c) => {
+    const baseList = searchResults !== null ? searchResults : creatures;
+
+    return baseList.filter((c) => {
       const nameMatch = normalize(c.name).includes(term);
       const typeTextMatch = normalize(c.type).includes(term);
       const alignmentMatch = normalize(c.alignment).includes(term);
@@ -91,7 +130,7 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
 
       return matchesSearch && matchesSize && matchesType;
     });
-  }, [creatures, searchTerm, selectedSize, selectedType]);
+  }, [creatures, searchResults, searchTerm, selectedSize, selectedType]);
 
   const handleClearFilters = () => {
     setSearchTerm('');
@@ -143,7 +182,16 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          {searchTerm && (
+          {isSearching && (
+            <span
+              id="creature-search-spinner"
+              className="spinner-inline search-spinner"
+              style={{ marginRight: '8px' }}
+              title="Buscando e ingiriendo desde Open5e SRD..."
+              aria-label="Buscando criaturas..."
+            />
+          )}
+          {searchTerm && !isSearching && (
             <button
               type="button"
               className="clear-search-btn"
@@ -194,10 +242,21 @@ export const BestiaryView: React.FC<BestiaryViewProps> = ({
 
       <div className="bestiary-count-bar">
         <span>{t('bestiary.totalCount', { count: filteredCreatures.length })}</span>
+        {isSearching && (
+          <span className="search-loading-indicator" style={{ marginLeft: '12px', fontSize: '0.85rem', color: 'var(--color-gold)' }}>
+            <span className="spinner-inline" style={{ width: '0.75rem', height: '0.75rem', marginRight: '6px' }} />
+            Buscando e ingiriendo criaturas desde Open5e SRD...
+          </span>
+        )}
       </div>
 
       {/* Grid de Criaturas */}
-      {filteredCreatures.length === 0 ? (
+      {isSearching && filteredCreatures.length === 0 ? (
+        <div className="empty-state-box" id="creatures-loading-box">
+          <span className="spinner-inline" style={{ width: '2.5rem', height: '2.5rem', marginBottom: '1rem' }} />
+          <p className="empty-title">Consultando Códice y traduciendo criaturas de Open5e SRD...</p>
+        </div>
+      ) : filteredCreatures.length === 0 ? (
         <div className="empty-state-box">
           <div className="empty-icon">📜</div>
           <p className="empty-title">{t('bestiary.emptyState')}</p>

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BestiaryView } from './BestiaryView';
-import { INITIAL_CREATURES, CANONICAL_MASTERIES } from '../services/apiClient';
+import { apiClient, INITIAL_CREATURES, CANONICAL_MASTERIES } from '../services/apiClient';
 import i18n from '../i18n';
 
 describe('BestiaryView Component Suite', () => {
@@ -104,4 +104,30 @@ describe('BestiaryView Component Suite', () => {
       );
     });
   });
+
+  it('calls apiClient.searchCreatures upon debounced typing and renders results', async () => {
+    const searchSpy = vi.spyOn(apiClient, 'searchCreatures').mockResolvedValue([
+      {
+        ...INITIAL_CREATURES[0],
+        id: 'new-beholder-id',
+        name: 'Beholder Tyrant',
+      },
+    ]);
+
+    renderComponent();
+
+    const searchInput = screen.getByPlaceholderText('Buscar criatura por nombre...');
+    await userEvent.type(searchInput, 'Beholder');
+
+    await waitFor(
+      () => {
+        expect(searchSpy).toHaveBeenCalledWith('Beholder', expect.any(AbortSignal));
+        expect(screen.getByText('Beholder Tyrant')).toBeInTheDocument();
+      },
+      { timeout: 1500 }
+    );
+
+    searchSpy.mockRestore();
+  });
 });
+

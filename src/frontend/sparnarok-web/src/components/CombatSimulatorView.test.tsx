@@ -445,6 +445,74 @@ describe('CombatSimulatorView Component Suite (Party vs Encounter)', () => {
       expect(document.getElementById('status-feedback-banner')).toBeInTheDocument();
     });
   });
+
+  it('searches for monsters dynamically with debounce and adds found creature to Team B', async () => {
+    const searchedMonster: CreatureResponseDto = {
+      id: 'c-open5e-beholder',
+      name: 'Beholder Prime',
+      size: 'Large',
+      type: 'Aberration',
+      alignment: 'Lawful Evil',
+      challengeRating: 13,
+      speedFeet: 20,
+      proficiencyBonus: 5,
+      effectiveArmorClass: 18,
+      abilityScores: {
+        strength: 10,
+        strengthModifier: 0,
+        dexterity: 14,
+        dexterityModifier: 2,
+        constitution: 18,
+        constitutionModifier: 4,
+        intelligence: 17,
+        intelligenceModifier: 3,
+        wisdom: 15,
+        wisdomModifier: 2,
+        charisma: 17,
+        charismaModifier: 3,
+      },
+      hitPoints: { max: 180, current: 180, temporary: 0 },
+      armorClass: { base: 18, shieldBonus: 0, allowsDexterityModifier: false, maxDexterityModifier: null },
+      actions: [],
+      knownMasteries: [],
+      expectedDpr: 45,
+    };
+
+    const searchSpy = vi.spyOn(apiClient, 'searchCreatures').mockResolvedValue([searchedMonster]);
+
+    render(
+      <CombatSimulatorView
+        creatures={mockCreatures}
+        weapons={mockWeapons}
+        onRunSimulation={vi.fn()}
+        isAuthenticated={true}
+      />
+    );
+
+    const searchInput = document.getElementById('simulator-monster-search-input') as HTMLInputElement;
+    expect(searchInput).toBeInTheDocument();
+
+    await userEvent.type(searchInput, 'Beholder');
+
+    await waitFor(() => {
+      expect(searchSpy).toHaveBeenCalledWith('Beholder', expect.any(AbortSignal));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Beholder Prime')).toBeInTheDocument();
+    });
+
+    const addTeamBBtn = screen.getByRole('button', { name: /\+ Equipo B/i });
+    await userEvent.click(addTeamBBtn);
+
+    // Beholder Prime should now appear in Team B (both in member title and dropdown options)
+    await waitFor(() => {
+      const matches = screen.getAllByText(/Beholder Prime/i);
+      expect(matches.length).toBeGreaterThan(0);
+      expect(screen.getByText(/#2 Beholder Prime/i)).toBeInTheDocument();
+    });
+  });
 });
+
 
 
